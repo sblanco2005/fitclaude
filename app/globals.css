@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b0b0f;
+  --foreground: #ededed;
+  --card: #111118;
+  --card-hover: #1C1C26;
+  --border: #1C1C26;
+  --muted: #6B7280;
+  --primary: #10b981;
+  --primary-dark: #059669;
+  --primary-light: #34d399;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-border-dark: var(--border);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-light: var(--primary-light);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --font-sans: var(--font-display), sans-serif;
+  --font-mono: var(--font-mono-code), monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-display), 'Roboto', sans-serif;
+}
+
+@utility glass {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+@utility glass-hover {
+  &:hover {
+    background: rgba(51, 65, 85, 0.7);
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+}
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

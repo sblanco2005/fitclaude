@@ -1,0 +1,1019 @@
+{
+  "exercises": [
+    {
+      "name": "Barbell Bench Press",
+      "muscle_group": "chest",
+      "secondary_muscles": "triceps, anterior deltoids",
+      "equipment_required": "barbell, bench",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Retract scapulae, plant feet flat, lower bar to mid-chest with elbows at ~45 degrees, then press to full lockout.",
+      "variations": [
+        {
+          "name": "Tempo Bench Press (3-1-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "3-second eccentric, 1-second pause on chest, explosive concentric. Increases time under tension and eliminates momentum."
+        },
+        {
+          "name": "Close-Grip Bench Press",
+          "spicy_level": 2,
+          "modification_type": "grip",
+          "description": "Hands placed shoulder-width apart shifting emphasis to the triceps and inner chest fibers."
+        },
+        {
+          "name": "Paused Bench Press",
+          "spicy_level": 3,
+          "modification_type": "pause",
+          "description": "2-3 second dead stop on the chest eliminates the stretch reflex, building raw pressing strength off the chest."
+        }
+      ]
+    },
+    {
+      "name": "Incline Dumbbell Press",
+      "muscle_group": "chest",
+      "secondary_muscles": "anterior deltoids, triceps",
+      "equipment_required": "dumbbells, bench",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Set bench to 30-45 degrees, press dumbbells from shoulder level to full extension while keeping a slight arch and shoulder blades pinched.",
+      "variations": [
+        {
+          "name": "Single-Arm Incline Press",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "Press one dumbbell at a time to challenge anti-rotation stability through the core and correct side-to-side imbalances."
+        },
+        {
+          "name": "Incline Squeeze Press",
+          "spicy_level": 2,
+          "modification_type": "grip",
+          "description": "Press dumbbells together in a neutral grip throughout the movement, maintaining constant adduction tension on the upper pecs."
+        },
+        {
+          "name": "Low-Incline Press (15-degree)",
+          "spicy_level": 1,
+          "modification_type": "angle",
+          "description": "Reduced incline angle biases the clavicular head while allowing heavier loads compared to a steep incline."
+        }
+      ]
+    },
+    {
+      "name": "Dumbbell Fly",
+      "muscle_group": "chest",
+      "secondary_muscles": "anterior deltoids",
+      "equipment_required": "dumbbells, bench",
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "With a slight bend in the elbows, lower dumbbells in a wide arc until you feel a stretch across the chest, then squeeze back to the top.",
+      "variations": [
+        {
+          "name": "Tempo Fly (4-0-1-2)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "4-second eccentric with a 2-second squeeze at the top maximizes mechanical tension through the full range of motion."
+        },
+        {
+          "name": "Incline Dumbbell Fly",
+          "spicy_level": 1,
+          "modification_type": "angle",
+          "description": "Performed on a 30-degree incline to target the upper chest fibers with a deep stretch at the bottom."
+        },
+        {
+          "name": "Half-Rep Fly Burnout",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Perform full reps to failure, then continue with partial reps in the top half of the range to extend the set and maximize metabolic stress."
+        }
+      ]
+    },
+    {
+      "name": "Push-Up",
+      "muscle_group": "chest",
+      "secondary_muscles": "triceps, anterior deltoids, core",
+      "equipment_required": null,
+      "difficulty": "beginner",
+      "exercise_type": "compound",
+      "instructions": "Maintain a rigid plank position, lower chest to the floor with elbows tracking at 45 degrees, then press back up to full lockout.",
+      "variations": [
+        {
+          "name": "Deficit Push-Up",
+          "spicy_level": 2,
+          "modification_type": "angle",
+          "description": "Hands elevated on dumbbells or parallettes to increase range of motion and deepen the pec stretch at the bottom."
+        },
+        {
+          "name": "Tempo Push-Up (5-2-1-0)",
+          "spicy_level": 3,
+          "modification_type": "tempo",
+          "description": "5-second lowering phase with a 2-second pause at the bottom turns a simple push-up into a brutally effective hypertrophy stimulus."
+        },
+        {
+          "name": "Close-Stance Diamond Push-Up",
+          "spicy_level": 2,
+          "modification_type": "stance",
+          "description": "Hands form a diamond shape under the sternum, shifting the primary load to the triceps and inner chest."
+        }
+      ]
+    },
+    {
+      "name": "Conventional Deadlift",
+      "muscle_group": "back",
+      "secondary_muscles": "hamstrings, glutes, core, traps",
+      "equipment_required": "barbell",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Hinge at the hips with a flat back, grip the bar just outside the knees, and drive through the floor while keeping the bar tight to your body.",
+      "variations": [
+        {
+          "name": "Paused Deadlift (knee level)",
+          "spicy_level": 3,
+          "modification_type": "pause",
+          "description": "3-second pause at knee height eliminates momentum and builds positional strength in the most mechanically disadvantaged part of the lift."
+        },
+        {
+          "name": "Snatch-Grip Deadlift",
+          "spicy_level": 3,
+          "modification_type": "grip",
+          "description": "Ultra-wide grip increases range of motion and significantly raises upper back and trap demand."
+        },
+        {
+          "name": "Tempo Deadlift (4-0-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "Controlled 4-second eccentric builds body awareness and reinforces proper hip hinge patterning under load."
+        }
+      ]
+    },
+    {
+      "name": "Barbell Bent-Over Row",
+      "muscle_group": "back",
+      "secondary_muscles": "biceps, rear deltoids, core",
+      "equipment_required": "barbell",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Hinge forward to roughly 45 degrees, brace your core, and row the bar to your lower ribcage while driving the elbows behind you.",
+      "variations": [
+        {
+          "name": "Pendlay Row",
+          "spicy_level": 2,
+          "modification_type": "pause",
+          "description": "Each rep starts from a dead stop on the floor with torso parallel to the ground, emphasizing concentric power and eliminating momentum."
+        },
+        {
+          "name": "Underhand Barbell Row",
+          "spicy_level": 1,
+          "modification_type": "grip",
+          "description": "Supinated grip increases bicep involvement and allows the elbows to tuck tighter, targeting the lower lats."
+        },
+        {
+          "name": "Tempo Row (2-1-3-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "2-second concentric with a 1-second squeeze and 3-second eccentric forces strict form and amplifies mind-muscle connection."
+        }
+      ]
+    },
+    {
+      "name": "Pull-Up",
+      "muscle_group": "back",
+      "secondary_muscles": "biceps, forearms, core",
+      "equipment_required": "pull-up bar",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Initiate by depressing and retracting the scapulae, pull chin over the bar while driving elbows down and back, then lower with control.",
+      "variations": [
+        {
+          "name": "Wide-Grip Pull-Up",
+          "spicy_level": 2,
+          "modification_type": "grip",
+          "description": "Hands placed 1.5x shoulder width apart to bias the teres major and upper lats with a greater stretch at the bottom."
+        },
+        {
+          "name": "Tempo Pull-Up (1-2-4-0)",
+          "spicy_level": 3,
+          "modification_type": "tempo",
+          "description": "Explosive pull with a 2-second hold at the top and a 4-second eccentric builds immense lat strength through the full range."
+        },
+        {
+          "name": "Mixed-Grip Pull-Up",
+          "spicy_level": 2,
+          "modification_type": "grip",
+          "description": "One hand pronated, one supinated creates an asymmetric challenge that exposes and corrects grip and lat imbalances."
+        }
+      ]
+    },
+    {
+      "name": "Single-Arm Dumbbell Row",
+      "muscle_group": "back",
+      "secondary_muscles": "biceps, rear deltoids, core",
+      "equipment_required": "dumbbells, bench",
+      "difficulty": "beginner",
+      "exercise_type": "compound",
+      "instructions": "Support yourself on a bench with one hand, row the dumbbell to your hip while keeping the torso square and avoiding rotation.",
+      "variations": [
+        {
+          "name": "Dead-Stop Dumbbell Row",
+          "spicy_level": 2,
+          "modification_type": "pause",
+          "description": "Return the dumbbell to the floor on each rep and pause 1 second to eliminate the stretch reflex and build concentric power."
+        },
+        {
+          "name": "Meadows Row (landmine setup)",
+          "spicy_level": 3,
+          "modification_type": "angle",
+          "description": "Barbell in a landmine with a perpendicular stance creates a unique line of pull that hammers the lower lat insertion."
+        },
+        {
+          "name": "Tempo Row (3-1-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "Slow 3-second eccentric with a 1-second peak squeeze ensures strict mechanics and maximal lat fiber recruitment."
+        }
+      ]
+    },
+    {
+      "name": "Seated Cable Row",
+      "muscle_group": "back",
+      "secondary_muscles": "biceps, rear deltoids, rhomboids",
+      "equipment_required": "cables",
+      "difficulty": "beginner",
+      "exercise_type": "compound",
+      "instructions": "Sit upright with a slight lean, pull the handle to your lower sternum while squeezing your shoulder blades together at peak contraction.",
+      "variations": [
+        {
+          "name": "Wide-Grip Cable Row",
+          "spicy_level": 1,
+          "modification_type": "grip",
+          "description": "Using a wide bar attachment targets the mid-traps and rhomboids more than the lats."
+        },
+        {
+          "name": "Single-Arm Cable Row",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "Unilateral pulling allows for greater range of motion and rotational core engagement."
+        },
+        {
+          "name": "Paused Cable Row (2-sec squeeze)",
+          "spicy_level": 2,
+          "modification_type": "pause",
+          "description": "A 2-second isometric hold at full contraction maximizes scapular retractor engagement and eliminates cheating."
+        }
+      ]
+    },
+    {
+      "name": "Overhead Press",
+      "muscle_group": "shoulders",
+      "secondary_muscles": "triceps, upper chest, core",
+      "equipment_required": "barbell",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Brace core, press the bar from the front rack position straight overhead, finishing with the bar over mid-foot and biceps by the ears.",
+      "variations": [
+        {
+          "name": "Z-Press (seated on floor)",
+          "spicy_level": 3,
+          "modification_type": "stance",
+          "description": "Pressing while seated on the floor with legs extended removes all lower body assistance and demands extreme core stability."
+        },
+        {
+          "name": "Push Press",
+          "spicy_level": 2,
+          "modification_type": "intensity",
+          "description": "A slight knee dip generates leg drive to handle supramaximal loads, overloading the lockout and eccentric phases."
+        },
+        {
+          "name": "Tempo Strict Press (3-1-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "3-second eccentric with a brief pause at the shoulders forces strict mechanics and builds pressing endurance."
+        }
+      ]
+    },
+    {
+      "name": "Dumbbell Lateral Raise",
+      "muscle_group": "shoulders",
+      "secondary_muscles": "traps",
+      "equipment_required": "dumbbells",
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "With a slight bend in the elbows, raise dumbbells out to the sides until arms are parallel to the floor, leading with the elbows not the hands.",
+      "variations": [
+        {
+          "name": "Cable Lateral Raise",
+          "spicy_level": 1,
+          "modification_type": "load_curve",
+          "description": "Constant cable tension throughout the range of motion eliminates the dead zone at the bottom of the dumbbell version."
+        },
+        {
+          "name": "Lu Raise (Y-raise to lateral raise combo)",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Raise dumbbells to the front (Y-shape overhead), lower, then immediately lateral raise — doubling delt time under tension per rep."
+        },
+        {
+          "name": "Single-Arm Leaning Lateral Raise",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "Lean away from an upright holding a post to shift the resistance curve and increase tension at the bottom of the movement."
+        }
+      ]
+    },
+    {
+      "name": "Cable Face Pull",
+      "muscle_group": "shoulders",
+      "secondary_muscles": "rear deltoids, rhomboids, rotator cuff",
+      "equipment_required": "cables",
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "Pull the rope to your forehead level while externally rotating the hands apart at the end, squeezing the rear delts and mid-traps.",
+      "variations": [
+        {
+          "name": "Paused Face Pull (3-sec hold)",
+          "spicy_level": 2,
+          "modification_type": "pause",
+          "description": "A 3-second isometric hold at full external rotation builds rotator cuff endurance and reinforces scapular health."
+        },
+        {
+          "name": "Prone Incline Dumbbell Face Pull",
+          "spicy_level": 2,
+          "modification_type": "angle",
+          "description": "Lying face down on an incline bench and performing the pull with dumbbells removes all momentum and body english."
+        },
+        {
+          "name": "Band Pull-Apart to Face Pull",
+          "spicy_level": 1,
+          "modification_type": "intensity",
+          "description": "Combine a horizontal band pull-apart with a face pull in one smooth motion to hit both horizontal abduction and external rotation."
+        }
+      ]
+    },
+    {
+      "name": "Barbell Curl",
+      "muscle_group": "biceps",
+      "secondary_muscles": "forearms, brachialis",
+      "equipment_required": "barbell",
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "Keep elbows pinned to your sides, curl the bar in a smooth arc to shoulder height, and lower with control — no swinging.",
+      "variations": [
+        {
+          "name": "Tempo Curl (4-1-2-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "4-second eccentric and 2-second concentric eliminates momentum and maximizes bicep time under tension."
+        },
+        {
+          "name": "Wide-Grip Barbell Curl",
+          "spicy_level": 1,
+          "modification_type": "grip",
+          "description": "Wider grip biases the short head of the biceps, contributing more to bicep width and peak."
+        },
+        {
+          "name": "Paused Curl (mid-range hold)",
+          "spicy_level": 2,
+          "modification_type": "pause",
+          "description": "2-second pause at 90 degrees where leverage is worst builds isometric strength at the hardest point of the curl."
+        }
+      ]
+    },
+    {
+      "name": "Dumbbell Hammer Curl",
+      "muscle_group": "biceps",
+      "secondary_muscles": "brachioradialis, brachialis",
+      "equipment_required": "dumbbells",
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "Curl dumbbells with a neutral (palms-facing) grip, keeping elbows stationary and forearms moving in a straight line.",
+      "variations": [
+        {
+          "name": "Cross-Body Hammer Curl",
+          "spicy_level": 1,
+          "modification_type": "angle",
+          "description": "Curling across the body toward the opposite shoulder emphasizes the brachialis and long head of the biceps."
+        },
+        {
+          "name": "Alternating Slow-Eccentric Hammer Curl",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "Alternate arms with a 5-second lowering phase to isolate each arm and maximize eccentric damage per rep."
+        },
+        {
+          "name": "Kettlebell Hammer Curl",
+          "spicy_level": 2,
+          "modification_type": "load_curve",
+          "description": "The kettlebell's offset center of mass forces the forearm extensors and grip to work harder through the entire range."
+        }
+      ]
+    },
+    {
+      "name": "Tricep Dip",
+      "muscle_group": "triceps",
+      "secondary_muscles": "chest, anterior deltoids",
+      "equipment_required": null,
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Support yourself on parallel bars or a bench, lower until upper arms are parallel to the floor, then press up to full lockout keeping elbows tight.",
+      "variations": [
+        {
+          "name": "Weighted Dip",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Add a dip belt or hold a dumbbell between the feet to progressively overload once bodyweight becomes manageable."
+        },
+        {
+          "name": "Tempo Dip (4-2-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "4-second descent with a 2-second pause in the hole builds immense pressing strength from the most stretched position."
+        },
+        {
+          "name": "Bench Dip (narrow stance)",
+          "spicy_level": 1,
+          "modification_type": "stance",
+          "description": "Feet on the floor, hands on a bench behind you — a regression that isolates the triceps with reduced bodyweight load."
+        }
+      ]
+    },
+    {
+      "name": "Skull Crusher",
+      "muscle_group": "triceps",
+      "secondary_muscles": null,
+      "equipment_required": "barbell, bench",
+      "difficulty": "intermediate",
+      "exercise_type": "isolation",
+      "instructions": "Lying on a bench, lower the bar toward your forehead by bending only at the elbows, then extend back to lockout.",
+      "variations": [
+        {
+          "name": "Dumbbell Skull Crusher",
+          "spicy_level": 1,
+          "modification_type": "grip",
+          "description": "Using dumbbells allows a neutral grip that is easier on the elbows and allows independent arm tracking."
+        },
+        {
+          "name": "Incline Skull Crusher",
+          "spicy_level": 2,
+          "modification_type": "angle",
+          "description": "Performing on an incline bench increases the stretch on the long head of the triceps at the bottom for greater hypertrophy stimulus."
+        },
+        {
+          "name": "Eccentric-Overload Skull Crusher",
+          "spicy_level": 3,
+          "modification_type": "tempo",
+          "description": "5-second eccentric to the forehead then press back explosively to recruit high-threshold motor units during the concentric."
+        }
+      ]
+    },
+    {
+      "name": "Barbell Back Squat",
+      "muscle_group": "quadriceps",
+      "secondary_muscles": "glutes, hamstrings, core",
+      "equipment_required": "barbell",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Bar on upper traps, break at hips and knees simultaneously, descend until hip crease is below the knee, then drive up through mid-foot.",
+      "variations": [
+        {
+          "name": "Paused Back Squat (3-sec in the hole)",
+          "spicy_level": 3,
+          "modification_type": "pause",
+          "description": "3-second pause at the bottom eliminates the stretch reflex and develops raw strength and confidence in the deep position."
+        },
+        {
+          "name": "Tempo Squat (4-0-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "4-second descent builds eccentric strength, postural awareness, and is invaluable for grooving squat mechanics."
+        },
+        {
+          "name": "Narrow-Stance Squat",
+          "spicy_level": 2,
+          "modification_type": "stance",
+          "description": "Feet hip-width with toes forward shifts emphasis to the vastus medialis (inner quad) and demands greater ankle mobility."
+        }
+      ]
+    },
+    {
+      "name": "Barbell Front Squat",
+      "muscle_group": "quadriceps",
+      "secondary_muscles": "glutes, core, upper back",
+      "equipment_required": "barbell",
+      "difficulty": "advanced",
+      "exercise_type": "compound",
+      "instructions": "Bar rests on the front delts in a clean grip, keep elbows high, sit straight down maintaining an upright torso throughout.",
+      "variations": [
+        {
+          "name": "Zombie Front Squat (no hands)",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Arms extended straight in front forces an extremely upright torso and punishes any forward lean immediately."
+        },
+        {
+          "name": "Tempo Front Squat (3-2-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "3-second eccentric with a 2-second pause challenges thoracic extension endurance and quad strength in the deep position."
+        },
+        {
+          "name": "1.5-Rep Front Squat",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Descend fully, come halfway up, go back down, then stand all the way up — one rep. Doubles time under tension in the hardest range."
+        }
+      ]
+    },
+    {
+      "name": "Dumbbell Walking Lunge",
+      "muscle_group": "quadriceps",
+      "secondary_muscles": "glutes, hamstrings, core",
+      "equipment_required": "dumbbells",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Take a controlled step forward, lower the back knee toward the floor until both legs are at 90 degrees, then drive through the front heel to step forward.",
+      "variations": [
+        {
+          "name": "Reverse Lunge",
+          "spicy_level": 1,
+          "modification_type": "stance",
+          "description": "Stepping backward instead of forward reduces shear force on the front knee and is more glute-dominant."
+        },
+        {
+          "name": "Deficit Lunge (front foot elevated)",
+          "spicy_level": 2,
+          "modification_type": "angle",
+          "description": "Front foot on a 2-4 inch platform increases range of motion and stretch on the quads and glutes."
+        },
+        {
+          "name": "Overhead Lunge (dumbbell or kettlebell)",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Holding weight overhead while lunging demands tremendous core stability, shoulder endurance, and balance."
+        }
+      ]
+    },
+    {
+      "name": "Romanian Deadlift",
+      "muscle_group": "hamstrings",
+      "secondary_muscles": "glutes, lower back",
+      "equipment_required": "barbell",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Push hips back with a soft knee bend, slide the bar down the thighs until you feel a deep hamstring stretch, then drive hips forward to stand.",
+      "variations": [
+        {
+          "name": "Single-Leg Romanian Deadlift",
+          "spicy_level": 3,
+          "modification_type": "unilateral",
+          "description": "Unilateral version challenges balance and proprioception while exposing hamstring and glute asymmetries between sides."
+        },
+        {
+          "name": "Snatch-Grip Romanian Deadlift",
+          "spicy_level": 2,
+          "modification_type": "grip",
+          "description": "Ultra-wide grip increases range of motion and posterior chain demand while heavily loading the upper back."
+        },
+        {
+          "name": "Tempo RDL (5-0-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "5-second eccentric creates massive time under tension for the hamstrings and reinforces a proper hip hinge pattern."
+        }
+      ]
+    },
+    {
+      "name": "Dumbbell Leg Curl (prone on bench)",
+      "muscle_group": "hamstrings",
+      "secondary_muscles": null,
+      "equipment_required": "dumbbells, bench",
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "Lie face down on a bench with a dumbbell squeezed between your feet, curl your heels toward your glutes, then lower with control.",
+      "variations": [
+        {
+          "name": "Tempo Leg Curl (3-2-4-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "3-second concentric, 2-second squeeze at the top, and 4-second eccentric maximizes hamstring fiber recruitment."
+        },
+        {
+          "name": "Single-Leg Dumbbell Curl",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "Isolate one leg at a time to identify weaknesses and ensure balanced hamstring development."
+        },
+        {
+          "name": "Paused Leg Curl (top hold)",
+          "spicy_level": 2,
+          "modification_type": "pause",
+          "description": "3-second isometric hold at peak contraction trains the hamstrings in their fully shortened position, improving cramping resistance."
+        }
+      ]
+    },
+    {
+      "name": "Kettlebell Swing",
+      "muscle_group": "hamstrings",
+      "secondary_muscles": "glutes, core, shoulders",
+      "equipment_required": "kettlebells",
+      "difficulty": "intermediate",
+      "exercise_type": "plyometric",
+      "instructions": "Hike the kettlebell back between your legs, then snap the hips forward explosively to float the bell to chest height — power comes from the hips, not the arms.",
+      "variations": [
+        {
+          "name": "Single-Arm Kettlebell Swing",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "One-handed swing adds an anti-rotation demand through the core and challenges grip endurance."
+        },
+        {
+          "name": "American Kettlebell Swing (overhead)",
+          "spicy_level": 2,
+          "modification_type": "angle",
+          "description": "Swinging the bell fully overhead increases range of motion and adds a shoulder stability component."
+        },
+        {
+          "name": "Dead-Stop Swing",
+          "spicy_level": 3,
+          "modification_type": "pause",
+          "description": "Park the kettlebell on the ground between each rep, eliminating the backswing and forcing each rep to be generated from a dead start."
+        }
+      ]
+    },
+    {
+      "name": "Barbell Hip Thrust",
+      "muscle_group": "glutes",
+      "secondary_muscles": "hamstrings, core",
+      "equipment_required": "barbell, bench",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Upper back on a bench, barbell across the hips, drive through your heels to full hip extension while squeezing the glutes hard at the top.",
+      "variations": [
+        {
+          "name": "Paused Hip Thrust (3-sec at top)",
+          "spicy_level": 2,
+          "modification_type": "pause",
+          "description": "3-second hold at full hip extension forces maximal glute contraction and eliminates momentum-driven reps."
+        },
+        {
+          "name": "Single-Leg Hip Thrust",
+          "spicy_level": 3,
+          "modification_type": "unilateral",
+          "description": "One leg extended in the air doubles the load per glute and exposes any strength asymmetries."
+        },
+        {
+          "name": "Tempo Hip Thrust (2-3-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "2-second concentric with a 3-second eccentric increases time under tension where the glutes are maximally loaded."
+        }
+      ]
+    },
+    {
+      "name": "Bulgarian Split Squat",
+      "muscle_group": "glutes",
+      "secondary_muscles": "quadriceps, hamstrings, core",
+      "equipment_required": "dumbbells, bench",
+      "difficulty": "intermediate",
+      "exercise_type": "compound",
+      "instructions": "Rear foot elevated on a bench, drop the back knee straight down until the front thigh is parallel, then drive up through the front heel.",
+      "variations": [
+        {
+          "name": "Deficit Bulgarian Split Squat",
+          "spicy_level": 3,
+          "modification_type": "angle",
+          "description": "Front foot on a 2-4 inch platform increases the range of motion and deepens the stretch on the working glute."
+        },
+        {
+          "name": "Tempo Bulgarian (4-1-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "4-second descent with a brief pause at the bottom builds single-leg stability and quad/glute endurance."
+        },
+        {
+          "name": "Goblet-Hold Bulgarian Split Squat",
+          "spicy_level": 2,
+          "modification_type": "load_curve",
+          "description": "Holding a single dumbbell or kettlebell in a goblet position shifts the center of gravity forward, increasing core and quad demand."
+        }
+      ]
+    },
+    {
+      "name": "Glute Bridge",
+      "muscle_group": "glutes",
+      "secondary_muscles": "hamstrings, core",
+      "equipment_required": null,
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "Lie on your back with knees bent and feet flat, squeeze glutes to lift hips until your body forms a straight line from shoulders to knees.",
+      "variations": [
+        {
+          "name": "Single-Leg Glute Bridge",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "One leg extended in the air isolates each glute independently and challenges pelvic stability."
+        },
+        {
+          "name": "Banded Glute Bridge",
+          "spicy_level": 2,
+          "modification_type": "intensity",
+          "description": "A resistance band above the knees forces hip abduction throughout the movement, activating the gluteus medius and minimus."
+        },
+        {
+          "name": "Tempo Glute Bridge (2-5-1-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "2-second lift, 5-second hold at the top creates a brutal isometric challenge for the glutes."
+        }
+      ]
+    },
+    {
+      "name": "Plank",
+      "muscle_group": "core",
+      "secondary_muscles": "shoulders, glutes",
+      "equipment_required": null,
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "Forearms on the floor, body in a straight line from head to heels, brace as if bracing for a punch and hold — no sagging or piking.",
+      "variations": [
+        {
+          "name": "RKC Plank (maximal tension)",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Actively pull elbows toward toes and squeeze every muscle at max effort — turns a simple plank into a full-body isometric that can only be held for 10-15 seconds."
+        },
+        {
+          "name": "Plank Shoulder Tap",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "From a push-up plank, tap each shoulder alternately while resisting hip rotation — an anti-rotation core challenge."
+        },
+        {
+          "name": "Long-Lever Plank (arms extended forward)",
+          "spicy_level": 2,
+          "modification_type": "stance",
+          "description": "Walking the forearms further in front of the shoulders dramatically increases the lever arm and core demand."
+        }
+      ]
+    },
+    {
+      "name": "Hanging Leg Raise",
+      "muscle_group": "core",
+      "secondary_muscles": "hip flexors, forearms",
+      "equipment_required": "pull-up bar",
+      "difficulty": "intermediate",
+      "exercise_type": "isolation",
+      "instructions": "Hang from a bar, posteriorly tilt the pelvis, and raise your legs until at least parallel to the floor — avoid swinging.",
+      "variations": [
+        {
+          "name": "Toes-to-Bar",
+          "spicy_level": 3,
+          "modification_type": "angle",
+          "description": "Full range of motion with toes touching the bar demands advanced hip flexor strength and thoracic mobility."
+        },
+        {
+          "name": "Hanging Knee Raise (bent knee)",
+          "spicy_level": 1,
+          "modification_type": "intensity",
+          "description": "Bending the knees shortens the lever arm as a regression for building foundational hanging core strength."
+        },
+        {
+          "name": "Tempo Leg Raise (2-2-3-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "Controlled 2-second raise, 2-second hold at the top, and 3-second lower eliminates all momentum and isolates the abs."
+        }
+      ]
+    },
+    {
+      "name": "Ab Wheel Rollout",
+      "muscle_group": "core",
+      "secondary_muscles": "shoulders, lats, hip flexors",
+      "equipment_required": "ab wheel",
+      "difficulty": "intermediate",
+      "exercise_type": "isolation",
+      "instructions": "Kneel behind the wheel, brace your core, and roll out as far as you can control without letting your lower back hyperextend, then pull back.",
+      "variations": [
+        {
+          "name": "Standing Ab Wheel Rollout",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Rolling out from a standing position is an elite-level core exercise that demands extraordinary anti-extension strength."
+        },
+        {
+          "name": "Tempo Rollout (3-1-3-0)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "3-second extension and 3-second return with a 1-second pause at full extension amplifies time under tension."
+        },
+        {
+          "name": "Banded Ab Wheel Rollout",
+          "spicy_level": 1,
+          "modification_type": "load_curve",
+          "description": "Attach a band from a rack behind you to the wheel — the band assists at the hardest extended position, allowing fuller range of motion."
+        }
+      ]
+    },
+    {
+      "name": "Standing Calf Raise",
+      "muscle_group": "calves",
+      "secondary_muscles": null,
+      "equipment_required": "barbell",
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "Bar on your back or dumbbells in hand, rise onto your toes as high as possible, squeeze at the top, then lower heels below the step for a full stretch.",
+      "variations": [
+        {
+          "name": "Single-Leg Calf Raise",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "Unilateral raises with bodyweight ensure balanced calf development and allow full concentration on each side."
+        },
+        {
+          "name": "Tempo Calf Raise (2-3-3-1)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "2-second concentric, 3-second hold at the top, 3-second eccentric with a 1-second stretch at the bottom maximizes both soleus and gastroc stimulus."
+        },
+        {
+          "name": "Paused Calf Raise (top and bottom)",
+          "spicy_level": 2,
+          "modification_type": "pause",
+          "description": "2-second pause at full dorsiflexion and 2-second pause at full plantarflexion trains the calves through their complete contractile range."
+        }
+      ]
+    },
+    {
+      "name": "Seated Calf Raise",
+      "muscle_group": "calves",
+      "secondary_muscles": null,
+      "equipment_required": "barbell, bench",
+      "difficulty": "beginner",
+      "exercise_type": "isolation",
+      "instructions": "Seated with a barbell or dumbbell on the knees, rise onto the toes and squeeze — the bent-knee position isolates the soleus.",
+      "variations": [
+        {
+          "name": "Tempo Seated Calf Raise (3-2-3-1)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "3-second concentric, 2-second peak squeeze, 3-second eccentric, and 1-second stretch at the bottom for maximal soleus time under tension."
+        },
+        {
+          "name": "Single-Leg Seated Calf Raise",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "Performing one leg at a time allows for heavier relative loading and correction of calf imbalances."
+        },
+        {
+          "name": "High-Rep Seated Calf Raise (20-30 reps)",
+          "spicy_level": 1,
+          "modification_type": "intensity",
+          "description": "The soleus is predominantly slow-twitch and responds well to higher rep ranges with controlled execution."
+        }
+      ]
+    },
+    {
+      "name": "Rowing Intervals (Concept 2)",
+      "muscle_group": "full_body",
+      "secondary_muscles": "quadriceps, hamstrings, back, biceps, core",
+      "equipment_required": "rower",
+      "difficulty": "intermediate",
+      "exercise_type": "cardio",
+      "instructions": "Drive with the legs first, then swing the body, then pull with the arms — reverse the sequence on the recovery. Maintain a 1:2 work-to-recovery ratio on the slide.",
+      "variations": [
+        {
+          "name": "500m Repeats (sprint intervals)",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "All-out 500m efforts with 2-3 minutes rest between sets builds anaerobic capacity and peak power output."
+        },
+        {
+          "name": "Damper 10 Power Pulls",
+          "spicy_level": 2,
+          "modification_type": "load_curve",
+          "description": "Set the damper to max, perform 10 powerful single strokes with full resets between each pull to build rowing-specific maximal power."
+        },
+        {
+          "name": "Slow-Rate Rowing (18-20 SPM)",
+          "spicy_level": 1,
+          "modification_type": "tempo",
+          "description": "Low stroke rate forces you to generate more power per stroke while building aerobic base and technical efficiency."
+        }
+      ]
+    },
+    {
+      "name": "Assault Runner Sprints",
+      "muscle_group": "full_body",
+      "secondary_muscles": "quadriceps, hamstrings, calves, core, hip flexors",
+      "equipment_required": "assault runner",
+      "difficulty": "intermediate",
+      "exercise_type": "cardio",
+      "instructions": "Lean slightly forward, drive with the balls of your feet, pump your arms aggressively — the belt is self-powered so effort directly controls speed.",
+      "variations": [
+        {
+          "name": "10/20 Intervals (10 sec sprint / 20 sec walk)",
+          "spicy_level": 2,
+          "modification_type": "intensity",
+          "description": "Short maximal sprints with incomplete rest develop alactic power and recovery between high-intensity efforts."
+        },
+        {
+          "name": "Calorie Target Sprints",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Sprint until you hit a calorie target (e.g., 15 cals) then rest — forces maximal output as calories get harder to earn at higher intensities."
+        },
+        {
+          "name": "Incline Walk (hands-free)",
+          "spicy_level": 1,
+          "modification_type": "tempo",
+          "description": "Steady-state walking without holding the handles builds aerobic base while challenging balance and posterior chain endurance."
+        }
+      ]
+    },
+    {
+      "name": "Burpee",
+      "muscle_group": "full_body",
+      "secondary_muscles": "chest, shoulders, triceps, quadriceps, hip flexors, core",
+      "equipment_required": null,
+      "difficulty": "intermediate",
+      "exercise_type": "plyometric",
+      "instructions": "Drop to the floor with chest touching, push up, jump feet under your hips, and explode into a jump with full hip extension at the top.",
+      "variations": [
+        {
+          "name": "Burpee to Pull-Up",
+          "spicy_level": 3,
+          "modification_type": "intensity",
+          "description": "Perform a standard burpee under a pull-up bar and jump into a pull-up at the top — combines pushing and pulling in one brutal movement."
+        },
+        {
+          "name": "Tempo Burpee (controlled descent)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "Slow, controlled lowering to the floor with a deliberate push-up turns a chaotic movement into a controlled strength-endurance exercise."
+        },
+        {
+          "name": "Lateral Burpee (over dumbbell)",
+          "spicy_level": 2,
+          "modification_type": "stance",
+          "description": "Perform the burpee then jump laterally over a dumbbell adding a frontal-plane athletic component and coordination challenge."
+        }
+      ]
+    },
+    {
+      "name": "Farmer's Carry",
+      "muscle_group": "full_body",
+      "secondary_muscles": "traps, forearms, core, glutes, calves",
+      "equipment_required": "dumbbells, kettlebells",
+      "difficulty": "beginner",
+      "exercise_type": "compound",
+      "instructions": "Pick up heavy dumbbells or kettlebells, stand tall with shoulders packed down and back, and walk with controlled steps while maintaining a rigid torso.",
+      "variations": [
+        {
+          "name": "Single-Arm Suitcase Carry",
+          "spicy_level": 2,
+          "modification_type": "unilateral",
+          "description": "Carrying load on one side only creates a massive anti-lateral-flexion demand on the obliques and quadratus lumborum."
+        },
+        {
+          "name": "Overhead Carry (waiter's walk)",
+          "spicy_level": 3,
+          "modification_type": "angle",
+          "description": "Holding a kettlebell locked out overhead challenges shoulder stability, thoracic extension, and full-body coordination under load."
+        },
+        {
+          "name": "Tempo Carry (slow march)",
+          "spicy_level": 2,
+          "modification_type": "tempo",
+          "description": "Deliberately slow, exaggerated steps with a brief single-leg pause each step increases time under tension and balance demand."
+        }
+      ]
+    },
+    {
+      "name": "Turkish Get-Up",
+      "muscle_group": "full_body",
+      "secondary_muscles": "shoulders, core, glutes, quadriceps, triceps",
+      "equipment_required": "kettlebells",
+      "difficulty": "advanced",
+      "exercise_type": "compound",
+      "instructions": "From lying flat with a kettlebell locked out overhead, move through a precise sequence — roll to elbow, post to hand, bridge, sweep leg, kneel, stand — then reverse it all back down.",
+      "variations": [
+        {
+          "name": "Half Get-Up (floor to seated)",
+          "spicy_level": 1,
+          "modification_type": "intensity",
+          "description": "Stop at the tall-sit position and reverse back down — a regression that isolates the most core-intensive portion of the movement."
+        },
+        {
+          "name": "Tempo Get-Up (5-sec per transition)",
+          "spicy_level": 3,
+          "modification_type": "tempo",
+          "description": "Hold each of the 7 positions for 5 seconds, turning one rep into a 70-second full-body stability and endurance challenge."
+        },
+        {
+          "name": "Bottom-Up Kettlebell Get-Up",
+          "spicy_level": 3,
+          "modification_type": "load_curve",
+          "description": "Holding the kettlebell upside-down by the handle demands extreme grip strength and shoulder stabilizer activation throughout the entire movement."
+        }
+      ]
+    }
+  ]
+}
