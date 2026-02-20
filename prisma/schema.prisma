@@ -34,6 +34,7 @@ model User {
   sex                String?   // male, female, other, prefer_not_to_say
   trainingFrequency  Int?      // days per week, 1–7
   isOnboarded        Boolean   @default(false)
+  isAdmin            Boolean   @default(false)
 
   // NextAuth relations
   accounts      Account[]
@@ -106,6 +107,7 @@ model Exercise {
 
   variations       ExerciseVariation[]
   workoutExercises WorkoutExercise[]
+  videos           ExerciseVideo[]
 
   @@index([muscleGroup])
   @@map("exercises")
@@ -218,4 +220,71 @@ model ConversationHistory {
   @@index([userId])
   @@index([userId, createdAt])
   @@map("conversation_history")
+}
+
+// ============================================
+// YouTube Subagent — Pending Review
+// ============================================
+
+model PendingExercise {
+  id                String    @id @default(cuid())
+  name              String
+  muscleGroup       String
+  secondaryMuscles  String?
+  equipmentRequired String?
+  difficulty        String    @default("intermediate")
+  exerciseType      String    // compound, isolation, cardio, stretch, plyometric
+  instructions      String?   @db.Text
+  youtubeVideoId    String?
+  youtubeUrl        String?
+  channelName       String?
+  thumbnailUrl      String?
+  status            String    @default("pending") // pending, approved, rejected
+  reviewedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  pendingVariations PendingVariation[]
+
+  @@index([status])
+  @@map("pending_exercises")
+}
+
+model PendingVariation {
+  id                  String  @id @default(cuid())
+  pendingExerciseId   String
+  name                String
+  spicyLevel          Int     @default(1)
+  modificationType    String
+  description         String  @db.Text
+  additionalEquipment String?
+
+  pendingExercise PendingExercise @relation(fields: [pendingExerciseId], references: [id], onDelete: Cascade)
+
+  @@index([pendingExerciseId])
+  @@map("pending_variations")
+}
+
+model ExerciseVideo {
+  id             String    @id @default(cuid())
+  exerciseId     String?
+  exerciseName   String
+  youtubeVideoId String
+  youtubeUrl     String
+  title          String
+  channelName    String?
+  thumbnailUrl   String?
+  duration       String?   // ISO 8601 e.g. "PT5M30S"
+  viewCount      Int?
+  status         String    @default("pending") // pending, approved, rejected
+  videoType      String    @default("tutorial") // tutorial (form-specific), reference (general/compilation)
+  isPrimary      Boolean   @default(false)
+  reviewedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  exercise Exercise? @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+
+  @@unique([exerciseId, youtubeVideoId])
+  @@index([status])
+  @@index([exerciseId])
+  @@map("exercise_videos")
 }

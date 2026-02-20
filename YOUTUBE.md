@@ -40,3 +40,18 @@ DB-wise you'd just need two new tables:
 pending_exercises — name, description, muscle_groups, equipment, difficulty, youtube_url, source, status, created_at
 pending_video_links — exercise_id (FK), youtube_url, match_confidence, status, created_at
 This keeps your main exercise library clean and gives you full control. Want me to help you scaffold the schema and the FastAPI routes for this?
+
+Yes, the classification of "tutorial" vs "reference" is based on the video title. Here's exactly what happens in classify_video_type():
+
+The function looks at the YouTube video title and checks for these signals:
+
+Signal	Example Title	Result
+Number > 1 + fitness keyword	"10 Best Back Exercises"	reference
+Plural "exercises"	"Chest Exercises for Mass"	reference
+Superlative + muscle group (without exercise name)	"Best Shoulder Workouts"	reference
+Workout/training + muscle group (without exercise name)	"Leg Day Routine"	reference
+Everything else	"How to Barbell Deadlift Proper Form"	tutorial
+The key distinction: if the title contains the specific exercise name (e.g. "Deadlift"), it leans toward tutorial. If it's generic muscle group language with no specific exercise, it's reference.
+
+This classification happens automatically when the Video Linker imports videos. You can still override it manually in the admin page by choosing "Tutorial" or "Reference" when approving.
+

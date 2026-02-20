@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { useFitClaude } from '@/context/FitClaudeContext';
 import type { Workout, WorkoutExercise } from '@/types';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -962,10 +963,11 @@ function ExerciseLogRow({
     }
   };
 
+  const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
+
   const toggleExpand = () => {
-    if (!isRunning) return;
     setExpanded((v) => !v);
-    if (!expanded) {
+    if (!expanded && isRunning) {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
@@ -1045,6 +1047,20 @@ function ExerciseLogRow({
           <p className="text-[9px] text-slate-600 mt-1 font-medium">
             Format: set@weightxreps — e.g. 1@195x4 2@200x5
           </p>
+        </div>
+      )}
+
+      {/* YouTube tutorial video */}
+      {expanded && videoId && (
+        <div className="ml-7 mt-2">
+          <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}`}
+              className="w-full h-full"
+              allowFullScreen
+              loading="lazy"
+            />
+          </div>
         </div>
       )}
     </div>
@@ -1318,6 +1334,7 @@ function FinishedWorkoutCard({
 type Tab = 'routines' | 'hitit';
 
 export default function WorkoutsPage() {
+  const { chatOpen } = useFitClaude();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('routines');
@@ -1329,12 +1346,18 @@ export default function WorkoutsPage() {
 
   const fetchWorkouts = useCallback(() => {
     fetch('/api/workouts?daysBack=90')
-      .then((r) => r.json())
-      .then((data: Workout[]) => {
-        setWorkouts(data);
+      .then((r) => {
+        if (!r.ok) throw new Error(`API ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        setWorkouts(Array.isArray(data) ? data : []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setWorkouts([]);
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -1444,10 +1467,12 @@ export default function WorkoutsPage() {
     );
   }
 
+  const pageHeight = chatOpen ? 'h-[calc(100vh-4rem-50vh)]' : 'h-[calc(100vh-4rem)]';
+
   // ── Full-screen detail view ──
   if (selectedRoutine && selectedGroup) {
     return (
-      <div className="h-[calc(100vh-4rem)] max-w-lg mx-auto flex flex-col">
+      <div className={`${pageHeight} max-w-lg mx-auto flex flex-col`}>
         <RoutineDetail
           workouts={selectedGroup}
           onBack={() => setSelectedRoutine(null)}
@@ -1465,7 +1490,7 @@ export default function WorkoutsPage() {
 
   // ── List view ──
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-lg mx-auto">
+    <div className={`flex flex-col ${pageHeight} max-w-lg mx-auto`}>
       {/* Tab bar */}
       <div className="flex gap-1 p-4 pb-2 shrink-0">
         {([

@@ -84,3 +84,11 @@ frontend/
 ## Workout page
 - For the workout page, i need to see a list on the left scrollable of all the routines i created, i should be able to quicly chek the whole rutine. maybe you click on the routine and tells you what muscles they work and the detail of the workout and another section (like 3 sections) with the past workouts logs
 When you select the routine you should have exactly the information that you suggested,I want to see all of it. Then additional called Hit It with i should be able to move the button from routine to hit it to indicate that the workout has started. then the routine will have a stop button that will indicate when  i finish the workout. while the routine is in Hit it, we will give the user 2 hours for them to move it to complete or back to routine or the app will automatically move it back 
+
+## 
+-ok let's crete an additional section/button to see all my single exercies and othe section to see videos (in general for back, biceps etc.. from you tube). When i import videos, you will be able to determine if it's a single exercise video or a video in general for a specific mucle group. The keys to determine that is in the title of the vidoe if it says the word "Exercises in plural" or "a number more than 1" or a generic word, "legs,chest etc..) then you will know are videos for a muscle grouo (back etc..)
+
+-another feature in the videos section is to either approve, reject/ dismi. If i approve or Reject idon't want you to fetch it again, if i dismish we can fetch it again. 
+
+
+lastly i want to be able to add an exercise manually and then run the video search to look for that especific scenario so i can add it to the list manually 

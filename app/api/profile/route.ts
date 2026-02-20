@@ -23,6 +23,7 @@ export const GET = withAuth(async (_request, user) => {
       sex: true,
       trainingFrequency: true,
       isOnboarded: true,
+      isAdmin: true,
     },
   });
 

@@ -205,6 +205,21 @@ export default function SettingsPage() {
         />
       </Card>
 
+      {/* Admin link */}
+      {profile.isAdmin && (
+        <Card>
+          <a
+            href="/admin"
+            className="flex items-center justify-between py-1 text-sm font-bold text-primary hover:text-white transition-colors"
+          >
+            <span>Admin Review</span>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+        </Card>
+      )}
+
       {/* Save */}
       <div className="flex gap-3">
         <Button onClick={save} disabled={saving} className="flex-1">

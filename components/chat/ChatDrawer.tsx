@@ -222,12 +222,12 @@ export function ChatDrawer() {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 z-40"
+        className="fixed inset-0 bg-black/30 z-40"
         onClick={() => setChatOpen(false)}
       />
 
       {/* Drawer */}
-      <div className="fixed left-0 right-0 bottom-0 z-50 h-[85vh] flex flex-col bg-background rounded-t-2xl shadow-2xl">
+      <div className="fixed left-0 right-0 bottom-0 z-50 h-[50vh] flex flex-col bg-background rounded-t-2xl shadow-2xl">
         {/* Drag handle + header */}
         <div className="shrink-0">
           <div className="flex justify-center py-2">

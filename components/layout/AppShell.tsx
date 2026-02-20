@@ -2,12 +2,14 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
+import { useFitClaude } from '@/context/FitClaudeContext';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { chatOpen } = useFitClaude();
   const isAuthPage = pathname.startsWith('/auth') || pathname === '/onboarding';
   const isChatPage = pathname === '/chat';
 

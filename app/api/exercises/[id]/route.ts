@@ -13,6 +13,10 @@ export async function GET(
       variations: {
         orderBy: { spicyLevel: 'asc' },
       },
+      videos: {
+        where: { status: 'approved' },
+        orderBy: { isPrimary: 'desc' },
+      },
     },
   });
 
