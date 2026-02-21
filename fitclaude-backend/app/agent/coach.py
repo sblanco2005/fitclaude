@@ -55,12 +55,15 @@ async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
 
 
 async def _load_conversation_history(
-    db: AsyncSession, user_id: str, limit: int = 20
+    db: AsyncSession, user_id: str, topic: str = "workout", limit: int = 20
 ) -> list[dict]:
-    """Load recent conversation history as messages array."""
+    """Load recent conversation history filtered by topic."""
     result = await db.execute(
         select(ConversationHistory)
-        .where(ConversationHistory.user_id == user_id)
+        .where(
+            ConversationHistory.user_id == user_id,
+            ConversationHistory.topic == topic,
+        )
         .order_by(ConversationHistory.created_at.desc())
         .limit(limit)
     )
@@ -97,6 +100,73 @@ async def _execute_tool(
         return {"error": f"Unknown tool: {tool_name}"}
 
 
+import re
+
+
+def _normalize_name(name: str) -> str:
+    """Normalize an exercise name for comparison: lowercase, strip parenthetical, collapse spaces."""
+    n = name.lower().strip()
+    n = re.sub(r"\s*\(.*?\)\s*", " ", n)  # Remove parenthetical like "(Dumbbells)"
+    n = re.sub(r"\s+", " ", n).strip()
+    return n
+
+
+def _name_words(name: str) -> set[str]:
+    """Get the set of significant words from a name."""
+    return set(_normalize_name(name).split())
+
+
+def _match_exercise(name: str, all_exercises: list) -> "Exercise | None":
+    """Smart exercise name matching with multiple strategies.
+
+    1. Exact match (case-insensitive)
+    2. Normalized match (strip parenthetical, compare)
+    3. Word-set match (all significant words of one name contained in the other)
+    4. Substring match (DB name contains input or vice versa)
+    """
+    name_lower = name.lower().strip()
+    name_norm = _normalize_name(name)
+    name_words = _name_words(name)
+
+    # Strategy 1: Exact case-insensitive
+    for ex in all_exercises:
+        if ex.name.lower().strip() == name_lower:
+            return ex
+
+    # Strategy 2: Normalized match (e.g. "Lateral Raise (Dumbbells)" == "Lateral Raise")
+    for ex in all_exercises:
+        if _normalize_name(ex.name) == name_norm:
+            return ex
+
+    # Strategy 3: Word-set overlap (handles word-order differences)
+    # e.g. "Lateral Raise (Dumbbells)" words = {lateral, raise} matches "Dumbbell Lateral Raise"
+    best_match = None
+    best_score = 0.0
+    for ex in all_exercises:
+        ex_words = _name_words(ex.name)
+        overlap = name_words & ex_words
+        if len(overlap) < 2:
+            continue
+        # Require the smaller set to be mostly contained in the larger
+        smaller = min(len(name_words), len(ex_words))
+        score = len(overlap) / smaller
+        if score > best_score:
+            best_score = score
+            best_match = ex
+
+    # Require at least 80% of the smaller word-set to match
+    if best_match and best_score >= 0.8:
+        return best_match
+
+    # Strategy 4: Substring (DB name contains input name or vice versa)
+    for ex in all_exercises:
+        ex_lower = ex.name.lower()
+        if name_lower in ex_lower or ex_lower in name_lower:
+            return ex
+
+    return None
+
+
 async def _tool_generate_workout(
     db: AsyncSession, user_id: str, params: dict
 ) -> dict:
@@ -119,6 +189,7 @@ async def _tool_generate_workout(
         id=cuid_generator.generate(),
         user_id=user_id,
         workout_type=params["workout_type"],
+        category=params.get("category", "lifting"),
         name=workout_name,
         date=datetime.utcnow(),
         display_id=next_display_id,
@@ -126,6 +197,10 @@ async def _tool_generate_workout(
     )
     db.add(workout)
     await db.flush()
+
+    # Pre-load all exercises for matching
+    all_exercises_result = await db.execute(select(Exercise))
+    all_exercises = all_exercises_result.scalars().all()
 
     # Store exercises — look up from DB to link exerciseId
     exercises_data = params.get("exercises", [])
@@ -135,21 +210,25 @@ async def _tool_generate_workout(
         exercise_id = None
         ex_name = ex.get("name", "")
         if ex_name:
-            # Try exact match first, then fuzzy
-            result = await db.execute(
-                select(Exercise).where(func.lower(Exercise.name) == ex_name.lower())
-            )
-            found = result.scalars().first()
-            if not found:
-                result = await db.execute(
-                    select(Exercise).where(Exercise.name.ilike(f"%{ex_name}%")).limit(1)
-                )
-                found = result.scalars().first()
+            found = _match_exercise(ex_name, all_exercises)
             if found:
                 exercise_id = found.id
-                logger.info(f"[Coach] Linked exercise '{ex_name}' -> DB id {found.id}")
+                logger.info(f"[Coach] Linked exercise '{ex_name}' -> '{found.name}' (id {found.id})")
             else:
-                logger.info(f"[Coach] Exercise '{ex_name}' not found in DB, storing without link")
+                # Auto-add to exercise library so Video Linker can find tutorials later
+                muscle_group = ex.get("muscle_group", "full_body")
+                new_exercise = Exercise(
+                    id=cuid_generator.generate(),
+                    name=ex_name,
+                    muscle_group=muscle_group,
+                    difficulty="intermediate",
+                    exercise_type="compound",
+                )
+                db.add(new_exercise)
+                await db.flush()
+                exercise_id = new_exercise.id
+                all_exercises.append(new_exercise)
+                logger.info(f"[Coach] Auto-added exercise '{ex_name}' to library -> {new_exercise.id}")
 
         # Store notes in pipe-delimited format: name|muscleGroup|coachingTip
         # This allows the frontend to parse exercise info even when not linked to DB
@@ -178,15 +257,17 @@ async def _tool_generate_workout(
 
     return {
         "workout_id": workout.id,
-        "display_id": workout.display_id,
+        "display_number": workout.display_id,
         "workout_type": workout.workout_type,
+        "category": workout.category,
         "name": workout.name,
         "exercises_stored": len(stored),
         "exercises": stored,
         "message": (
             f"Routine #{workout.display_id} created with {len(stored)} exercises stored. "
             "Present the full workout to the user with coaching tips. "
-            f"The user can refer to this routine as #{workout.display_id}."
+            f"The user can refer to this routine as #{workout.display_id}. "
+            "IMPORTANT: Never show the workout_id to the user — only refer to the routine by its display_number."
         ),
     }
 
@@ -248,8 +329,7 @@ async def _tool_get_workout_history(
     return {
         "workouts": [
             {
-                "id": w.id,
-                "display_id": w.display_id,
+                "display_number": w.display_id,
                 "date": str(w.date),
                 "type": w.workout_type,
                 "name": w.name,
@@ -322,6 +402,7 @@ async def handle_chat(
     user_id: str,
     user_message: str,
     db: AsyncSession,
+    topic: str = "workout",
     image_base64: str | None = None,
     image_media_type: str | None = None,
 ) -> dict:
@@ -335,7 +416,7 @@ async def handle_chat(
     # Load context
     user_data = await _load_user_context(db, user_id)
     context = build_user_context(user_data)
-    history = await _load_conversation_history(db, user_id)
+    history = await _load_conversation_history(db, user_id, topic=topic)
 
     # Build user content — text only, or text + image for vision
     if image_base64 and image_media_type:
@@ -377,16 +458,19 @@ async def handle_chat(
                 logger.info(f"[Coach] Tool call: {block.name} with input keys: {list(block.input.keys())}")
                 result = await _execute_tool(block.name, block.input, user_id, db)
                 logger.info(f"[Coach] Tool result keys: {list(result.keys())}")
-                # Track IDs for response
+                # Track IDs for response (but strip from what Claude sees)
                 if "workout_id" in result:
                     workout_id = result["workout_id"]
                 if "nutrition_log_id" in result:
                     nutrition_log_id = result["nutrition_log_id"]
 
+                # Strip internal IDs before sending to Claude
+                claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id")}
+
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
-                    "content": json.dumps(result),
+                    "content": json.dumps(claude_result),
                 })
 
         messages.append({"role": "assistant", "content": response.content})

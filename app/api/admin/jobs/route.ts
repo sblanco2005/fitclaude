@@ -7,7 +7,7 @@ const BACKEND_URL =
 export const POST = withAdmin(async (request: NextRequest) => {
   const { job } = await request.json();
 
-  if (!['video-linking', 'video-discovery', 'exercise-discovery'].includes(job)) {
+  if (!['video-linking', 'video-discovery'].includes(job)) {
     return NextResponse.json({ error: 'Invalid job name' }, { status: 400 });
   }
 

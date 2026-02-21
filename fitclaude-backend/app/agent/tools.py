@@ -18,7 +18,15 @@ TOOL_DEFINITIONS = [
                         "push", "pull", "legs", "upper", "lower",
                         "full_body", "cardio", "custom",
                     ],
-                    "description": "The type of workout to generate",
+                    "description": "The split/type of workout (push/pull/legs for lifting, or custom/cardio/full_body for other styles)",
+                },
+                "category": {
+                    "type": "string",
+                    "enum": [
+                        "lifting", "hiit", "cardio", "mobility",
+                        "calisthenics", "sport",
+                    ],
+                    "description": "The training style: lifting (weights/machines), hiit (high-intensity intervals), cardio (running/cycling/swimming), mobility (stretching/yoga/recovery), calisthenics (bodyweight), sport (sport-specific drills)",
                 },
                 "name": {
                     "type": "string",
@@ -88,7 +96,7 @@ TOOL_DEFINITIONS = [
                     "description": "Exercises to avoid (e.g., due to injury)",
                 },
             },
-            "required": ["workout_type", "exercises"],
+            "required": ["workout_type", "category", "exercises"],
         },
     },
     {

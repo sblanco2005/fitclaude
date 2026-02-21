@@ -41,9 +41,11 @@ model User {
   sessions      Session[]
 
   // FitClaude relations
-  workouts      Workout[]
-  nutritionLogs NutritionLog[]
-  conversations ConversationHistory[]
+  workouts             Workout[]
+  nutritionLogs        NutritionLog[]
+  nutritionSummaries   DailyNutritionSummary[]
+  conversations        ConversationHistory[]
+  apiTokens            ApiToken[]
 
   @@map("users")
 }
@@ -140,6 +142,7 @@ model Workout {
   date            DateTime @default(now())
   name            String?
   workoutType     String   // push, pull, legs, upper, lower, full_body, cardio, custom
+  category        String   @default("lifting") // lifting, hiit, cardio, mobility, calisthenics, sport
   durationMinutes Int?
   notes           String?  @db.Text
   fatigueRating   Int?     // 1-10
@@ -202,6 +205,25 @@ model NutritionLog {
   @@map("nutrition_logs")
 }
 
+model DailyNutritionSummary {
+  id         String   @id @default(cuid())
+  userId     String
+  date       DateTime @db.Date
+  calories   Float    @default(0)
+  proteinG   Float    @default(0)
+  carbsG     Float    @default(0)
+  fatG       Float    @default(0)
+  fiberG     Float    @default(0)
+  mealCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("daily_nutrition_summaries")
+}
+
 // ============================================
 // Chat / Conversation History
 // ============================================
@@ -211,6 +233,7 @@ model ConversationHistory {
   userId    String
   role      String   // user, assistant
   content   String   @db.Text
+  topic     String   @default("workout") // workout, nutrition
   toolUse   String?  @db.Text // JSON string of tool calls
   imageUrl  String?  // if message included an image
   createdAt DateTime @default(now())
@@ -219,6 +242,7 @@ model ConversationHistory {
 
   @@index([userId])
   @@index([userId, createdAt])
+  @@index([userId, topic])
   @@map("conversation_history")
 }
 
@@ -287,4 +311,23 @@ model ExerciseVideo {
   @@index([status])
   @@index([exerciseId])
   @@map("exercise_videos")
+}
+
+// ============================================
+// Mobile API Tokens
+// ============================================
+
+model ApiToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  name      String   @default("ios")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("api_tokens")
 }

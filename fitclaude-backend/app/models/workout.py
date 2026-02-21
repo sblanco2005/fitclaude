@@ -16,6 +16,7 @@ class Workout(Base):
     date: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     workout_type: Mapped[str] = mapped_column("workoutType", String)
+    category: Mapped[str] = mapped_column(String, default="lifting")
     duration_minutes: Mapped[Optional[int]] = mapped_column(
         "durationMinutes", nullable=True
     )

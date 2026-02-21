@@ -3,11 +3,16 @@
  *
  * Every API route must verify user identity.
  * Every database query must filter by userId.
+ *
+ * Supports two auth methods:
+ * 1. Bearer token (for mobile/iOS) — checked first
+ * 2. NextAuth session cookie (for web) — fallback
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 
 export interface AuthenticatedUser {
   id: string;
@@ -17,10 +22,48 @@ export interface AuthenticatedUser {
 }
 
 /**
- * Get the currently authenticated user from NextAuth session.
+ * Try to authenticate via Bearer token (mobile clients).
+ * Returns user if valid token found, null otherwise.
+ */
+async function getUserFromBearerToken(): Promise<AuthenticatedUser | null> {
+  const headersList = await headers();
+  const authHeader = headersList.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+
+  const token = authHeader.slice(7);
+  if (!token) return null;
+
+  const apiToken = await prisma.apiToken.findUnique({
+    where: { token },
+    include: {
+      user: {
+        select: { id: true, email: true, name: true, image: true },
+      },
+    },
+  });
+
+  if (!apiToken || !apiToken.user.email) return null;
+  if (apiToken.expiresAt < new Date()) return null;
+
+  return {
+    id: apiToken.user.id,
+    email: apiToken.user.email,
+    name: apiToken.user.name,
+    image: apiToken.user.image,
+  };
+}
+
+/**
+ * Get the currently authenticated user.
+ * Checks Bearer token first (mobile), then NextAuth session (web).
  * Throws if not authenticated.
  */
 export async function getCurrentUser(): Promise<AuthenticatedUser> {
+  // 1. Try Bearer token (mobile/iOS)
+  const bearerUser = await getUserFromBearerToken();
+  if (bearerUser) return bearerUser;
+
+  // 2. Fall back to NextAuth session (web)
   const session = await auth();
 
   if (!session?.user?.email) {

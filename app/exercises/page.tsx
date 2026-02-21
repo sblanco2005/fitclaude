@@ -63,6 +63,10 @@ export default function ExercisesPage() {
   const [videosLoading, setVideosLoading] = useState(false);
   const [videoMuscleFilter, setVideoMuscleFilter] = useState('all');
 
+  // Rename state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+
   // Create exercise modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ ...emptyForm });
@@ -125,6 +129,28 @@ export default function ExercisesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'reject' }),
     });
+  };
+
+  const startRename = (exercise: Exercise) => {
+    setEditingId(exercise.id);
+    setEditName(exercise.name);
+  };
+
+  const handleRename = async (id: string) => {
+    const trimmed = editName.trim();
+    if (!trimmed) return;
+    const res = await fetch(`/api/exercises/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmed }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setExercises((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, ...updated } : e))
+      );
+    }
+    setEditingId(null);
   };
 
   const handleCreateExercise = async () => {
@@ -252,10 +278,50 @@ export default function ExercisesPage() {
                   hover
                   className="cursor-pointer"
                 >
-                  <div onClick={() => setExpandedId(expandedId === exercise.id ? null : exercise.id)}>
+                  <div onClick={() => { if (editingId !== exercise.id) setExpandedId(expandedId === exercise.id ? null : exercise.id); }}>
                     <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-white">{exercise.name}</h3>
+                      <div className="flex-1 min-w-0">
+                        {editingId === exercise.id ? (
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              autoFocus
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleRename(exercise.id);
+                                if (e.key === 'Escape') setEditingId(null);
+                              }}
+                              className="bg-slate-800 text-white border border-primary rounded px-2 py-1 text-sm font-semibold w-full focus:outline-none"
+                            />
+                            <button
+                              onClick={() => handleRename(exercise.id)}
+                              className="text-xs text-primary font-bold hover:text-primary/80 shrink-0"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="text-xs text-slate-500 hover:text-white shrink-0"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-white">{exercise.name}</h3>
+                            {session && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); startRename(exercise); }}
+                                className="text-slate-600 hover:text-slate-300 transition-colors"
+                                title="Rename exercise"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="info" size="sm">
                             {exercise.muscleGroup.replace('_', ' ')}
@@ -267,7 +333,7 @@ export default function ExercisesPage() {
                       </div>
                       {exercise.variations.length > 0 && (
                         <span className="text-xs text-muted">
-                          🌶️ {exercise.variations.length}
+                          {'🌶️'} {exercise.variations.length}
                         </span>
                       )}
                     </div>

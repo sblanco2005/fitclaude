@@ -104,6 +104,7 @@ export interface Workout {
   date: string;
   name: string | null;
   workoutType: string;
+  category: string;
   durationMinutes: number | null;
   notes: string | null;
   fatigueRating: number | null;
@@ -155,6 +156,19 @@ export interface DailyNutrition {
     fatG: number;
     fiberG: number;
   };
+}
+
+export interface DailyNutritionSummary {
+  id: string;
+  userId: string;
+  date: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  fiberG: number;
+  mealCount: number;
+  createdAt: string;
 }
 
 // Chat

@@ -14,6 +14,7 @@ class ConversationHistory(Base):
     user_id: Mapped[str] = mapped_column("userId", ForeignKey("users.id"))
     role: Mapped[str] = mapped_column(String)
     content: Mapped[str] = mapped_column(Text)
+    topic: Mapped[str] = mapped_column(String, default="workout")
     tool_use: Mapped[Optional[str]] = mapped_column("toolUse", Text, nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column("imageUrl", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

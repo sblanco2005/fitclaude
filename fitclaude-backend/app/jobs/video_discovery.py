@@ -67,7 +67,7 @@ async def _discover_videos_for_exercise(
     Returns the number of videos added."""
     results = await search_youtube(
         f"{exercise.name} exercise workout tutorial",
-        max_results=3,
+        max_results=1,
     )
     if not results:
         logger.info(f"[VideoDiscovery] No results for '{exercise.name}'")
@@ -124,23 +124,22 @@ async def run_video_discovery_job(db: AsyncSession) -> dict:
     result = await db.execute(select(Exercise))
     exercises = result.scalars().all()
 
-    # 2. Get exercise IDs that already have pending discovery videos
-    # (to avoid re-searching exercises already queued for review)
+    # 2. Skip exercises that already have ANY video (approved, pending, or from Video Linker)
     result = await db.execute(
         select(ExerciseVideo.exercise_id).where(
-            ExerciseVideo.status == "pending",
+            ExerciseVideo.status.in_(["approved", "pending"]),
         )
     )
-    pending_ids = {row[0] for row in result.all() if row[0]}
+    has_video_ids = {row[0] for row in result.all() if row[0]}
 
     uncovered = [
         ex for ex in exercises
-        if ex.id not in pending_ids
+        if ex.id not in has_video_ids
     ]
 
     logger.info(
         f"[VideoDiscovery] {len(exercises)} exercises total, "
-        f"{len(pending_ids)} with pending videos, "
+        f"{len(has_video_ids)} already have videos, "
         f"{len(uncovered)} to search"
     )
 
@@ -162,6 +161,6 @@ async def run_video_discovery_job(db: AsyncSession) -> dict:
         "added": added,
         "errors": errors,
         "total_exercises": len(exercises),
-        "already_pending": len(pending_ids),
+        "already_have_videos": len(has_video_ids),
         "searched": len(uncovered),
     }

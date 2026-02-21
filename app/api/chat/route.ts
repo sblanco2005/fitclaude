@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 
 export const POST = withAuth(async (request, user) => {
   const body = await request.json();
-  const { message, image_base64, image_media_type } = body;
+  const { message, image_base64, image_media_type, topic = 'workout' } = body;
 
   if (!message && !image_base64) {
     return NextResponse.json(
@@ -19,6 +19,7 @@ export const POST = withAuth(async (request, user) => {
       userId: user.id,
       role: 'user',
       content: message || '',
+      topic,
       imageUrl: image_base64 ? `data:${image_media_type};base64,${image_base64.slice(0, 100)}...` : null,
     },
   });
@@ -31,6 +32,7 @@ export const POST = withAuth(async (request, user) => {
     body: JSON.stringify({
       user_id: user.id,
       message: message || '',
+      topic,
       image_base64,
       image_media_type,
     }),
@@ -54,6 +56,7 @@ export const POST = withAuth(async (request, user) => {
       userId: user.id,
       role: 'assistant',
       content: assistantContent,
+      topic,
     },
   });
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useFitClaude } from '@/context/FitClaudeContext';
 
 function renderMarkdown(text: string): React.ReactNode[] {
@@ -111,9 +112,21 @@ export function ChatDrawer() {
     messages,
     chatLoading,
     chatOpen,
+    chatTopic,
     setChatOpen,
+    setChatTopic,
     sendMessage,
   } = useFitClaude();
+  const pathname = usePathname();
+
+  // Auto-switch chat topic based on current page
+  useEffect(() => {
+    if (pathname.startsWith('/nutrition')) {
+      setChatTopic('nutrition');
+    } else if (pathname === '/' || pathname.startsWith('/workouts')) {
+      setChatTopic('workout');
+    }
+  }, [pathname, setChatTopic]);
 
   const [input, setInput] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -206,7 +219,9 @@ export function ChatDrawer() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
           </button>
-          <span className="text-slate-500 text-sm flex-1">Message Coach Fit...</span>
+          <span className="text-slate-500 text-sm flex-1">
+            {chatTopic === 'nutrition' ? 'Log food, ask about macros...' : 'Message Coach Fit...'}
+          </span>
           <span className="text-slate-600 shrink-0">
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
@@ -243,6 +258,9 @@ export function ChatDrawer() {
               </div>
               <span className="text-sm font-semibold text-white">
                 Coach Fit
+              </span>
+              <span className="text-[10px] font-medium text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full capitalize">
+                {chatTopic}
               </span>
             </div>
             <button
@@ -371,7 +389,7 @@ export function ChatDrawer() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Message Coach Fit..."
+              placeholder={chatTopic === 'nutrition' ? 'Log food, ask about macros...' : 'Message Coach Fit...'}
               rows={1}
               className="flex-1 bg-transparent text-white placeholder-slate-500 focus:outline-none resize-none text-[15px] leading-relaxed py-1.5 px-2 max-h-[120px]"
             />

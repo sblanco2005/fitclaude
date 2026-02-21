@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.jobs.exercise_discoverer import run_exercise_discovery_job
 from app.jobs.video_discovery import run_video_discovery_job
 from app.jobs.video_linker import run_video_linking_job
 
@@ -32,16 +31,6 @@ async def trigger_video_discovery(
     _key: None = Depends(_verify_api_key),
     db: AsyncSession = Depends(get_db),
 ):
-    """Trigger the video discovery job — fetches 3 videos per exercise with classification."""
+    """Trigger the video discovery job — fetches reference videos with classification."""
     result = await run_video_discovery_job(db)
-    return result
-
-
-@router.post("/exercise-discovery")
-async def trigger_exercise_discovery(
-    _key: None = Depends(_verify_api_key),
-    db: AsyncSession = Depends(get_db),
-):
-    """Trigger the weekly exercise discovery job."""
-    result = await run_exercise_discovery_job(db)
     return result

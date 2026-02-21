@@ -4,6 +4,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import type { UserProfile, Workout, DailyNutrition, ChatMessage } from '@/types';
 import { useSession } from 'next-auth/react';
 
+export type ChatTopic = 'workout' | 'nutrition';
+
 interface FitClaudeState {
   profile: UserProfile | null;
   todayWorkout: Workout | null;
@@ -11,15 +13,19 @@ interface FitClaudeState {
   messages: ChatMessage[];
   chatLoading: boolean;
   chatOpen: boolean;
+  chatTopic: ChatTopic;
   loading: boolean;
+  /** Increments after every successful chat response — pages can watch this to re-fetch */
+  dataVersion: number;
 
   fetchProfile: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   fetchTodayNutrition: () => Promise<void>;
   fetchWorkouts: (daysBack?: number) => Promise<Workout[]>;
   sendMessage: (text: string, imageBase64?: string, imageMediaType?: string) => Promise<string>;
-  loadChatHistory: () => Promise<void>;
+  loadChatHistory: (topic?: ChatTopic) => Promise<void>;
   setChatOpen: (open: boolean) => void;
+  setChatTopic: (topic: ChatTopic) => void;
   toggleChat: () => void;
 }
 
@@ -30,11 +36,20 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [todayWorkout, setTodayWorkout] = useState<Workout | null>(null);
   const [todayNutrition, setTodayNutrition] = useState<DailyNutrition | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatTopic, setChatTopicState] = useState<ChatTopic>('workout');
   const [loading, setLoading] = useState(false);
-  const historyLoaded = useRef(false);
+  const [dataVersion, setDataVersion] = useState(0);
+
+  // Separate message arrays per topic
+  const [workoutMessages, setWorkoutMessages] = useState<ChatMessage[]>([]);
+  const [nutritionMessages, setNutritionMessages] = useState<ChatMessage[]>([]);
+  const historyLoadedTopics = useRef<Set<string>>(new Set());
+
+  // Active messages based on current topic
+  const messages = chatTopic === 'workout' ? workoutMessages : nutritionMessages;
+  const setMessages = chatTopic === 'workout' ? setWorkoutMessages : setNutritionMessages;
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -94,10 +109,11 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
     return [];
   }, []);
 
-  // Load today's chat history from DB
-  const loadChatHistory = useCallback(async () => {
+  // Load chat history for a specific topic
+  const loadChatHistory = useCallback(async (topic?: ChatTopic) => {
+    const t = topic || chatTopic;
     try {
-      const res = await fetch('/api/chat/history');
+      const res = await fetch(`/api/chat/history?topic=${t}`);
       if (res.ok) {
         const data = await res.json();
         const loaded: ChatMessage[] = data.map((m: { id: string; role: string; content: string; imageUrl?: string; createdAt: string }) => ({
@@ -107,20 +123,30 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
           imageUrl: m.imageUrl,
           createdAt: m.createdAt,
         }));
-        setMessages(loaded);
+        if (t === 'workout') setWorkoutMessages(loaded);
+        else setNutritionMessages(loaded);
       }
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
-  }, []);
+  }, [chatTopic]);
 
   // Auto-load history when authenticated
   useEffect(() => {
-    if (status === 'authenticated' && !historyLoaded.current) {
-      historyLoaded.current = true;
-      loadChatHistory();
+    if (status === 'authenticated' && !historyLoadedTopics.current.has('workout')) {
+      historyLoadedTopics.current.add('workout');
+      loadChatHistory('workout');
     }
   }, [status, loadChatHistory]);
+
+  // Load history when switching topics
+  const setChatTopic = useCallback((topic: ChatTopic) => {
+    setChatTopicState(topic);
+    if (!historyLoadedTopics.current.has(topic)) {
+      historyLoadedTopics.current.add(topic);
+      loadChatHistory(topic);
+    }
+  }, [loadChatHistory]);
 
   const sendMessage = useCallback(async (
     text: string,
@@ -134,7 +160,9 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
       imageUrl: imageBase64 ? `data:${imageMediaType};base64,${imageBase64}` : undefined,
       createdAt: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+
+    const setter = chatTopic === 'workout' ? setWorkoutMessages : setNutritionMessages;
+    setter((prev) => [...prev, userMsg]);
     setChatLoading(true);
 
     try {
@@ -143,6 +171,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
+          topic: chatTopic,
           image_base64: imageBase64,
           image_media_type: imageMediaType,
         }),
@@ -153,8 +182,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       const response = data.response || data.message || 'No response';
 
-      // Replace temp user message ID with real one, add assistant message
-      setMessages((prev) => {
+      setter((prev) => {
         const updated = prev.map((m) =>
           m.id === userMsg.id ? { ...m, id: data.userMessageId || m.id } : m
         );
@@ -169,6 +197,9 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
         ];
       });
 
+      // Signal pages to re-fetch their data
+      setDataVersion((v) => v + 1);
+
       return response;
     } catch {
       const errorMsg: ChatMessage = {
@@ -177,12 +208,12 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
         content: 'Sorry, I had trouble responding. Please try again.',
         createdAt: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, errorMsg]);
+      setter((prev) => [...prev, errorMsg]);
       return errorMsg.content;
     } finally {
       setChatLoading(false);
     }
-  }, []);
+  }, [chatTopic]);
 
   const toggleChat = useCallback(() => {
     setChatOpen((prev) => !prev);
@@ -197,7 +228,9 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
         messages,
         chatLoading,
         chatOpen,
+        chatTopic,
         loading,
+        dataVersion,
         fetchProfile,
         updateProfile,
         fetchTodayNutrition,
@@ -205,6 +238,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
         sendMessage,
         loadChatHistory,
         setChatOpen,
+        setChatTopic,
         toggleChat,
       }}
     >

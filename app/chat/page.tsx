@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useFitClaude } from '@/context/FitClaudeContext';
+import type { ChatTopic } from '@/context/FitClaudeContext';
 
 export default function ChatPage() {
-  const { messages, chatLoading, sendMessage } = useFitClaude();
+  const { messages, chatLoading, sendMessage, chatTopic, setChatTopic } = useFitClaude();
   const [input, setInput] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageData, setImageData] = useState<{ base64: string; mediaType: string } | null>(null);
@@ -51,15 +52,48 @@ export default function ChatPage() {
     }
   };
 
+  const topics: { key: ChatTopic; label: string }[] = [
+    { key: 'workout', label: 'Workouts' },
+    { key: 'nutrition', label: 'Nutrition' },
+  ];
+
+  const placeholders: Record<ChatTopic, string> = {
+    workout: 'Ask about workouts, routines, exercises...',
+    nutrition: 'Log food, ask about macros, meal ideas...',
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-7.5rem)]">
+      {/* Topic toggle */}
+      <div className="px-4 pt-3 pb-1">
+        <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">
+          {topics.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setChatTopic(t.key)}
+              className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                chatTopic === t.key
+                  ? 'bg-primary text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-muted px-6">
               <p className="text-lg font-bold tracking-wide">Coach Fit</p>
-              <p className="text-sm mt-1">Ask me to create a workout, log your food, or anything fitness-related.</p>
+              <p className="text-sm mt-1">
+                {chatTopic === 'workout'
+                  ? 'Ask me to create a workout, suggest exercises, or track your training.'
+                  : 'Tell me what you ate, ask about macros, or get meal suggestions.'}
+              </p>
             </div>
           </div>
         )}
@@ -138,7 +172,7 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message Coach Fit..."
+            placeholder={placeholders[chatTopic]}
             rows={1}
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none text-sm"
           />

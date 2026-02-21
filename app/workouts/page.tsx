@@ -159,6 +159,11 @@ function RoutineCard({
             <Badge variant={typeColor} size="sm">
               {latest.workoutType.replace('_', ' ')}
             </Badge>
+            {(latest.category && latest.category !== 'lifting') && (
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${CATEGORY_COLORS[latest.category] || 'bg-slate-700/30 text-slate-400 border-slate-600'}`}>
+                {latest.category}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 mt-1">
             <span className="text-xs text-muted font-medium">{workouts.length}x done</span>
@@ -174,21 +179,21 @@ function RoutineCard({
           tabIndex={0}
           onClick={(e) => {
             e.stopPropagation();
-            if (!isInHitIt) onSendToHitIt();
+            onSendToHitIt();
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.stopPropagation();
-              if (!isInHitIt) onSendToHitIt();
+              onSendToHitIt();
             }
           }}
-          className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md transition-all shrink-0 ${
+          className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md transition-all shrink-0 cursor-pointer ${
             isInHitIt
-              ? 'bg-primary/20 text-primary cursor-default'
-              : 'bg-slate-700/60 text-slate-400 hover:bg-primary/20 hover:text-primary cursor-pointer'
+              ? 'bg-primary/20 text-primary'
+              : 'bg-slate-700/60 text-slate-400 hover:bg-primary/20 hover:text-primary'
           }`}
         >
-          {isInHitIt ? 'Queued' : 'Hit It'}
+          {isInHitIt ? '→ Go' : 'Hit It'}
         </span>
       </div>
 
@@ -517,6 +522,87 @@ function getLastLogForExercise(
   return null;
 }
 
+// ─── RoutineExerciseRow (expandable exercise in routine detail) ──────────────
+
+function RoutineExerciseRow({
+  ex,
+  globalIndex,
+  tip,
+  lastLog,
+}: {
+  ex: WorkoutExercise;
+  globalIndex: number;
+  tip: string | null;
+  lastLog: SetLog[] | null;
+}) {
+  const [showVideo, setShowVideo] = useState(false);
+  const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
+
+  return (
+    <div className="py-2 border-b border-slate-800/40 last:border-0">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+          <span className="text-[10px] text-slate-500 font-bold tabular-nums mt-0.5 shrink-0">
+            {String(globalIndex).padStart(2, '0')}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm text-white font-semibold">
+                {getExerciseName(ex)}
+                {ex.wasSpicy && <span className="ml-1">🌶️</span>}
+              </p>
+              {videoId && (
+                <button
+                  onClick={() => setShowVideo((v) => !v)}
+                  className={`shrink-0 p-0.5 rounded transition-colors ${showVideo ? 'text-red-400' : 'text-red-400/40 hover:text-red-400'}`}
+                  title="Watch tutorial"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+            {tip && (
+              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed italic">
+                {tip}
+              </p>
+            )}
+            {lastLog && (
+              <p className="text-[10px] text-slate-500 font-bold mt-0.5 tabular-nums">
+                Last: {lastLog.map((l) => `${l.weight}×${l.reps}`).join('  ')}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-sm text-primary font-bold tabular-nums">
+            {ex.sets} x {ex.reps ?? '?'}
+          </p>
+          {ex.weightKg != null && (
+            <p className="text-[10px] text-muted">{ex.weightKg} kg</p>
+          )}
+          {ex.restSeconds != null && (
+            <p className="text-[10px] text-slate-600">{ex.restSeconds}s rest</p>
+          )}
+        </div>
+      </div>
+      {showVideo && videoId && (
+        <div className="ml-7 mt-2">
+          <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}`}
+              className="w-full h-full"
+              allowFullScreen
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── RoutineDetail (full-screen view) ────────────────────────────────────────
 
 type DetailTab = 'routine' | 'log';
@@ -782,49 +868,15 @@ function RoutineDetail({
               </div>
 
               <div className="space-y-1">
-                {exs.map(({ ex, globalIndex }) => {
-                  const tip = getCoachingTip(ex);
-                  const lastLog = getLastLogForExercise(workouts, getExerciseName(ex));
-                  return (
-                    <div key={ex.id} className="py-2 border-b border-slate-800/40 last:border-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                          <span className="text-[10px] text-slate-500 font-bold tabular-nums mt-0.5 shrink-0">
-                            {String(globalIndex).padStart(2, '0')}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm text-white font-semibold">
-                              {getExerciseName(ex)}
-                              {ex.wasSpicy && <span className="ml-1">🌶️</span>}
-                            </p>
-                            {tip && (
-                              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed italic">
-                                {tip}
-                              </p>
-                            )}
-                            {/* Last log inline */}
-                            {lastLog && (
-                              <p className="text-[10px] text-slate-500 font-bold mt-0.5 tabular-nums">
-                                Last: {lastLog.map((l) => `${l.weight}×${l.reps}`).join('  ')}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm text-primary font-bold tabular-nums">
-                            {ex.sets} x {ex.reps ?? '?'}
-                          </p>
-                          {ex.weightKg != null && (
-                            <p className="text-[10px] text-muted">{ex.weightKg} kg</p>
-                          )}
-                          {ex.restSeconds != null && (
-                            <p className="text-[10px] text-slate-600">{ex.restSeconds}s rest</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {exs.map(({ ex, globalIndex }) => (
+                  <RoutineExerciseRow
+                    key={ex.id}
+                    ex={ex}
+                    globalIndex={globalIndex}
+                    tip={getCoachingTip(ex)}
+                    lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
+                  />
+                ))}
               </div>
             </div>
           ))}
@@ -884,37 +936,29 @@ interface SetLog {
 }
 
 /**
- * Parse shorthand like "1@195x4 2@200x5 3@195x6"
- * Each token: <set>@<weight>x<reps>
- * Also supports just "<weight>x<reps>" (auto-numbers sets)
+ * Parse shorthand like "1@195x4 2@200x5" or "195x4, 200x5"
+ * Flexible: handles spaces around @/x, commas, mixed separators.
+ * Formats: <set>@<weight>x<reps> | <weight>x<reps> (auto-numbers)
  */
 function parseSetLogs(input: string): SetLog[] {
   if (!input.trim()) return [];
-  const tokens = input.trim().split(/\s+/);
+  // Normalize: remove commas, collapse spaces, trim
+  const clean = input.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+  // Extract all set entries with a single regex scan
+  // Matches: optional(set @) weight x reps — with flexible spacing
+  const pattern = /(?:(\d+)\s*@\s*)?([\d.]+)\s*x\s*(\d+)/gi;
   const logs: SetLog[] = [];
   let autoSet = 1;
+  let match;
 
-  for (const token of tokens) {
-    // Try full format: 1@195x4
-    const fullMatch = token.match(/^(\d+)@([\d.]+)x(\d+)$/i);
-    if (fullMatch) {
-      logs.push({
-        set: parseInt(fullMatch[1]),
-        weight: parseFloat(fullMatch[2]),
-        reps: parseInt(fullMatch[3]),
-      });
-      autoSet = parseInt(fullMatch[1]) + 1;
-      continue;
-    }
-    // Try short format: 195x4 (auto-number)
-    const shortMatch = token.match(/^([\d.]+)x(\d+)$/i);
-    if (shortMatch) {
-      logs.push({
-        set: autoSet++,
-        weight: parseFloat(shortMatch[1]),
-        reps: parseInt(shortMatch[2]),
-      });
-    }
+  while ((match = pattern.exec(clean)) !== null) {
+    const setNum = match[1] ? parseInt(match[1]) : autoSet;
+    logs.push({
+      set: setNum,
+      weight: parseFloat(match[2]),
+      reps: parseInt(match[3]),
+    });
+    autoSet = setNum + 1;
   }
   return logs;
 }
@@ -940,6 +984,7 @@ function ExerciseLogRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [input, setInput] = useState('');
+  const [showVideo, setShowVideo] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasLogs = logs.length > 0;
 
@@ -965,9 +1010,25 @@ function ExerciseLogRow({
 
   const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
 
+  const numSets = ex.sets || 3;
+
   const toggleExpand = () => {
-    setExpanded((v) => !v);
-    if (!expanded && isRunning) {
+    const opening = !expanded;
+    setExpanded(opening);
+    if (opening && isRunning) {
+      // Pre-fill with set numbers so user just types weight x reps
+      if (!hasLogs && !input) {
+        const template = Array.from({ length: numSets }, (_, i) => `${i + 1}@`).join(' ');
+        setInput(template);
+        // Place cursor right after "1@"
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.setSelectionRange(2, 2);
+          }
+        }, 50);
+        return;
+      }
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
@@ -991,6 +1052,11 @@ function ExerciseLogRow({
           <span className={`truncate text-xs font-medium ${hasLogs ? 'text-white' : 'text-slate-300'}`}>
             {getExerciseName(ex)}
           </span>
+          {videoId && !expanded && (
+            <svg className="w-3 h-3 text-red-400/60 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-2">
           <span className="text-xs text-muted tabular-nums font-medium">
@@ -1045,22 +1111,43 @@ function ExerciseLogRow({
             </button>
           </div>
           <p className="text-[9px] text-slate-600 mt-1 font-medium">
-            Format: set@weightxreps — e.g. 1@195x4 2@200x5
+            <span className="text-primary/60">1</span>
+            <span className="text-slate-700">@</span>
+            <span className="text-blue-400/60">195</span>
+            <span className="text-slate-700">x</span>
+            <span className="text-amber-400/60">4</span>
+            <span className="mx-1">→</span>
+            <span className="text-primary/60">set</span>
+            <span className="text-slate-700">@</span>
+            <span className="text-blue-400/60">weight(lb)</span>
+            <span className="text-slate-700">x</span>
+            <span className="text-amber-400/60">reps</span>
           </p>
         </div>
       )}
 
-      {/* YouTube tutorial video */}
+      {/* YouTube tutorial video — toggle */}
       {expanded && videoId && (
         <div className="ml-7 mt-2">
-          <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
-            <iframe
-              src={`https://www.youtube.com/embed/${videoId}`}
-              className="w-full h-full"
-              allowFullScreen
-              loading="lazy"
-            />
-          </div>
+          <button
+            onClick={() => setShowVideo((v) => !v)}
+            className={`flex items-center gap-1.5 text-[10px] font-medium transition-colors ${showVideo ? 'text-red-400' : 'text-slate-500 hover:text-red-400'}`}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+            {showVideo ? 'Hide video' : 'Watch form'}
+          </button>
+          {showVideo && (
+            <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900 mt-1.5">
+              <iframe
+                src={`https://www.youtube.com/embed/${videoId}`}
+                className="w-full h-full"
+                allowFullScreen
+                loading="lazy"
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1333,16 +1420,31 @@ function FinishedWorkoutCard({
 
 type Tab = 'routines' | 'hitit';
 
+const CATEGORIES = ['all', 'lifting', 'hiit', 'cardio', 'mobility', 'calisthenics', 'sport'] as const;
+type Category = typeof CATEGORIES[number];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  lifting: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  hiit: 'bg-red-500/20 text-red-300 border-red-500/30',
+  cardio: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  mobility: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+  calisthenics: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+  sport: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+};
+
 export default function WorkoutsPage() {
-  const { chatOpen } = useFitClaude();
+  const { chatOpen, dataVersion } = useFitClaude();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('routines');
   const [selectedRoutine, setSelectedRoutine] = useState<string | null>(null);
   const [hitItQueue, setHitItQueue] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<Category>('all');
   const [finishedWorkouts, setFinishedWorkouts] = useState<
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
   >([]);
+  const [queueToast, setQueueToast] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchWorkouts = useCallback(() => {
     fetch('/api/workouts?daysBack=90')
@@ -1360,9 +1462,10 @@ export default function WorkoutsPage() {
       });
   }, []);
 
+  // Initial load + re-fetch when chat creates/modifies workouts
   useEffect(() => {
     fetchWorkouts();
-  }, [fetchWorkouts]);
+  }, [fetchWorkouts, dataVersion]);
 
   const routineGroups = useMemo(() => {
     const map = new Map<string, Workout[]>();
@@ -1376,12 +1479,36 @@ export default function WorkoutsPage() {
     );
   }, [workouts]);
 
+  // Filter routine groups by category
+  const filteredRoutineGroups = useMemo(() => {
+    if (categoryFilter === 'all') return routineGroups;
+    return routineGroups.filter(([, group]) => {
+      const latest = group[0];
+      return (latest.category || 'lifting') === categoryFilter;
+    });
+  }, [routineGroups, categoryFilter]);
+
+  // Categories that actually have routines (for showing only relevant pills)
+  const activeCategories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const [, group] of routineGroups) {
+      cats.add(group[0].category || 'lifting');
+    }
+    return cats;
+  }, [routineGroups]);
+
   const selectedGroup = selectedRoutine
     ? routineGroups.find(([k]) => k === selectedRoutine)?.[1] ?? null
     : null;
 
   const addToHitIt = (name: string) => {
-    if (!hitItQueue.includes(name)) setHitItQueue((prev) => [...prev, name]);
+    const alreadyQueued = hitItQueue.includes(name);
+    if (!alreadyQueued) {
+      setHitItQueue((prev) => [...prev, name]);
+      setQueueToast(name);
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = setTimeout(() => setQueueToast(null), 3000);
+    }
     setSelectedRoutine(null);
     setTab('hitit');
   };
@@ -1518,17 +1645,41 @@ export default function WorkoutsPage() {
 
       {/* Routines Tab — full-width list */}
       {tab === 'routines' && (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2 scrollbar-hide">
-          {routineGroups.length === 0 ? (
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
+          {/* Category filter pills */}
+          {activeCategories.size > 1 && (
+            <div className="flex gap-1.5 px-4 pb-3 overflow-x-auto scrollbar-hide">
+              {CATEGORIES.filter((c) => c === 'all' || activeCategories.has(c)).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCategoryFilter(cat)}
+                  className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
+                    categoryFilter === cat
+                      ? cat === 'all'
+                        ? 'bg-primary/20 text-primary border-primary/30'
+                        : CATEGORY_COLORS[cat] || 'bg-slate-700 text-white border-slate-600'
+                      : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="px-4 pb-4 space-y-2">
+          {filteredRoutineGroups.length === 0 ? (
             <div className="flex items-center justify-center min-h-[40vh]">
               <Card className="text-center">
                 <p className="text-muted text-sm font-medium">
-                  No routines yet. Chat with your coach to generate one!
+                  {routineGroups.length === 0
+                    ? 'No routines yet. Chat with your coach to generate one!'
+                    : `No ${categoryFilter} routines yet.`}
                 </p>
               </Card>
             </div>
           ) : (
-            routineGroups.map(([key, group]) => (
+            filteredRoutineGroups.map(([key, group]) => (
               <RoutineCard
                 key={key}
                 name={key}
@@ -1539,12 +1690,44 @@ export default function WorkoutsPage() {
               />
             ))
           )}
+          </div>
         </div>
       )}
 
       {/* Hit It Tab */}
       {tab === 'hitit' && (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide">
+          {/* Toast notification */}
+          {queueToast && (
+            <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary/15 border border-primary/20 animate-in fade-in slide-in-from-top-2 duration-300">
+              <svg className="w-4 h-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <p className="text-xs font-semibold text-primary flex-1 capitalize">
+                {queueToast.replace(/_/g, ' ')} added to queue
+              </p>
+              <button onClick={() => setQueueToast(null)} className="text-primary/50 hover:text-primary transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* Back to routines link */}
+          {(hitItQueue.length > 0 || finishedWorkouts.length > 0) && (
+            <button
+              onClick={() => setTab('routines')}
+              className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors mb-3 group"
+            >
+              <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-xs font-medium">Back to Routines</span>
+            </button>
+          )}
+
+          <div className="space-y-3">
           {hitItQueue.length === 0 && finishedWorkouts.length === 0 ? (
             <div className="flex items-center justify-center min-h-[40vh]">
               <div className="text-center px-6">
@@ -1554,6 +1737,12 @@ export default function WorkoutsPage() {
                 <p className="text-sm text-muted mt-2 font-medium">
                   Go to Routines and tap &quot;Hit It&quot; to queue a workout
                 </p>
+                <button
+                  onClick={() => setTab('routines')}
+                  className="mt-4 px-5 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 hover:text-white transition-all"
+                >
+                  Browse Routines
+                </button>
               </div>
             </div>
           ) : (
@@ -1584,6 +1773,7 @@ export default function WorkoutsPage() {
               )}
             </>
           )}
+          </div>
         </div>
       )}
     </div>

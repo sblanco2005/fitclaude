@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -29,3 +29,26 @@ class NutritionLog(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="nutrition_logs")  # noqa: F821
+
+
+class DailyNutritionSummary(Base):
+    __tablename__ = "daily_nutrition_summaries"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column("userId", ForeignKey("users.id"))
+    date: Mapped[date] = mapped_column(Date)
+    calories: Mapped[float] = mapped_column(Float, default=0)
+    protein_g: Mapped[float] = mapped_column("proteinG", Float, default=0)
+    carbs_g: Mapped[float] = mapped_column("carbsG", Float, default=0)
+    fat_g: Mapped[float] = mapped_column("fatG", Float, default=0)
+    fiber_g: Mapped[float] = mapped_column("fiberG", Float, default=0)
+    meal_count: Mapped[int] = mapped_column("mealCount", Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        "createdAt", DateTime, default=func.now()
+    )
+
+    user: Mapped["User"] = relationship(back_populates="nutrition_summaries")  # noqa: F821
+
+    __table_args__ = (
+        UniqueConstraint("userId", "date", name="uq_user_date"),
+    )
