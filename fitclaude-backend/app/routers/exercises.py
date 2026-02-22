@@ -22,8 +22,12 @@ async def search(q: str, db: AsyncSession = Depends(get_db)):
 @router.post("/{exercise_id}/search-videos")
 async def search_videos_for_exercise(
     exercise_id: str,
+    force: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    """Trigger YouTube video search for a specific exercise."""
-    result = await run_single_exercise_video_search(db, exercise_id)
+    """Trigger YouTube video search for a specific exercise.
+
+    Pass ?force=true to dismiss pending videos and search again.
+    """
+    result = await run_single_exercise_video_search(db, exercise_id, force=force)
     return result

@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useFitClaude } from '@/context/FitClaudeContext';
-import type { Workout, WorkoutExercise } from '@/types';
+import { Modal } from '@/components/ui/Modal';
+import type { Workout, WorkoutExercise, Exercise } from '@/types';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -127,84 +128,91 @@ function RoutineCard({
   onClick,
   onSendToHitIt,
   isInHitIt,
+  onSpin,
 }: {
   name: string;
   workouts: Workout[];
   onClick: () => void;
   onSendToHitIt: () => void;
   isInHitIt: boolean;
+  onSpin: () => void;
 }) {
   const latest = workouts[0];
   const typeColor = TYPE_COLORS[latest.workoutType] ?? 'default';
   const muscles = uniqueMuscles(latest);
-  const exerciseCount = latest.exercises.length;
   const routineNum = getRoutineDisplayId(workouts);
+  const isLifting = (latest.category || 'lifting') === 'lifting';
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left p-4 rounded-xl border bg-card border-border-dark hover:bg-card-hover hover:border-slate-600 transition-all duration-200"
+      className="w-full text-left px-4 py-3 rounded-xl glass hover:bg-slate-800/60 hover:border-slate-600 transition-all duration-200"
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {routineNum != null && (
-              <span className="text-[10px] font-black text-primary/70 bg-primary/10 px-1.5 py-0.5 rounded-md tabular-nums tracking-tight shrink-0">
-                #{routineNum}
-              </span>
-            )}
-            <p className="font-bold text-white text-sm leading-tight truncate capitalize tracking-wide">
-              {name.replace(/_/g, ' ')}
-            </p>
+      {/* Row 1: #N + name + badge + spin + hit it */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {routineNum != null && (
+            <span className="text-xs text-slate-500 tabular-nums shrink-0">#{routineNum}</span>
+          )}
+          <p className="font-bold text-white text-sm leading-tight truncate capitalize">
+            {name.replace(/_/g, ' ')}
+          </p>
+          {isLifting ? (
             <Badge variant={typeColor} size="sm">
               {latest.workoutType.replace('_', ' ')}
             </Badge>
-            {(latest.category && latest.category !== 'lifting') && (
-              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${CATEGORY_COLORS[latest.category] || 'bg-slate-700/30 text-slate-400 border-slate-600'}`}>
-                {latest.category}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 mt-1">
-            <span className="text-xs text-muted font-medium">{workouts.length}x done</span>
-            {exerciseCount > 0 && (
-              <span className="text-xs text-slate-500">{exerciseCount} exercises</span>
-            )}
-          </div>
-        </div>
-
-        {/* Hit It button */}
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSendToHitIt();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.stopPropagation();
-              onSendToHitIt();
-            }
-          }}
-          className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md transition-all shrink-0 cursor-pointer ${
-            isInHitIt
-              ? 'bg-primary/20 text-primary'
-              : 'bg-slate-700/60 text-slate-400 hover:bg-primary/20 hover:text-primary'
-          }`}
-        >
-          {isInHitIt ? '→ Go' : 'Hit It'}
-        </span>
-      </div>
-
-      {muscles.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {muscles.slice(0, 4).map((m) => muscleChip(m))}
-          {muscles.length > 4 && (
-            <span className="text-[10px] text-muted self-center">+{muscles.length - 4}</span>
+          ) : (
+            <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${CATEGORY_COLORS[latest.category!] || 'bg-slate-700/30 text-slate-400 border-slate-600'}`}>
+              {latest.category}
+            </span>
           )}
         </div>
-      )}
+
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Spin — icon only */}
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onSpin(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onSpin(); } }}
+            className="p-1.5 rounded-md transition-colors cursor-pointer text-amber-400/40 hover:text-amber-400 hover:bg-amber-500/10"
+            title="Regenerate routine"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+            </svg>
+          </span>
+
+          {/* Hit It — solid CTA */}
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onSendToHitIt(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onSendToHitIt(); } }}
+            className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+              isInHitIt
+                ? 'bg-primary text-white'
+                : 'bg-primary/15 text-primary hover:bg-primary hover:text-white'
+            }`}
+          >
+            {isInHitIt ? '→ Go' : 'Hit It'}
+          </span>
+        </div>
+      </div>
+
+      {/* Row 2: stats + inline muscles */}
+      <div className="flex items-center gap-2 mt-1 ml-0.5">
+        <span className="text-[11px] text-slate-500">{workouts.length}x done</span>
+        {isLifting && muscles.length > 0 && (
+          <>
+            <span className="text-slate-700">·</span>
+            <span className="text-[10px] text-slate-500/80 uppercase tracking-wider truncate">
+              {muscles.slice(0, 3).join(' · ')}
+              {muscles.length > 3 && ` +${muscles.length - 3}`}
+            </span>
+          </>
+        )}
+      </div>
     </button>
   );
 }
@@ -529,11 +537,13 @@ function RoutineExerciseRow({
   globalIndex,
   tip,
   lastLog,
+  onSwap,
 }: {
   ex: WorkoutExercise;
   globalIndex: number;
   tip: string | null;
   lastLog: SetLog[] | null;
+  onSwap: () => void;
 }) {
   const [showVideo, setShowVideo] = useState(false);
   const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
@@ -562,6 +572,15 @@ function RoutineExerciseRow({
                   </svg>
                 </button>
               )}
+              <button
+                onClick={onSwap}
+                className="shrink-0 p-0.5 rounded transition-colors text-slate-600 hover:text-amber-400"
+                title="Swap exercise"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+              </button>
             </div>
             {tip && (
               <p className="text-xs text-slate-400 mt-0.5 leading-relaxed italic">
@@ -603,6 +622,126 @@ function RoutineExerciseRow({
   );
 }
 
+// ─── SwapExerciseModal ───────────────────────────────────────────────────────
+
+function SwapExerciseModal({
+  isOpen,
+  onClose,
+  onSelect,
+  currentExerciseName,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (exercise: Exercise) => void;
+  currentExerciseName: string;
+}) {
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoading(true);
+    setSearch('');
+    setMuscleFilter(null);
+    fetch('/api/exercises')
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Exercise[]) => {
+        setExercises(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+    setTimeout(() => searchRef.current?.focus(), 100);
+  }, [isOpen]);
+
+  const muscleGroups = useMemo(() => {
+    const groups = new Set<string>();
+    exercises.forEach((e) => groups.add(e.muscleGroup));
+    return Array.from(groups).sort();
+  }, [exercises]);
+
+  const filtered = useMemo(() => {
+    return exercises.filter((e) => {
+      if (e.name === currentExerciseName) return false;
+      if (muscleFilter && e.muscleGroup !== muscleFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        return e.name.toLowerCase().includes(q) || e.muscleGroup.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [exercises, search, muscleFilter, currentExerciseName]);
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Swap Exercise" size="md">
+      <div className="space-y-3">
+        {/* Search */}
+        <input
+          ref={searchRef}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search exercises..."
+          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+
+        {/* Muscle group chips */}
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setMuscleFilter(null)}
+            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
+              !muscleFilter ? 'bg-primary/20 text-primary' : 'bg-slate-800 text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            All
+          </button>
+          {muscleGroups.map((mg) => (
+            <button
+              key={mg}
+              onClick={() => setMuscleFilter(muscleFilter === mg ? null : mg)}
+              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
+                muscleFilter === mg
+                  ? (MUSCLE_COLORS[mg.toLowerCase()] ?? 'bg-slate-500/20 text-slate-300')
+                  : 'bg-slate-800 text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {mg}
+            </button>
+          ))}
+        </div>
+
+        {/* Exercise list */}
+        <div className="max-h-[50vh] overflow-y-auto space-y-0.5 scrollbar-hide">
+          {loading ? (
+            <p className="text-sm text-muted text-center py-8">Loading exercises...</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-muted text-center py-8">No matching exercises</p>
+          ) : (
+            filtered.map((ex) => (
+              <button
+                key={ex.id}
+                onClick={() => onSelect(ex)}
+                className="w-full text-left flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition-colors group"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-white font-medium group-hover:text-primary transition-colors truncate">
+                    {ex.name}
+                  </p>
+                  <p className="text-[10px] text-slate-500">{ex.muscleGroup} · {ex.difficulty} · {ex.exerciseType}</p>
+                </div>
+                <svg className="w-4 h-4 text-slate-600 group-hover:text-primary shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ─── RoutineDetail (full-screen view) ────────────────────────────────────────
 
 type DetailTab = 'routine' | 'log';
@@ -617,6 +756,7 @@ function RoutineDetail({
   onDeleteLogs,
   onEditLog,
   onDeleteSession,
+  onSwapExercise,
 }: {
   workouts: Workout[];
   onBack: () => void;
@@ -627,12 +767,14 @@ function RoutineDetail({
   onDeleteLogs: (workoutId: string) => void;
   onEditLog: (workoutId: string, exerciseId: string, logs: SetLog[]) => void;
   onDeleteSession: (workoutId: string) => void;
+  onSwapExercise: (workoutId: string, workoutExerciseId: string, newExerciseId: string) => Promise<void>;
 }) {
   const [detailTab, setDetailTab] = useState<DetailTab>('routine');
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [swappingExercise, setSwappingExercise] = useState<WorkoutExercise | null>(null);
   const renameRef = useRef<HTMLInputElement>(null);
 
   const latest = workouts[0];
@@ -822,7 +964,7 @@ function RoutineDetail({
           </div>
         </div>
 
-        {muscles.length > 0 && (
+        {muscles.length > 0 && (latest.category || 'lifting') === 'lifting' && (
           <div className="flex flex-wrap gap-1.5 mt-3">
             {muscles.map((m) => muscleChip(m))}
           </div>
@@ -859,27 +1001,43 @@ function RoutineDetail({
       {/* Routine Tab */}
       {detailTab === 'routine' && (
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5 scrollbar-hide">
-          {/* Exercise breakdown grouped by muscle */}
-          {groupedByMuscle.map(([muscle, exs]) => (
-            <div key={muscle}>
-              <div className="flex items-center gap-2 mb-3">
-                {muscleChip(muscle)}
-                <div className="flex-1 h-px bg-slate-800" />
-              </div>
-
-              <div className="space-y-1">
-                {exs.map(({ ex, globalIndex }) => (
-                  <RoutineExerciseRow
-                    key={ex.id}
-                    ex={ex}
-                    globalIndex={globalIndex}
-                    tip={getCoachingTip(ex)}
-                    lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
-                  />
-                ))}
-              </div>
+          {/* Exercise breakdown — grouped by muscle for lifting, flat list for cardio/HIIT */}
+          {(latest.category || 'lifting') !== 'lifting' ? (
+            <div className="space-y-1">
+              {latest.exercises.map((ex, i) => (
+                <RoutineExerciseRow
+                  key={ex.id}
+                  ex={ex}
+                  globalIndex={i + 1}
+                  tip={getCoachingTip(ex)}
+                  lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
+                  onSwap={() => setSwappingExercise(ex)}
+                />
+              ))}
             </div>
-          ))}
+          ) : (
+            groupedByMuscle.map(([muscle, exs]) => (
+              <div key={muscle}>
+                <div className="flex items-center gap-2 mb-3">
+                  {muscleChip(muscle)}
+                  <div className="flex-1 h-px bg-slate-800" />
+                </div>
+
+                <div className="space-y-1">
+                  {exs.map(({ ex, globalIndex }) => (
+                    <RoutineExerciseRow
+                      key={ex.id}
+                      ex={ex}
+                      globalIndex={globalIndex}
+                      tip={getCoachingTip(ex)}
+                      lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
+                      onSwap={() => setSwappingExercise(ex)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
 
           {/* Tips */}
           {latest.notes && (
@@ -923,6 +1081,18 @@ function RoutineDetail({
           </div>
         );
       })()}
+
+      {/* Swap Exercise Modal */}
+      <SwapExerciseModal
+        isOpen={!!swappingExercise}
+        onClose={() => setSwappingExercise(null)}
+        currentExerciseName={swappingExercise ? getExerciseName(swappingExercise) : ''}
+        onSelect={async (exercise) => {
+          if (!swappingExercise) return;
+          await onSwapExercise(latest.id, swappingExercise.id, exercise.id);
+          setSwappingExercise(null);
+        }}
+      />
     </div>
   );
 }
@@ -1432,14 +1602,25 @@ const CATEGORY_COLORS: Record<string, string> = {
   sport: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
 };
 
+const SPIN_CONFIRMS = [
+  { title: 'Time to shake things up?', body: 'Your muscles are getting too comfortable. Let Coach cook you a fresh routine.' },
+  { title: 'Bored of this one, huh?', body: 'No shame — variety is the spice of gains. Let\'s get a new lineup.' },
+  { title: 'Remix incoming?', body: 'Same muscles, brand new pain. Coach will whip up something different.' },
+  { title: 'Feeling adventurous?', body: 'The old routine had a good run. Time for a plot twist.' },
+  { title: 'Out with the old?', body: 'Coach is warming up a fresh set of exercises for you. Ready?' },
+];
+
 export default function WorkoutsPage() {
-  const { chatOpen, dataVersion } = useFitClaude();
+  const { chatOpen, dataVersion, sendMessage, setChatOpen, setChatTopic } = useFitClaude();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('routines');
   const [selectedRoutine, setSelectedRoutine] = useState<string | null>(null);
   const [hitItQueue, setHitItQueue] = useState<string[]>([]);
+  const [spinTarget, setSpinTarget] = useState<{ name: string; muscles: string[]; exerciseCount: number; category: string; confirm: typeof SPIN_CONFIRMS[number] } | null>(null);
+  const [spinning, setSpinning] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<Category>('all');
+  const [routineSearch, setRoutineSearch] = useState('');
   const [finishedWorkouts, setFinishedWorkouts] = useState<
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
   >([]);
@@ -1479,14 +1660,32 @@ export default function WorkoutsPage() {
     );
   }, [workouts]);
 
-  // Filter routine groups by category
+  // Filter routine groups by category + search
   const filteredRoutineGroups = useMemo(() => {
-    if (categoryFilter === 'all') return routineGroups;
-    return routineGroups.filter(([, group]) => {
-      const latest = group[0];
-      return (latest.category || 'lifting') === categoryFilter;
-    });
-  }, [routineGroups, categoryFilter]);
+    let filtered = routineGroups;
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(([, group]) => {
+        return (group[0].category || 'lifting') === categoryFilter;
+      });
+    }
+    if (routineSearch.trim()) {
+      const q = routineSearch.toLowerCase().trim();
+      filtered = filtered.filter(([key, group]) => {
+        const latest = group[0];
+        // Match on routine name
+        if (key.toLowerCase().includes(q)) return true;
+        // Match on workout type
+        if (latest.workoutType.toLowerCase().includes(q)) return true;
+        // Match on muscle groups
+        const muscles = uniqueMuscles(latest);
+        if (muscles.some((m) => m.toLowerCase().includes(q))) return true;
+        // Match on exercise names
+        if (latest.exercises.some((ex) => getExerciseName(ex).toLowerCase().includes(q))) return true;
+        return false;
+      });
+    }
+    return filtered;
+  }, [routineGroups, categoryFilter, routineSearch]);
 
   // Categories that actually have routines (for showing only relevant pills)
   const activeCategories = useMemo(() => {
@@ -1586,6 +1785,45 @@ export default function WorkoutsPage() {
     fetchWorkouts();
   };
 
+  const handleSwapExercise = async (workoutId: string, workoutExerciseId: string, newExerciseId: string) => {
+    const res = await fetch(`/api/workouts/${workoutId}/exercises/${workoutExerciseId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newExerciseId }),
+    });
+    if (res.ok) {
+      fetchWorkouts();
+    }
+  };
+
+  const requestSpin = (routineName: string) => {
+    const group = routineGroups.find(([k]) => k === routineName)?.[1];
+    if (!group) return;
+    const latest = group[0];
+    const muscles = uniqueMuscles(latest);
+    const category = latest.category || 'lifting';
+    const confirm = SPIN_CONFIRMS[Math.floor(Math.random() * SPIN_CONFIRMS.length)];
+    setSpinTarget({ name: routineName, muscles, exerciseCount: latest.exercises.length, category, confirm });
+  };
+
+  const confirmSpin = async () => {
+    if (!spinTarget) return;
+    setSpinning(true);
+    const { name, muscles, exerciseCount, category } = spinTarget;
+    let msg: string;
+    if (category !== 'lifting') {
+      msg = `Generate a new HIIT / cardio workout with ${exerciseCount} exercises. This replaces my "${name.replace(/_/g, ' ')}" routine — keep it HIIT style but give me different exercises.`;
+    } else {
+      const muscleList = muscles.join(' & ');
+      msg = `Generate a new ${muscleList} workout with ${exerciseCount} exercises. This replaces my "${name.replace(/_/g, ' ')}" routine — keep the same muscle focus but give me different exercises.`;
+    }
+    setChatTopic('workout');
+    setChatOpen(true);
+    setSpinTarget(null);
+    setSpinning(false);
+    await sendMessage(msg);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -1610,6 +1848,7 @@ export default function WorkoutsPage() {
           onDeleteLogs={handleDeleteLogs}
           onEditLog={handleEditLog}
           onDeleteSession={handleDeleteSession}
+          onSwapExercise={handleSwapExercise}
         />
       </div>
     );
@@ -1667,6 +1906,32 @@ export default function WorkoutsPage() {
             </div>
           )}
 
+          {/* Search bar */}
+          <div className="px-4 pb-3">
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={routineSearch}
+                onChange={(e) => setRoutineSearch(e.target.value)}
+                placeholder="Search routines, muscles, exercises…"
+                className="w-full pl-9 pr-8 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/30 transition-colors"
+              />
+              {routineSearch && (
+                <button
+                  onClick={() => setRoutineSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="px-4 pb-4 space-y-2">
           {filteredRoutineGroups.length === 0 ? (
             <div className="flex items-center justify-center min-h-[40vh]">
@@ -1674,7 +1939,9 @@ export default function WorkoutsPage() {
                 <p className="text-muted text-sm font-medium">
                   {routineGroups.length === 0
                     ? 'No routines yet. Chat with your coach to generate one!'
-                    : `No ${categoryFilter} routines yet.`}
+                    : routineSearch
+                      ? `No routines match "${routineSearch}"`
+                      : `No ${categoryFilter} routines yet.`}
                 </p>
               </Card>
             </div>
@@ -1687,6 +1954,7 @@ export default function WorkoutsPage() {
                 onClick={() => setSelectedRoutine(key)}
                 onSendToHitIt={() => addToHitIt(key)}
                 isInHitIt={hitItQueue.includes(key)}
+                onSpin={() => requestSpin(key)}
               />
             ))
           )}
@@ -1775,6 +2043,40 @@ export default function WorkoutsPage() {
           )}
           </div>
         </div>
+      )}
+
+      {/* Spin confirmation overlay */}
+      {spinTarget && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setSpinTarget(null)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-full shadow-2xl">
+            <div className="text-center mb-1">
+              <span className="text-2xl">🎰</span>
+            </div>
+            <p className="text-sm font-bold text-white text-center">{spinTarget.confirm.title}</p>
+            <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">
+              {spinTarget.confirm.body}
+            </p>
+            <p className="text-[10px] text-slate-500 mt-2 text-center">
+              {spinTarget.muscles.join(' & ').toUpperCase()} · {spinTarget.exerciseCount} exercises
+            </p>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setSpinTarget(null)}
+                className="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-colors"
+              >
+                Nah, keep it
+              </button>
+              <button
+                onClick={confirmSpin}
+                disabled={spinning}
+                className="flex-1 py-2 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-50"
+              >
+                {spinning ? 'Spinning...' : 'Let\'s go!'}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

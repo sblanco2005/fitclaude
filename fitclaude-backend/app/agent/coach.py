@@ -2,7 +2,8 @@
 
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone as tz
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
@@ -76,16 +77,17 @@ async def _execute_tool(
     tool_input: dict,
     user_id: str,
     db: AsyncSession,
+    user_tz: ZoneInfo | None = None,
 ) -> dict:
     """Execute a tool call and return the result."""
     if tool_name == "generate_workout":
         return await _tool_generate_workout(db, user_id, tool_input)
     elif tool_name == "log_nutrition":
-        return await _tool_log_nutrition(db, user_id, tool_input)
+        return await _tool_log_nutrition(db, user_id, tool_input, user_tz=user_tz)
     elif tool_name == "get_workout_history":
         return await _tool_get_workout_history(db, user_id, tool_input)
     elif tool_name == "get_daily_nutrition":
-        return await _tool_get_daily_nutrition(db, user_id, tool_input)
+        return await _tool_get_daily_nutrition(db, user_id, tool_input, user_tz=user_tz)
     elif tool_name == "get_spicy_variation":
         return await get_spicy_variation(
             db,
@@ -101,6 +103,277 @@ async def _execute_tool(
 
 
 import re
+
+
+# Keywords that suggest the user is describing food to log
+_FOOD_LOG_KEYWORDS = re.compile(
+    r"\b(ate|had|log|ate|eaten|drank|drinking|eating|burger|chicken|rice|eggs?|"
+    r"shake|protein|banana|oats|yogurt|steak|jerky|cheese|bread|pasta|pizza|"
+    r"salad|fish|salmon|tuna|burrito|wrap|sandwich|cereal|milk|coffee|juice|"
+    r"nurri|oikos|kirkland|costco|meal|snack|breakfast|lunch|dinner|"
+    r"\d+\s*(?:g|oz|cup|piece|strip|serving|scoop))\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_food_log(message: str) -> bool:
+    """Heuristic: does the user message look like they're describing food to log?"""
+    return bool(_FOOD_LOG_KEYWORDS.search(message))
+
+
+# Keywords that suggest the user wants a new workout generated
+_WORKOUT_GEN_KEYWORDS = re.compile(
+    r"\b(generate|create|make|build|give me|new workout|new routine|spin|replace|"
+    r"different exercises|fresh routine|remix|regenerate|another workout|"
+    r"new .{0,20} workout|workout with \d+ exercises)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_workout_request(message: str) -> bool:
+    """Heuristic: does the user message look like they want a workout generated?"""
+    return bool(_WORKOUT_GEN_KEYWORDS.search(message))
+
+
+# ─── Parse exercises from assistant text (fallback when Haiku skips tool) ─────
+
+# Pattern A: "Exercise Name — 4 × 8-10 reps (2 min rest)" (weight-lifting style)
+_EXERCISE_LINE_RE = re.compile(
+    r"^[ \t]*"
+    r"(?:\d+\.\s+)?"                              # optional "1. "
+    r"\*{0,2}"                                     # optional bold **
+    r"([A-Z][A-Za-z \-(),.]{2,55}?)"               # exercise name (2-55 chars, no newlines)
+    r"\*{0,2}"                                     # optional bold **
+    r"\s*[—–-]\s*"                                 # dash separator
+    r"(\d+)\s*[×xX]\s*"                            # sets
+    r"([\d\-]+)"                                   # reps
+    r"(?:\s*(?:reps?|per\s+(?:leg|side)))?"        # optional "reps" / "per leg"
+    r"(?:[^(\n]*\((\d+(?:\.\d+)?)\s*(min|sec|s)\s*rest\))?"  # optional rest with unit (supports decimals)
+    ,
+    re.MULTILINE,
+)
+
+# Pattern B: "Exercise Name — Description text." (HIIT / cardio / circuit style)
+# Matches lines with a dash separator followed by descriptive text (not sets×reps).
+_EXERCISE_DESC_LINE_RE = re.compile(
+    r"^[ \t]*"
+    r"(?:\d+\.\s+)?"                              # optional "1. "
+    r"\*{0,2}"                                     # optional bold **
+    r"([A-Z][A-Za-z \-(),.]{2,55}?)"               # exercise name
+    r"\*{0,2}"                                     # optional bold **
+    r"\s*[—–-]\s*"                                 # dash separator
+    r"([A-Z][^\n]{5,120})"                         # description: starts uppercase, 5-120 chars
+    ,
+    re.MULTILINE,
+)
+
+# Extract circuit structure: "8 rounds" or "X rounds" from surrounding text
+_ROUNDS_RE = re.compile(r"(\d+)\s*(?:rounds?|circuits?|sets?)", re.IGNORECASE)
+# Extract work/rest intervals: "40 sec work / 20 sec rest" or "30s on / 15s off"
+_INTERVAL_RE = re.compile(
+    r"(\d+)\s*(?:sec(?:onds?)?|s)\s*(?:work|on)"
+    r"(?:\s*/\s*(\d+)\s*(?:sec(?:onds?)?|s)\s*(?:rest|off))?",
+    re.IGNORECASE,
+)
+
+# Workout title: "ROUTINE #5: GLUTES ONLY – 6 EXERCISES" or similar
+_WORKOUT_TITLE_RE = re.compile(
+    r"(?:ROUTINE|WORKOUT)\s*#?\d*:?\s*(.+?)(?:\s*[–—-]\s*\d+\s*EXERCISE|\n|$)",
+    re.IGNORECASE,
+)
+
+_WORKOUT_TYPE_HINTS = {
+    "cardio": re.compile(r"\b(hiit|circuit|emom|amrap|tabata|conditioning|sprint|cardio)\b", re.IGNORECASE),
+    "push": re.compile(r"\b(chest|shoulder|tricep|push)\b", re.IGNORECASE),
+    "pull": re.compile(r"\b(back|bicep|pull|row)\b", re.IGNORECASE),
+    "legs": re.compile(r"\b(leg|quad|hamstring|glute|squat|calf)\b", re.IGNORECASE),
+    "upper": re.compile(r"\b(upper)\b", re.IGNORECASE),
+    "lower": re.compile(r"\b(lower)\b", re.IGNORECASE),
+    "full_body": re.compile(r"\b(full.?body)\b", re.IGNORECASE),
+}
+
+# Ordered list — more specific matches first to avoid "back squat" → "back"
+_MUSCLE_KEYWORDS_ORDERED: list[tuple[str, list[str]]] = [
+    ("glutes", ["glute", "hip thrust", "bulgarian", "kickback", "pull-through"]),
+    ("chest", ["chest", "pec", "bench press", "flye", "fly", "push-up", "pushup"]),
+    ("legs", ["squat", "leg", "quad", "hamstring", "lunge", "leg press", "calf"]),
+    ("shoulders", ["shoulder", "delt", "overhead press", "lateral raise", "ohp"]),
+    ("back", ["row", "lat ", "latissimus", "pull-up", "pullup", "deadlift", "pull-down"]),
+    ("biceps", ["bicep", "curl"]),
+    ("triceps", ["tricep", "pushdown", "skull crusher", "close-grip", "dip"]),
+    ("core", ["core", "ab", "plank", "crunch"]),
+    ("cardio", ["cardio", "running", "sprint", "assault", "swing"]),
+]
+
+
+def _guess_muscle_group(exercise_name: str) -> str:
+    name_lower = exercise_name.lower()
+    for muscle, keywords in _MUSCLE_KEYWORDS_ORDERED:
+        for kw in keywords:
+            if kw in name_lower:
+                return muscle
+    return "full_body"
+
+
+def _parse_workout_from_text(text: str) -> dict | None:
+    """Parse a workout from assistant text. Returns generate_workout params or None.
+
+    Tries weight-lifting pattern first (sets × reps). If that fails,
+    tries description-style pattern (HIIT / cardio / circuits).
+    """
+    # --- Try Pattern A: weight-lifting (sets × reps) ---
+    matches = _EXERCISE_LINE_RE.findall(text)
+    if len(matches) >= 3:
+        exercises = []
+        for name, sets_str, reps, rest_val, rest_unit in matches:
+            name = name.strip().rstrip("* ")
+            if name.count(".") > 0 or len(name.split()) > 8:
+                continue
+            rest = None
+            if rest_val:
+                rest_float = float(rest_val)
+                rest = int(rest_float * 60) if rest_unit == "min" else int(rest_float)
+            exercises.append({
+                "name": name,
+                "muscle_group": _guess_muscle_group(name),
+                "sets": int(sets_str),
+                "reps": reps,
+                "rest_seconds": rest,
+                "notes": "",
+            })
+        if len(exercises) >= 3:
+            return _build_parsed_result(text, exercises, "lifting")
+
+    # --- Try Pattern B: HIIT / cardio / circuit (description-style) ---
+    desc_matches = _EXERCISE_DESC_LINE_RE.findall(text)
+    if len(desc_matches) >= 3:
+        # Extract circuit params from surrounding text
+        rounds_m = _ROUNDS_RE.search(text)
+        interval_m = _INTERVAL_RE.search(text)
+        rounds = int(rounds_m.group(1)) if rounds_m else 3
+        work_sec = int(interval_m.group(1)) if interval_m else None
+        rest_sec = int(interval_m.group(2)) if interval_m and interval_m.group(2) else 20
+
+        exercises = []
+        seen_names: set[str] = set()
+        for name, description in desc_matches:
+            name = name.strip().rstrip("* ")
+            if name.count(".") > 0 or len(name.split()) > 8:
+                continue
+            # Deduplicate (same exercise name can match twice if reformatted)
+            name_key = name.lower()
+            if name_key in seen_names:
+                continue
+            seen_names.add(name_key)
+
+            # Use work interval as "reps" display (e.g. "40s")
+            reps_str = f"{work_sec}s" if work_sec else "AMRAP"
+            exercises.append({
+                "name": name,
+                "muscle_group": _guess_muscle_group(name),
+                "sets": rounds,
+                "reps": reps_str,
+                "rest_seconds": rest_sec,
+                "notes": description.strip().rstrip(". "),
+            })
+        if len(exercises) >= 3:
+            # Detect HIIT vs generic cardio from text
+            is_hiit = bool(re.search(r"\b(HIIT|tabata|EMOM|AMRAP)\b", text, re.IGNORECASE))
+            return _build_parsed_result(text, exercises, "hiit" if is_hiit else "cardio")
+
+    return None
+
+
+def _build_parsed_result(text: str, exercises: list[dict], category: str) -> dict:
+    """Build the final parsed workout dict from exercises."""
+    title_match = _WORKOUT_TITLE_RE.search(text)
+    workout_name = title_match.group(1).strip() if title_match else None
+
+    all_names = " ".join(e["name"] for e in exercises)
+    workout_type = "custom"
+    for wt, pattern in _WORKOUT_TYPE_HINTS.items():
+        if pattern.search(all_names):
+            workout_type = wt
+            break
+
+    # Non-lifting categories always get "cardio" workout_type
+    if category != "lifting":
+        workout_type = "cardio"
+
+    return {
+        "workout_type": workout_type,
+        "category": category,
+        "name": workout_name or "Custom Workout",
+        "exercises": exercises,
+    }
+
+
+# ─── Equipment validation ─────────────────────────────────────────────────────
+
+# Map common free-text equipment entries to normalized keywords.
+# User might type "dumbells" or "Dumbbells (100 lb)" — we normalize.
+_EQUIPMENT_ALIASES: dict[str, list[str]] = {
+    "barbell": ["barbell", "barbells", "bar"],
+    "dumbbells": ["dumbbell", "dumbbells", "dumbells", "db"],
+    "bench": ["bench", "flat bench", "incline", "decline"],
+    "cables": ["cables", "cable", "cable machine"],
+    "pull-up bar": ["pullup", "pull-up", "pull up", "chin-up", "chinup"],
+    "kettlebells": ["kettlebell", "kettlebells", "kb"],
+    "rack": ["rack", "squat rack", "power rack"],
+    "assault runner": ["assault", "assault runner", "treadmill"],
+    "rower": ["rower", "rowing", "row machine"],
+    "ab wheel": ["ab wheel", "ab roller"],
+    "bands": ["bands", "resistance bands", "band"],
+    "machine": ["machine", "machines"],
+}
+
+
+def _parse_user_equipment(equipment_text: str) -> set[str]:
+    """Parse user's free-text equipment into normalized equipment keywords."""
+    text_lower = equipment_text.lower()
+    available = set()
+    for canonical, aliases in _EQUIPMENT_ALIASES.items():
+        for alias in aliases:
+            if alias in text_lower:
+                available.add(canonical)
+                break
+    return available
+
+
+def _exercise_fits_equipment(
+    exercise_equip: str | None,
+    user_equipment: set[str],
+) -> bool:
+    """Check if an exercise's equipment requirements are met by the user's equipment.
+
+    Returns True if the exercise can be performed, False if it requires
+    equipment the user doesn't have.
+    """
+    if not exercise_equip:
+        # Bodyweight / no equipment needed
+        return True
+
+    # Split "barbell, bench" into individual requirements
+    required = [r.strip().lower() for r in exercise_equip.split(",")]
+
+    for req in required:
+        # Check if any canonical equipment matches this requirement
+        matched = False
+        for canonical, aliases in _EQUIPMENT_ALIASES.items():
+            if req in aliases or req == canonical:
+                if canonical in user_equipment:
+                    matched = True
+                    break
+        # Also check direct substring match against user equipment set
+        if not matched:
+            for equip in user_equipment:
+                if req in equip or equip in req:
+                    matched = True
+                    break
+        if not matched:
+            return False
+
+    return True
 
 
 def _normalize_name(name: str) -> str:
@@ -177,6 +450,15 @@ async def _tool_generate_workout(
         print(f"[Coach] NO EXERCISES! Full params: {json.dumps(params, default=str)[:500]}", flush=True)
     tips = params.get("tips", "")
 
+    # Load user profile for equipment validation
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    gym_type = user.gym_type if user else None
+    user_equipment: set[str] | None = None
+    if gym_type == "own_gym" and user and user.equipment_text:
+        user_equipment = _parse_user_equipment(user.equipment_text)
+        logger.info(f"[Coach] Home gym equipment detected: {user_equipment}")
+
     # Get next display_id for this user
     max_result = await db.execute(
         select(func.max(Workout.display_id)).where(Workout.user_id == user_id)
@@ -205,15 +487,30 @@ async def _tool_generate_workout(
     # Store exercises — look up from DB to link exerciseId
     exercises_data = params.get("exercises", [])
     stored = []
+    rejected = []
     for i, ex in enumerate(exercises_data):
         # Try to find matching exercise in DB by name (case-insensitive)
         exercise_id = None
         ex_name = ex.get("name", "")
+        found_exercise = None
         if ex_name:
-            found = _match_exercise(ex_name, all_exercises)
-            if found:
-                exercise_id = found.id
-                logger.info(f"[Coach] Linked exercise '{ex_name}' -> '{found.name}' (id {found.id})")
+            found_exercise = _match_exercise(ex_name, all_exercises)
+            if found_exercise:
+                exercise_id = found_exercise.id
+                logger.info(f"[Coach] Linked exercise '{ex_name}' -> '{found_exercise.name}' (id {found_exercise.id})")
+
+                # Equipment check for home gym users
+                if user_equipment is not None and found_exercise.equipment_required:
+                    if not _exercise_fits_equipment(found_exercise.equipment_required, user_equipment):
+                        rejected.append({
+                            "name": ex_name,
+                            "requires": found_exercise.equipment_required,
+                        })
+                        logger.info(
+                            f"[Coach] REJECTED '{ex_name}' — requires '{found_exercise.equipment_required}' "
+                            f"but user only has {user_equipment}"
+                        )
+                        continue  # Skip this exercise
             else:
                 # Auto-add to exercise library so Video Linker can find tutorials later
                 muscle_group = ex.get("muscle_group", "full_body")
@@ -239,7 +536,7 @@ async def _tool_generate_workout(
             id=cuid_generator.generate(),
             workout_id=workout.id,
             exercise_id=exercise_id,
-            order=i + 1,
+            order=len(stored) + 1,
             sets=ex.get("sets", 3),
             reps=ex.get("reps"),
             rest_seconds=ex.get("rest_seconds"),
@@ -253,9 +550,10 @@ async def _tool_generate_workout(
             "reps": ex.get("reps", ""),
         })
 
-    await db.flush()
+    await db.commit()
+    logger.info(f"[Coach] Workout {workout.id} committed to DB with {len(stored)} exercises ({len(rejected)} rejected)")
 
-    return {
+    result = {
         "workout_id": workout.id,
         "display_number": workout.display_id,
         "workout_type": workout.workout_type,
@@ -271,15 +569,33 @@ async def _tool_generate_workout(
         ),
     }
 
+    if rejected:
+        rejected_names = ", ".join(r["name"] for r in rejected)
+        result["equipment_warning"] = (
+            f"WARNING: {len(rejected)} exercise(s) were REMOVED because the user has a home gym "
+            f"and doesn't have the required equipment: {rejected_names}. "
+            f"Their available equipment: {', '.join(sorted(user_equipment or set()))}. "
+            "Tell the user which exercises were removed and why, then suggest replacements "
+            "that only use their available equipment. Call generate_workout again if you want to add replacements."
+        )
+
+    return result
+
 
 async def _tool_log_nutrition(
-    db: AsyncSession, user_id: str, params: dict
+    db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
-    """Log a nutrition entry."""
+    """Log a nutrition entry using the user's local date."""
+    # Use user's timezone to determine the correct "now" and "today"
+    if user_tz:
+        user_now = datetime.now(user_tz)
+    else:
+        user_now = datetime.now(tz.utc)
+    # Store as UTC but ensure the date component matches the user's local date
     log = NutritionLog(
         id=cuid_generator.generate(),
         user_id=user_id,
-        date=datetime.utcnow(),
+        date=user_now.astimezone(tz.utc).replace(tzinfo=None),
         meal_type=params.get("meal_type"),
         raw_input=params["raw_text"],
         calories=params.get("calories"),
@@ -289,10 +605,17 @@ async def _tool_log_nutrition(
         fiber_g=params.get("fiber_g"),
     )
     db.add(log)
-    await db.flush()
+    try:
+        await db.commit()
+        logger.info(f"[Coach] Nutrition log {log.id} committed to DB")
+    except Exception as e:
+        logger.error(f"[Coach] FAILED to commit nutrition log: {e}")
+        await db.rollback()
+        raise
 
-    # Get daily totals
-    daily = await _get_daily_totals(db, user_id, date.today())
+    # Get daily totals using user's local date
+    user_today = user_now.date()
+    daily = await _get_daily_totals(db, user_id, user_today, user_tz=user_tz)
 
     return {
         "nutrition_log_id": log.id,
@@ -344,26 +667,44 @@ async def _tool_get_workout_history(
 
 
 async def _tool_get_daily_nutrition(
-    db: AsyncSession, user_id: str, params: dict
+    db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
     """Get nutrition totals for a date."""
-    target_date = date.today()
     if params.get("date"):
         target_date = date.fromisoformat(params["date"])
+    elif user_tz:
+        target_date = datetime.now(user_tz).date()
+    else:
+        target_date = date.today()
 
-    return await _get_daily_totals(db, user_id, target_date)
+    return await _get_daily_totals(db, user_id, target_date, user_tz=user_tz)
 
 
 async def _get_daily_totals(
-    db: AsyncSession, user_id: str, target_date: date
+    db: AsyncSession, user_id: str, target_date: date, user_tz: ZoneInfo | None = None
 ) -> dict:
-    """Helper to aggregate daily nutrition totals."""
-    result = await db.execute(
-        select(NutritionLog).where(
-            NutritionLog.user_id == user_id,
-            func.date(NutritionLog.date) == target_date,
+    """Helper to aggregate daily nutrition totals using timezone-aware date range."""
+    if user_tz:
+        # Compute midnight-to-midnight in user's timezone, converted to UTC
+        day_start_local = datetime(target_date.year, target_date.month, target_date.day, tzinfo=user_tz)
+        day_end_local = day_start_local + timedelta(days=1)
+        day_start_utc = day_start_local.astimezone(tz.utc).replace(tzinfo=None)
+        day_end_utc = day_end_local.astimezone(tz.utc).replace(tzinfo=None)
+        result = await db.execute(
+            select(NutritionLog).where(
+                NutritionLog.user_id == user_id,
+                NutritionLog.date >= day_start_utc,
+                NutritionLog.date < day_end_utc,
+            )
         )
-    )
+    else:
+        # Fallback: use DB date extraction (server timezone)
+        result = await db.execute(
+            select(NutritionLog).where(
+                NutritionLog.user_id == user_id,
+                func.date(NutritionLog.date) == target_date,
+            )
+        )
     logs = result.scalars().all()
 
     return {
@@ -389,7 +730,8 @@ async def _tool_mark_workout_complete(db: AsyncSession, params: dict) -> dict:
     workout.fatigue_rating = params["fatigue_rating"]
     if params.get("notes"):
         workout.notes = params["notes"]
-    await db.flush()
+    await db.commit()
+    logger.info(f"[Coach] Workout {workout.id} marked complete")
 
     return {
         "workout_id": workout.id,
@@ -405,6 +747,7 @@ async def handle_chat(
     topic: str = "workout",
     image_base64: str | None = None,
     image_media_type: str | None = None,
+    timezone: str | None = None,
 ) -> dict:
     """
     Main agent entry point.
@@ -413,6 +756,14 @@ async def handle_chat(
     executes any tool calls, sends results back, repeats until
     Claude returns a text response.
     """
+    # Parse user timezone
+    user_tz: ZoneInfo | None = None
+    if timezone:
+        try:
+            user_tz = ZoneInfo(timezone)
+        except (KeyError, ValueError):
+            logger.warning(f"Invalid timezone '{timezone}', falling back to UTC")
+
     # Load context
     user_data = await _load_user_context(db, user_id)
     context = build_user_context(user_data)
@@ -456,7 +807,7 @@ async def handle_chat(
         for block in response.content:
             if block.type == "tool_use":
                 logger.info(f"[Coach] Tool call: {block.name} with input keys: {list(block.input.keys())}")
-                result = await _execute_tool(block.name, block.input, user_id, db)
+                result = await _execute_tool(block.name, block.input, user_id, db, user_tz=user_tz)
                 logger.info(f"[Coach] Tool result keys: {list(result.keys())}")
                 # Track IDs for response (but strip from what Claude sees)
                 if "workout_id" in result:
@@ -489,9 +840,90 @@ async def handle_chat(
         block.text for block in response.content if hasattr(block, "text")
     )
 
-    # Conversation history is saved by the Next.js API route (Prisma).
-    # Only commit tool-created records (workouts, nutrition logs, etc).
-    await db.commit()
+    # Safety net: if the topic is nutrition and the user mentioned food but
+    # the model didn't call log_nutrition, retry once with a forced instruction.
+    if (
+        topic == "nutrition"
+        and nutrition_log_id is None
+        and _looks_like_food_log(user_message)
+        and response.stop_reason == "end_turn"
+    ):
+        logger.warning("[Coach] Model skipped log_nutrition tool — retrying with forced instruction")
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append({
+            "role": "user",
+            "content": (
+                "SYSTEM: You did NOT call the log_nutrition tool. The food was NOT saved. "
+                "You MUST call log_nutrition now with the food the user described. "
+                "Do not respond with text — call the tool."
+            ),
+        })
+        response = await client.messages.create(
+            model=settings.agent_model,
+            max_tokens=2048,
+            system=COACH_SYSTEM_PROMPT + "\n" + context,
+            messages=messages,
+            tools=TOOL_DEFINITIONS,
+        )
+        # Process tool calls from the retry
+        while response.stop_reason == "tool_use":
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    logger.info(f"[Coach] Retry tool call: {block.name}")
+                    result = await _execute_tool(block.name, block.input, user_id, db, user_tz=user_tz)
+                    if "nutrition_log_id" in result:
+                        nutrition_log_id = result["nutrition_log_id"]
+                    claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id")}
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(claude_result),
+                    })
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": tool_results})
+            response = await client.messages.create(
+                model=settings.agent_model,
+                max_tokens=2048,
+                system=COACH_SYSTEM_PROMPT + "\n" + context,
+                messages=messages,
+                tools=TOOL_DEFINITIONS,
+            )
+        # Use the retry response text
+        assistant_text = "".join(
+            block.text for block in response.content if hasattr(block, "text")
+        )
+
+    # Safety net: if the topic is workout and the user asked for a workout but
+    # the model didn't call generate_workout, parse exercises from the text and save directly.
+    # This avoids a costly retry API call and is deterministic.
+    if (
+        topic == "workout"
+        and workout_id is None
+        and _looks_like_workout_request(user_message)
+        and response.stop_reason == "end_turn"
+    ):
+        parsed = _parse_workout_from_text(assistant_text)
+        if parsed and len(parsed.get("exercises", [])) >= 3:
+            logger.warning(
+                f"[Coach] Model skipped generate_workout — auto-saving {len(parsed['exercises'])} "
+                f"exercises parsed from text response"
+            )
+            try:
+                result = await _tool_generate_workout(db, user_id, parsed)
+                workout_id = result.get("workout_id")
+                logger.info(f"[Coach] Auto-saved workout {workout_id} from text parse")
+            except Exception as e:
+                logger.error(f"[Coach] Failed to auto-save parsed workout: {e}")
+        else:
+            logger.warning("[Coach] Model skipped generate_workout and text parse failed — workout NOT saved")
+
+    # Tool-created records are committed immediately in each tool handler.
+    # Final commit is a no-op safety net in case any tool only flushed.
+    try:
+        await db.commit()
+    except Exception as e:
+        logger.error(f"[Coach] Final commit error (data already committed per-tool): {e}")
 
     return {
         "response": assistant_text,

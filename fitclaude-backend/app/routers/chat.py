@@ -17,5 +17,6 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         topic=request.topic,
         image_base64=request.image_base64,
         image_media_type=request.image_media_type,
+        timezone=request.timezone,
     )
     return ChatResponse(**result)

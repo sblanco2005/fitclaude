@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
 import type { ExerciseVideoLink } from '@/types';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected';
+type VideoTab = 'tutorials' | 'reference';
 
 interface UnlinkedExercise {
   id: string | null;
@@ -21,12 +22,16 @@ export default function AdminPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<VideoTab>('tutorials');
+
   // Videos state
   const [videos, setVideos] = useState<ExerciseVideoLink[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
   const [selectedVidIds, setSelectedVidIds] = useState<Set<string>>(new Set());
   const [expandedVidId, setExpandedVidId] = useState<string | null>(null);
   const [loadingVid, setLoadingVid] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Unlinked exercises state
   const [unlinked, setUnlinked] = useState<UnlinkedExercise[]>([]);
@@ -63,6 +68,26 @@ export default function AdminPage() {
     fetchUnlinked();
   }, [fetchVideos, fetchUnlinked]);
 
+  // Filter videos by tab (tutorial vs reference) and search query
+  const filteredVideos = useMemo(() => {
+    let filtered = videos;
+    if (activeTab === 'tutorials') {
+      filtered = filtered.filter((v) => v.videoType === 'tutorial');
+    } else {
+      filtered = filtered.filter((v) => v.videoType === 'reference');
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(
+        (v) =>
+          v.exerciseName?.toLowerCase().includes(q) ||
+          v.title?.toLowerCase().includes(q) ||
+          v.channelName?.toLowerCase().includes(q)
+      );
+    }
+    return filtered;
+  }, [videos, activeTab, searchQuery]);
+
   // Video actions
   const handleVideoAction = async (id: string, action: 'approve' | 'reject', videoType?: string) => {
     await fetch(`/api/admin/exercise-videos/${id}`, {
@@ -92,6 +117,20 @@ export default function AdminPage() {
     fetchVideos();
     fetchUnlinked();
     setSelectedVidIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+  };
+
+  const [refetchingExercise, setRefetchingExercise] = useState<string | null>(null);
+  const handleRefetch = async (exerciseId: string) => {
+    setRefetchingExercise(exerciseId);
+    try {
+      const res = await fetch(`/api/exercises/${exerciseId}/search-videos?force=true`, { method: 'POST' });
+      if (res.ok) {
+        fetchVideos();
+        fetchUnlinked();
+      }
+    } finally {
+      setRefetchingExercise(null);
+    }
   };
 
   const runJob = async (job: 'video-linking' | 'video-discovery') => {
@@ -124,8 +163,10 @@ export default function AdminPage() {
   };
 
   const toggleSelectAllVid = () => {
-    if (selectedVidIds.size === videos.length) setSelectedVidIds(new Set());
-    else setSelectedVidIds(new Set(videos.map((v) => v.id)));
+    const visibleIds = filteredVideos.map((v) => v.id);
+    const allSelected = visibleIds.every((id) => selectedVidIds.has(id));
+    if (allSelected) setSelectedVidIds(new Set());
+    else setSelectedVidIds(new Set(visibleIds));
   };
 
   if (sessionStatus === 'loading') {
@@ -140,7 +181,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-bg">
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-xl font-black text-white tracking-tight">Admin</h1>
             <p className="text-xs text-muted mt-0.5">Video review & exercise management</p>
@@ -153,37 +194,48 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* ─── Jobs ─── */}
-        <div className="flex gap-2 mb-4">
+        {/* ─── Tab Switcher ─── */}
+        <div className="flex rounded-xl bg-card border border-border-dark p-1 mb-4">
           <button
-            onClick={() => runJob('video-linking')}
-            disabled={!!runningJob}
-            className="flex-1 py-2.5 rounded-xl bg-card hover:bg-card-hover border border-border-dark text-xs font-bold text-slate-300 transition-all disabled:opacity-50"
+            onClick={() => { setActiveTab('tutorials'); setSelectedVidIds(new Set()); setSearchQuery(''); }}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+              activeTab === 'tutorials'
+                ? 'bg-emerald-500/15 text-emerald-400 shadow-sm'
+                : 'text-muted hover:text-slate-300'
+            }`}
           >
-            {runningJob === 'video-linking' ? (
-              <span className="text-primary">Running...</span>
-            ) : (
-              <>
-                <span className="block text-[10px] text-muted uppercase tracking-widest mb-0.5">Tutorials</span>
-                Video Linker
-              </>
-            )}
+            Tutorials
           </button>
           <button
-            onClick={() => runJob('video-discovery')}
-            disabled={!!runningJob}
-            className="flex-1 py-2.5 rounded-xl bg-card hover:bg-card-hover border border-border-dark text-xs font-bold text-slate-300 transition-all disabled:opacity-50"
+            onClick={() => { setActiveTab('reference'); setSelectedVidIds(new Set()); setSearchQuery(''); }}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+              activeTab === 'reference'
+                ? 'bg-blue-500/15 text-blue-400 shadow-sm'
+                : 'text-muted hover:text-slate-300'
+            }`}
           >
-            {runningJob === 'video-discovery' ? (
-              <span className="text-primary">Running...</span>
-            ) : (
-              <>
-                <span className="block text-[10px] text-muted uppercase tracking-widest mb-0.5">Reference</span>
-                YouTube Videos
-              </>
-            )}
+            Reference
           </button>
         </div>
+
+        {/* ─── Job Button (contextual per tab) ─── */}
+        <button
+          onClick={() => runJob(activeTab === 'tutorials' ? 'video-linking' : 'video-discovery')}
+          disabled={!!runningJob}
+          className={`w-full py-2.5 rounded-xl border text-xs font-bold transition-all disabled:opacity-50 mb-4 ${
+            activeTab === 'tutorials'
+              ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10'
+              : 'bg-blue-500/5 border-blue-500/20 text-blue-400 hover:bg-blue-500/10'
+          }`}
+        >
+          {runningJob ? (
+            <span className="text-primary">Running...</span>
+          ) : activeTab === 'tutorials' ? (
+            <>Run Video Linker<span className="text-muted ml-1.5 font-normal">— find best tutorial per exercise</span></>
+          ) : (
+            <>Run Video Discovery<span className="text-muted ml-1.5 font-normal">— fetch reference videos from YouTube</span></>
+          )}
+        </button>
 
         {/* Job result banner */}
         {jobResult && (
@@ -196,124 +248,152 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ─── Unlinked Exercises ─── */}
-        <div className="mb-5">
-          <button
-            onClick={() => setShowUnlinked((v) => !v)}
-            className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-card border border-border-dark hover:bg-card-hover transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">Unlinked Exercises</span>
-              {unlinked.length > 0 && (
-                <span className="text-[10px] font-bold bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
-                  {unlinked.length}
-                </span>
-              )}
-            </div>
-            <svg
-              className={`w-4 h-4 text-slate-500 transition-transform ${showUnlinked ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        {/* ─── Unlinked Exercises (tutorials tab only) ─── */}
+        {activeTab === 'tutorials' && (
+          <div className="mb-5">
+            <button
+              onClick={() => setShowUnlinked((v) => !v)}
+              className="w-full flex items-center justify-between py-3 px-4 rounded-xl bg-card border border-border-dark hover:bg-card-hover transition-colors"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white">Unlinked Exercises</span>
+                {unlinked.length > 0 && (
+                  <span className="text-[10px] font-bold bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
+                    {unlinked.length}
+                  </span>
+                )}
+              </div>
+              <svg
+                className={`w-4 h-4 text-slate-500 transition-transform ${showUnlinked ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-          {showUnlinked && (
-            <div className="mt-2 rounded-xl border border-border-dark overflow-hidden">
-              {loadingUnlinked ? (
-                <p className="text-center text-muted text-xs py-6">Loading...</p>
-              ) : unlinked.length === 0 ? (
-                <div className="py-6 text-center">
-                  <p className="text-sm text-primary font-bold">All exercises are linked!</p>
-                  <p className="text-xs text-muted mt-0.5">Every exercise has at least one approved video.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-800/60">
-                  <div className="px-4 py-2 bg-slate-800/30">
-                    <p className="text-[10px] text-muted uppercase tracking-widest font-bold">
-                      Run Video Linker to search for tutorials
-                    </p>
+            {showUnlinked && (
+              <div className="mt-2 rounded-xl border border-border-dark overflow-hidden">
+                {loadingUnlinked ? (
+                  <p className="text-center text-muted text-xs py-6">Loading...</p>
+                ) : unlinked.length === 0 ? (
+                  <div className="py-6 text-center">
+                    <p className="text-sm text-primary font-bold">All exercises are linked!</p>
+                    <p className="text-xs text-muted mt-0.5">Every exercise has at least one approved video.</p>
                   </div>
-                  {unlinked.map((ex, i) => (
-                    <div key={ex.id ?? `orphan-${i}`} className="flex items-center justify-between px-4 py-2.5 gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm text-white font-medium truncate">{ex.name}</p>
+                ) : (
+                  <div className="divide-y divide-slate-800/60">
+                    <div className="px-4 py-2 bg-slate-800/30">
+                      <p className="text-[10px] text-muted uppercase tracking-widest font-bold">
+                        Run Video Linker to search for tutorials
+                      </p>
+                    </div>
+                    {unlinked.map((ex, i) => (
+                      <div key={ex.id ?? `orphan-${i}`} className="flex items-center justify-between px-4 py-2.5 gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm text-white font-medium truncate">{ex.name}</p>
+                            {ex.source === 'workout' && (
+                              <span className="text-[9px] font-bold bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                                Not in library
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-500 capitalize">{ex.muscleGroup}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {ex.pendingCount > 0 && (
+                            <Badge variant="warning" size="sm">
+                              {ex.pendingCount} pending
+                            </Badge>
+                          )}
+                          {ex.rejectedCount > 0 && (
+                            <Badge variant="danger" size="sm">
+                              {ex.rejectedCount} rejected
+                            </Badge>
+                          )}
+                          {ex.source === 'library' && ex.pendingCount === 0 && ex.rejectedCount === 0 && (
+                            <span className="text-[10px] text-slate-600 font-medium">No videos</span>
+                          )}
                           {ex.source === 'workout' && (
-                            <span className="text-[9px] font-bold bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
-                              Not in library
-                            </span>
+                            <button
+                              onClick={async () => {
+                                await fetch('/api/exercises', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    name: ex.name,
+                                    muscleGroup: ex.muscleGroup,
+                                    exerciseType: 'compound',
+                                  }),
+                                });
+                                fetchUnlinked();
+                              }}
+                              className="text-[10px] font-bold text-primary bg-primary/15 hover:bg-primary/25 px-2 py-1 rounded-lg transition-colors"
+                            >
+                              + Add to Library
+                            </button>
                           )}
                         </div>
-                        <p className="text-[10px] text-slate-500 capitalize">{ex.muscleGroup}</p>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {ex.pendingCount > 0 && (
-                          <Badge variant="warning" size="sm">
-                            {ex.pendingCount} pending
-                          </Badge>
-                        )}
-                        {ex.rejectedCount > 0 && (
-                          <Badge variant="danger" size="sm">
-                            {ex.rejectedCount} rejected
-                          </Badge>
-                        )}
-                        {ex.source === 'library' && ex.pendingCount === 0 && ex.rejectedCount === 0 && (
-                          <span className="text-[10px] text-slate-600 font-medium">No videos</span>
-                        )}
-                        {ex.source === 'workout' && (
-                          <button
-                            onClick={async () => {
-                              await fetch('/api/exercises', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  name: ex.name,
-                                  muscleGroup: ex.muscleGroup,
-                                  exerciseType: 'compound',
-                                }),
-                              });
-                              fetchUnlinked();
-                            }}
-                            className="text-[10px] font-bold text-primary bg-primary/15 hover:bg-primary/25 px-2 py-1 rounded-lg transition-colors"
-                          >
-                            + Add to Library
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ─── Video Review ─── */}
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-white uppercase tracking-widest">Video Review</h2>
-          <span className="text-[10px] text-muted font-medium">{videos.length} {statusFilter}</span>
+          <h2 className="text-sm font-bold text-white uppercase tracking-widest">
+            {activeTab === 'tutorials' ? 'Tutorial' : 'Reference'} Videos
+          </h2>
+          <span className="text-[10px] text-muted font-medium">{filteredVideos.length} {statusFilter}</span>
         </div>
 
-        {/* Status filter pills */}
-        <div className="flex gap-1.5 mb-4">
-          {(['pending', 'approved', 'rejected'] as StatusFilter[]).map((s) => (
-            <button
-              key={s}
-              onClick={() => { setStatusFilter(s); setSelectedVidIds(new Set()); }}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
-                statusFilter === s
-                  ? s === 'pending'
-                    ? 'bg-amber-500/15 text-amber-400'
-                    : s === 'approved'
-                    ? 'bg-emerald-500/15 text-emerald-400'
-                    : 'bg-red-500/15 text-red-400'
-                  : 'bg-card text-muted hover:text-slate-300'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+        {/* Status filter pills + search bar */}
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex gap-1.5">
+            {(['pending', 'approved', 'rejected'] as StatusFilter[]).map((s) => (
+              <button
+                key={s}
+                onClick={() => { setStatusFilter(s); setSelectedVidIds(new Set()); }}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  statusFilter === s
+                    ? s === 'pending'
+                      ? 'bg-amber-500/15 text-amber-400'
+                      : s === 'approved'
+                      ? 'bg-emerald-500/15 text-emerald-400'
+                      : 'bg-red-500/15 text-red-400'
+                    : 'bg-card text-muted hover:text-slate-300'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search exercise or video..."
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-card border border-border-dark text-xs text-white placeholder-slate-600 focus:outline-none focus:border-slate-500 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Bulk action bar */}
@@ -341,11 +421,19 @@ export default function AdminPage() {
         <div className="space-y-3">
           {loadingVid ? (
             <p className="text-center text-muted text-sm py-12">Loading...</p>
-          ) : videos.length === 0 ? (
+          ) : filteredVideos.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-muted text-sm font-medium">No {statusFilter} videos</p>
+              <p className="text-muted text-sm font-medium">
+                {searchQuery
+                  ? `No ${statusFilter} ${activeTab} matching "${searchQuery}"`
+                  : `No ${statusFilter} ${activeTab} videos`}
+              </p>
               <p className="text-slate-600 text-xs mt-1">
-                {statusFilter === 'pending' ? 'Run a job above to search for videos' : 'Change the filter to see other videos'}
+                {statusFilter === 'pending'
+                  ? `Run ${activeTab === 'tutorials' ? 'Video Linker' : 'Video Discovery'} to search for videos`
+                  : searchQuery
+                  ? 'Try a different search term'
+                  : 'Change the filter to see other videos'}
               </p>
             </div>
           ) : (
@@ -354,10 +442,10 @@ export default function AdminPage() {
                 onClick={toggleSelectAllVid}
                 className="text-[10px] text-muted hover:text-white font-medium transition-colors"
               >
-                {selectedVidIds.size === videos.length ? 'Deselect all' : 'Select all'}
+                {filteredVideos.every((v) => selectedVidIds.has(v.id)) ? 'Deselect all' : 'Select all'}
               </button>
 
-              {videos.map((vid) => {
+              {filteredVideos.map((vid) => {
                 const isExpanded = expandedVidId === vid.id;
                 const isSelected = selectedVidIds.has(vid.id);
 
@@ -405,40 +493,41 @@ export default function AdminPage() {
                               </Badge>
                             )}
                             {vid.isPrimary && <Badge variant="success" size="sm">Primary</Badge>}
-                            {vid.videoType && (
-                              <Badge variant={vid.videoType === 'tutorial' ? 'success' : 'info'} size="sm">
-                                {vid.videoType}
-                              </Badge>
-                            )}
                           </div>
                         </button>
 
-                        {/* Watch link */}
+                        {/* Inline YouTube preview */}
                         {vid.youtubeVideoId && (
-                          <a
-                            href={`https://www.youtube.com/watch?v=${vid.youtubeVideoId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 mt-2 text-[11px] text-red-400 hover:text-red-300 font-medium transition-colors"
-                          >
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                            </svg>
-                            Watch on YouTube
-                          </a>
-                        )}
-
-                        {/* Expanded: YouTube embed */}
-                        {isExpanded && vid.youtubeVideoId && (
                           <div className="mt-3">
-                            <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
-                              <iframe
-                                src={`https://www.youtube.com/embed/${vid.youtubeVideoId}`}
-                                className="w-full h-full"
-                                allowFullScreen
-                                loading="lazy"
-                              />
-                            </div>
+                            {isExpanded ? (
+                              <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
+                                <iframe
+                                  src={`https://www.youtube.com/embed/${vid.youtubeVideoId}?autoplay=1`}
+                                  className="w-full h-full"
+                                  allow="autoplay; encrypted-media"
+                                  allowFullScreen
+                                  loading="lazy"
+                                />
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setExpandedVidId(vid.id)}
+                                className="relative w-full aspect-video rounded-lg overflow-hidden bg-slate-900 group"
+                              >
+                                <img
+                                  src={vid.thumbnailUrl || `https://img.youtube.com/vi/${vid.youtubeVideoId}/mqdefault.jpg`}
+                                  alt={vid.title}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition-colors">
+                                  <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                    <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M8 5v14l11-7z"/>
+                                    </svg>
+                                  </div>
+                                </div>
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -451,13 +540,7 @@ export default function AdminPage() {
                           onClick={() => handleVideoAction(vid.id, 'approve', 'tutorial')}
                           className="flex-1 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-500/25 transition-colors"
                         >
-                          Tutorial
-                        </button>
-                        <button
-                          onClick={() => handleVideoAction(vid.id, 'approve', 'reference')}
-                          className="flex-1 py-1.5 rounded-lg bg-blue-500/15 text-blue-400 text-[10px] font-bold uppercase tracking-widest hover:bg-blue-500/25 transition-colors"
-                        >
-                          Reference
+                          Approve
                         </button>
                         <button
                           onClick={() => handleVideoAction(vid.id, 'reject')}
@@ -465,6 +548,15 @@ export default function AdminPage() {
                         >
                           Reject
                         </button>
+                        {vid.exerciseId && (
+                          <button
+                            onClick={() => handleRefetch(vid.exerciseId!)}
+                            disabled={refetchingExercise === vid.exerciseId}
+                            className="py-1.5 px-3 rounded-lg bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                          >
+                            {refetchingExercise === vid.exerciseId ? 'Searching...' : 'Re-fetch'}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDeleteVideo(vid.id)}
                           className="py-1.5 px-3 rounded-lg bg-slate-800 text-slate-500 text-[10px] font-bold hover:bg-slate-700 hover:text-slate-300 transition-colors"

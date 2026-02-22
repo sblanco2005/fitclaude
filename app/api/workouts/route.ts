@@ -30,10 +30,10 @@ export const GET = withAuth(async (request, user) => {
                 name: true,
                 muscleGroup: true,
                 videos: {
-                  where: { status: 'approved', videoType: 'tutorial' },
-                  orderBy: { isPrimary: 'desc' },
+                  where: { status: 'approved' },
+                  orderBy: [{ videoType: 'asc' }, { isPrimary: 'desc' }],
                   take: 1,
-                  select: { youtubeVideoId: true, title: true },
+                  select: { youtubeVideoId: true, title: true, videoType: true },
                 },
               },
             },

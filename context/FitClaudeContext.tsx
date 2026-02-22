@@ -81,7 +81,8 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
 
   const fetchTodayNutrition = useCallback(async () => {
     try {
-      const res = await fetch('/api/nutrition/today');
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await fetch(`/api/nutrition/today?tz=${encodeURIComponent(tz)}`);
       if (res.ok) {
         const data = await res.json();
         setTodayNutrition(data);
@@ -174,6 +175,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
           topic: chatTopic,
           image_base64: imageBase64,
           image_media_type: imageMediaType,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
 

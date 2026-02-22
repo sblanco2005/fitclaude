@@ -33,7 +33,7 @@ export default function DashboardPage() {
       .then((res) => res.ok ? res.json() : [])
       .then((workouts: Workout[]) => {
         const today = new Date().toDateString();
-        setTodayWorkouts(workouts.filter((w) => new Date(w.date).toDateString() === today));
+        setTodayWorkouts(workouts.filter((w) => new Date(w.date).toDateString() === today && w.completed));
       })
       .catch(() => {});
   }, [status]);
@@ -117,11 +117,7 @@ export default function DashboardPage() {
                           <span className="text-sm text-white">{w.name || w.workoutType.replace('_', ' ')}</span>
                           <span className="text-xs text-muted ml-2">{w.exercises?.length || 0} exercises</span>
                         </div>
-                        {w.completed ? (
-                          <span className="text-[10px] font-medium text-primary bg-primary/15 px-2 py-0.5 rounded-full">Done</span>
-                        ) : (
-                          <span className="text-[10px] font-medium text-amber-400 bg-amber-400/15 px-2 py-0.5 rounded-full">Pending</span>
-                        )}
+                        <span className="text-[10px] font-medium text-primary bg-primary/15 px-2 py-0.5 rounded-full">Done</span>
                       </div>
                     </Link>
                   ))}

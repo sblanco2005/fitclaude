@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 
 export const POST = withAuth(async (request, user) => {
   const body = await request.json();
-  const { message, image_base64, image_media_type, topic = 'workout' } = body;
+  const { message, image_base64, image_media_type, topic = 'workout', timezone } = body;
 
   if (!message && !image_base64) {
     return NextResponse.json(
@@ -35,6 +35,7 @@ export const POST = withAuth(async (request, user) => {
       topic,
       image_base64,
       image_media_type,
+      timezone: timezone || null,
     }),
   });
 

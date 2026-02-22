@@ -396,23 +396,37 @@ export default function NutritionPage() {
   const [closing, setClosing] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
-  // Fetch today's data
+  const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  // Fetch today's data (timezone-aware)
   const fetchToday = useCallback(() => {
-    fetch('/api/nutrition/today')
+    fetch(`/api/nutrition/today?tz=${encodeURIComponent(userTz)}`)
       .then((res) => res.json())
       .then((data) => {
         setToday(data);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [userTz]);
 
-  // Initial load + re-fetch when chat creates/modifies data
+  // Auto-close stale days from previous dates + fetch today on load
+  useEffect(() => {
+    // Auto-close any unclosed previous days first, then fetch today
+    fetch('/api/nutrition/auto-close', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timezone: userTz }),
+    })
+      .then(() => fetchToday())
+      .catch(() => fetchToday());
+  }, [fetchToday, userTz]);
+
+  // Re-fetch when chat creates/modifies data
   useEffect(() => {
     fetchToday();
   }, [fetchToday, dataVersion]);
 
-  // Auto-close day at 23:00
+  // Auto-close day at 23:00 (belt-and-suspenders with the auto-close on load)
   useEffect(() => {
     const checkAutoClose = () => {
       const now = new Date();

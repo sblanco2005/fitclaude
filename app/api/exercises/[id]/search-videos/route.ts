@@ -14,8 +14,10 @@ export const POST = withAuth(
     if (!exercise) return AuthErrors.notFound('Exercise');
 
     try {
+      const { searchParams } = new URL(_request.url);
+      const force = searchParams.get('force') === 'true';
       const resp = await fetch(
-        `${BACKEND_URL}/api/exercises/${id}/search-videos`,
+        `${BACKEND_URL}/api/exercises/${id}/search-videos${force ? '?force=true' : ''}`,
         { method: 'POST' }
       );
 

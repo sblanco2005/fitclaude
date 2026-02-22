@@ -15,31 +15,40 @@ cuid_generator = Cuid()
 
 
 async def _link_best_video(
-    db: AsyncSession, exercise: Exercise, commit: bool = False
+    db: AsyncSession, exercise: Exercise, commit: bool = False,
+    skip_video_ids: set[str] | None = None,
 ) -> int:
     """Search YouTube for the single best tutorial video for an exercise.
-    Skips any youtubeVideoId that already exists for this exercise (any status).
-    Returns 1 if a video was added, 0 otherwise."""
+    Skips any youtubeVideoId that already exists for this exercise (any status)
+    and any IDs in skip_video_ids. Returns 1 if a video was added, 0 otherwise."""
+    # Fetch more results when we need to skip known videos
+    max_results = 5 if skip_video_ids else 1
     results = await search_youtube(
         f"how to {exercise.name} proper form technique",
-        max_results=1,
+        max_results=max_results,
     )
     if not results:
         logger.info(f"[VideoLinker] No results for '{exercise.name}'")
         return 0
 
-    video = results[0]
-
-    # Check if this specific YouTube video already exists for this exercise
+    # Collect all YouTube video IDs already in DB for this exercise
     existing_result = await db.execute(
         select(ExerciseVideo.youtube_video_id).where(
             ExerciseVideo.exercise_id == exercise.id,
         )
     )
     existing_video_ids = {row[0] for row in existing_result.all()}
+    all_skip = existing_video_ids | (skip_video_ids or set())
 
-    if video["videoId"] in existing_video_ids:
-        logger.info(f"[VideoLinker] Video already exists for '{exercise.name}'")
+    # Find first result not already in DB
+    video = None
+    for candidate in results:
+        if candidate["videoId"] not in all_skip:
+            video = candidate
+            break
+
+    if not video:
+        logger.info(f"[VideoLinker] All results already exist for '{exercise.name}'")
         return 0
 
     # Get video details (duration, view count)
@@ -130,8 +139,14 @@ async def run_video_linking_job(db: AsyncSession) -> dict:
     }
 
 
-async def run_single_exercise_video_search(db: AsyncSession, exercise_id: str) -> dict:
-    """Search YouTube for the best tutorial video for a specific exercise by ID."""
+async def run_single_exercise_video_search(
+    db: AsyncSession, exercise_id: str, force: bool = False
+) -> dict:
+    """Search YouTube for the best tutorial video for a specific exercise by ID.
+
+    If force=True, delete all pending videos for this exercise first so a fresh
+    search can run even when pending videos already exist.
+    """
     result = await db.execute(
         select(Exercise).where(Exercise.id == exercise_id)
     )
@@ -139,18 +154,46 @@ async def run_single_exercise_video_search(db: AsyncSession, exercise_id: str) -
     if not exercise:
         return {"error": "Exercise not found", "added": 0}
 
-    # Check if already has pending or approved videos
-    existing = await db.execute(
-        select(ExerciseVideo.id).where(
-            ExerciseVideo.exercise_id == exercise_id,
-            ExerciseVideo.status.in_(["approved", "pending"]),
+    # Collect YouTube video IDs to skip (rejected + approved videos for this exercise)
+    skip_video_ids: set[str] = set()
+
+    if force:
+        # Reject pending videos and collect all known video IDs to skip
+        pending = await db.execute(
+            select(ExerciseVideo).where(
+                ExerciseVideo.exercise_id == exercise_id,
+                ExerciseVideo.status == "pending",
+            )
         )
-    )
-    if existing.first():
-        return {"message": "Already has videos", "added": 0}
+        rejected = 0
+        for vid in pending.scalars().all():
+            vid.status = "rejected"
+            skip_video_ids.add(vid.youtube_video_id)
+            rejected += 1
+        if rejected:
+            await db.commit()
+            logger.info(f"[VideoLinker] Force: rejected {rejected} pending videos for '{exercise.name}'")
+
+        # Also skip any previously rejected/approved videos
+        all_vids = await db.execute(
+            select(ExerciseVideo.youtube_video_id).where(
+                ExerciseVideo.exercise_id == exercise_id,
+            )
+        )
+        skip_video_ids.update(row[0] for row in all_vids.all())
+    else:
+        # Check if already has pending or approved videos
+        existing = await db.execute(
+            select(ExerciseVideo.id).where(
+                ExerciseVideo.exercise_id == exercise_id,
+                ExerciseVideo.status.in_(["approved", "pending"]),
+            )
+        )
+        if existing.first():
+            return {"message": "Already has videos", "added": 0}
 
     try:
-        added = await _link_best_video(db, exercise, commit=True)
+        added = await _link_best_video(db, exercise, commit=True, skip_video_ids=skip_video_ids)
         return {"added": added, "exercise": exercise.name}
     except Exception as e:
         logger.error(f"[VideoLinker] Single search failed for '{exercise.name}': {e}")

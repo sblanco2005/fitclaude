@@ -9,6 +9,7 @@ class ChatRequest(BaseModel):
     topic: str = "workout"
     image_base64: Optional[str] = None
     image_media_type: Optional[str] = None
+    timezone: Optional[str] = None  # e.g. "America/New_York"
 
 
 class ChatResponse(BaseModel):
