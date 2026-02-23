@@ -29,6 +29,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
 
   callbacks: {
+    async signIn({ profile }) {
+      const allowed = process.env.ALLOWED_EMAILS?.split(',') ?? [];
+      if (allowed.length > 0 && !allowed.includes(profile?.email ?? '')) {
+        return false;
+      }
+      return true;
+    },
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id;
