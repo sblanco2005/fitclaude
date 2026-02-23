@@ -201,32 +201,37 @@ export function ChatDrawer() {
   // ── Collapsed: Claude-style input bar ──
   if (!chatOpen) {
     return (
-      <div className="shrink-0 px-3 py-2 bg-background border-t border-slate-800/50 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
+      <div className="shrink-0 px-3 py-2 bg-background border-t border-primary/20 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
         {hiddenFileInput}
         <div
-          className="flex items-center gap-2 bg-slate-800/50 border border-slate-700/40 rounded-2xl px-3 py-2.5 cursor-text"
+          className="flex items-center gap-2 bg-slate-800/70 border border-primary/30 rounded-2xl px-3 py-2.5 cursor-text shadow-[0_0_12px_rgba(16,185,129,0.08)]"
           onClick={() => setChatOpen(true)}
         >
-          {/* + button */}
+          {/* Coach avatar */}
+          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+            <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+          </div>
+          <span className="text-slate-400 text-sm flex-1">
+            {chatTopic === 'nutrition' ? 'Log food, ask about macros...' : 'Message Coach Fit...'}
+          </span>
           <button
             onClick={(e) => {
               e.stopPropagation();
               fileInputRef.current?.click();
             }}
-            className="w-7 h-7 rounded-full bg-slate-700/60 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white transition-colors shrink-0"
+            className="w-7 h-7 rounded-full hover:bg-slate-700/60 flex items-center justify-center text-slate-500 hover:text-white transition-colors shrink-0"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
           </button>
-          <span className="text-slate-500 text-sm flex-1">
-            {chatTopic === 'nutrition' ? 'Log food, ask about macros...' : 'Message Coach Fit...'}
-          </span>
-          <span className="text-slate-600 shrink-0">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
+            <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
               <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
             </svg>
-          </span>
+          </div>
         </div>
       </div>
     );
