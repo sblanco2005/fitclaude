@@ -13,7 +13,7 @@ export const Card: React.FC<CardProps> = ({
   hover = false,
   glass = true,
 }) => {
-  const baseStyles = 'rounded-xl p-6 transition-all duration-200';
+  const baseStyles = 'rounded-xl p-4 transition-all duration-200';
   const glassStyles = glass ? 'glass' : 'bg-card';
   const hoverStyles = hover ? 'glass-hover cursor-pointer' : '';
 

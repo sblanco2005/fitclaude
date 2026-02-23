@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const hasSummary = hasNutrition || hasWorkouts;
 
   return (
-    <div className="p-4 space-y-4 max-w-lg mx-auto">
+    <div className="p-3 pb-1 space-y-3 max-w-lg mx-auto">
       <h2 className="text-xl font-bold text-white">
         Hey, {session.user?.name?.split(' ')[0] || 'there'}
       </h2>
@@ -77,14 +77,14 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
         <Link href="/workouts" className="block">
-          <Card className="text-center p-4" hover>
-            <div className="text-2xl mb-1">🏋️</div>
+          <Card className="text-center p-3" hover>
+            <div className="text-2xl mb-0.5">🏋️</div>
             <span className="text-xs text-slate-300">Workouts</span>
           </Card>
         </Link>
         <Link href="/nutrition" className="block">
-          <Card className="text-center p-4" hover>
-            <div className="text-2xl mb-1">🍽️</div>
+          <Card className="text-center p-3" hover>
+            <div className="text-2xl mb-0.5">🍽️</div>
             <span className="text-xs text-slate-300">Nutrition</span>
           </Card>
         </Link>
@@ -92,7 +92,7 @@ export default function DashboardPage() {
 
       {/* Today's Summary */}
       <Card>
-        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
+        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">
           Today&apos;s Summary
         </h3>
 
