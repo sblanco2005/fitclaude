@@ -69,3 +69,4 @@ ENV/
 
 # Streamlit (legacy)
 .streamlit/secrets.toml
+SCALE.md
