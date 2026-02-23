@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
-from anthropic import AsyncAnthropic
+from anthropic import APIConnectionError, APIStatusError, AsyncAnthropic
 from cuid2 import Cuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from app.agent.prompts import COACH_SYSTEM_PROMPT, build_user_context
 from app.agent.spicy import get_spicy_variation
 from app.services.youtube_service import import_exercises_from_youtube
 from app.agent.tools import TOOL_DEFINITIONS
+from app.agent.minimax_fallback import handle_chat_minimax
 from app.config import settings
 from app.models import (
     ConversationHistory,
@@ -788,145 +789,162 @@ async def handle_chat(
     # Build messages
     messages = history + [{"role": "user", "content": user_content}]
 
-    # Call Claude
-    response = await client.messages.create(
-        model=settings.agent_model,
-        max_tokens=2048,
-        system=COACH_SYSTEM_PROMPT + "\n" + context,
-        messages=messages,
-        tools=TOOL_DEFINITIONS,
-    )
+    # Call Claude with MiniMax fallback on transient errors
+    system_full = COACH_SYSTEM_PROMPT + "\n" + context
 
-    # Tool-use loop
-    workout_id = None
-    nutrition_log_id = None
-
-    logger.info(f"[Coach] Initial stop_reason: {response.stop_reason}")
-    while response.stop_reason == "tool_use":
-        tool_results = []
-        for block in response.content:
-            if block.type == "tool_use":
-                logger.info(f"[Coach] Tool call: {block.name} with input keys: {list(block.input.keys())}")
-                result = await _execute_tool(block.name, block.input, user_id, db, user_tz=user_tz)
-                logger.info(f"[Coach] Tool result keys: {list(result.keys())}")
-                # Track IDs for response (but strip from what Claude sees)
-                if "workout_id" in result:
-                    workout_id = result["workout_id"]
-                if "nutrition_log_id" in result:
-                    nutrition_log_id = result["nutrition_log_id"]
-
-                # Strip internal IDs before sending to Claude
-                claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id")}
-
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": json.dumps(claude_result),
-                })
-
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append({"role": "user", "content": tool_results})
-
+    try:
         response = await client.messages.create(
             model=settings.agent_model,
             max_tokens=2048,
-            system=COACH_SYSTEM_PROMPT + "\n" + context,
+            system=system_full,
             messages=messages,
             tools=TOOL_DEFINITIONS,
         )
 
-    # Extract final text
-    assistant_text = "".join(
-        block.text for block in response.content if hasattr(block, "text")
-    )
+        # Tool-use loop
+        workout_id = None
+        nutrition_log_id = None
 
-    # Safety net: if the topic is nutrition and the user mentioned food but
-    # the model didn't call log_nutrition, retry once with a forced instruction.
-    if (
-        topic == "nutrition"
-        and nutrition_log_id is None
-        and _looks_like_food_log(user_message)
-        and response.stop_reason == "end_turn"
-    ):
-        logger.warning("[Coach] Model skipped log_nutrition tool — retrying with forced instruction")
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append({
-            "role": "user",
-            "content": (
-                "SYSTEM: You did NOT call the log_nutrition tool. The food was NOT saved. "
-                "You MUST call log_nutrition now with the food the user described. "
-                "Do not respond with text — call the tool."
-            ),
-        })
-        response = await client.messages.create(
-            model=settings.agent_model,
-            max_tokens=2048,
-            system=COACH_SYSTEM_PROMPT + "\n" + context,
-            messages=messages,
-            tools=TOOL_DEFINITIONS,
-        )
-        # Process tool calls from the retry
+        logger.info(f"[Coach] Initial stop_reason: {response.stop_reason}")
         while response.stop_reason == "tool_use":
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
-                    logger.info(f"[Coach] Retry tool call: {block.name}")
+                    logger.info(f"[Coach] Tool call: {block.name} with input keys: {list(block.input.keys())}")
                     result = await _execute_tool(block.name, block.input, user_id, db, user_tz=user_tz)
+                    logger.info(f"[Coach] Tool result keys: {list(result.keys())}")
+                    # Track IDs for response (but strip from what Claude sees)
+                    if "workout_id" in result:
+                        workout_id = result["workout_id"]
                     if "nutrition_log_id" in result:
                         nutrition_log_id = result["nutrition_log_id"]
+
+                    # Strip internal IDs before sending to Claude
                     claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id")}
+
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,
                         "content": json.dumps(claude_result),
                     })
+
             messages.append({"role": "assistant", "content": response.content})
             messages.append({"role": "user", "content": tool_results})
+
             response = await client.messages.create(
                 model=settings.agent_model,
                 max_tokens=2048,
-                system=COACH_SYSTEM_PROMPT + "\n" + context,
+                system=system_full,
                 messages=messages,
                 tools=TOOL_DEFINITIONS,
             )
-        # Use the retry response text
+
+        # Extract final text
         assistant_text = "".join(
             block.text for block in response.content if hasattr(block, "text")
         )
 
-    # Safety net: if the topic is workout and the user asked for a workout but
-    # the model didn't call generate_workout, parse exercises from the text and save directly.
-    # This avoids a costly retry API call and is deterministic.
-    if (
-        topic == "workout"
-        and workout_id is None
-        and _looks_like_workout_request(user_message)
-        and response.stop_reason == "end_turn"
-    ):
-        parsed = _parse_workout_from_text(assistant_text)
-        if parsed and len(parsed.get("exercises", [])) >= 3:
-            logger.warning(
-                f"[Coach] Model skipped generate_workout — auto-saving {len(parsed['exercises'])} "
-                f"exercises parsed from text response"
+        # Safety net: if the topic is nutrition and the user mentioned food but
+        # the model didn't call log_nutrition, retry once with a forced instruction.
+        if (
+            topic == "nutrition"
+            and nutrition_log_id is None
+            and _looks_like_food_log(user_message)
+            and response.stop_reason == "end_turn"
+        ):
+            logger.warning("[Coach] Model skipped log_nutrition tool — retrying with forced instruction")
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({
+                "role": "user",
+                "content": (
+                    "SYSTEM: You did NOT call the log_nutrition tool. The food was NOT saved. "
+                    "You MUST call log_nutrition now with the food the user described. "
+                    "Do not respond with text — call the tool."
+                ),
+            })
+            response = await client.messages.create(
+                model=settings.agent_model,
+                max_tokens=2048,
+                system=system_full,
+                messages=messages,
+                tools=TOOL_DEFINITIONS,
             )
-            try:
-                result = await _tool_generate_workout(db, user_id, parsed)
-                workout_id = result.get("workout_id")
-                logger.info(f"[Coach] Auto-saved workout {workout_id} from text parse")
-            except Exception as e:
-                logger.error(f"[Coach] Failed to auto-save parsed workout: {e}")
-        else:
-            logger.warning("[Coach] Model skipped generate_workout and text parse failed — workout NOT saved")
+            # Process tool calls from the retry
+            while response.stop_reason == "tool_use":
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        logger.info(f"[Coach] Retry tool call: {block.name}")
+                        result = await _execute_tool(block.name, block.input, user_id, db, user_tz=user_tz)
+                        if "nutrition_log_id" in result:
+                            nutrition_log_id = result["nutrition_log_id"]
+                        claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id")}
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": json.dumps(claude_result),
+                        })
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "user", "content": tool_results})
+                response = await client.messages.create(
+                    model=settings.agent_model,
+                    max_tokens=2048,
+                    system=system_full,
+                    messages=messages,
+                    tools=TOOL_DEFINITIONS,
+                )
+            # Use the retry response text
+            assistant_text = "".join(
+                block.text for block in response.content if hasattr(block, "text")
+            )
 
-    # Tool-created records are committed immediately in each tool handler.
-    # Final commit is a no-op safety net in case any tool only flushed.
-    try:
-        await db.commit()
-    except Exception as e:
-        logger.error(f"[Coach] Final commit error (data already committed per-tool): {e}")
+        # Safety net: if the topic is workout and the user asked for a workout but
+        # the model didn't call generate_workout, parse exercises from the text and save directly.
+        # This avoids a costly retry API call and is deterministic.
+        if (
+            topic == "workout"
+            and workout_id is None
+            and _looks_like_workout_request(user_message)
+            and response.stop_reason == "end_turn"
+        ):
+            parsed = _parse_workout_from_text(assistant_text)
+            if parsed and len(parsed.get("exercises", [])) >= 3:
+                logger.warning(
+                    f"[Coach] Model skipped generate_workout — auto-saving {len(parsed['exercises'])} "
+                    f"exercises parsed from text response"
+                )
+                try:
+                    result = await _tool_generate_workout(db, user_id, parsed)
+                    workout_id = result.get("workout_id")
+                    logger.info(f"[Coach] Auto-saved workout {workout_id} from text parse")
+                except Exception as e:
+                    logger.error(f"[Coach] Failed to auto-save parsed workout: {e}")
+            else:
+                logger.warning("[Coach] Model skipped generate_workout and text parse failed — workout NOT saved")
 
-    return {
-        "response": assistant_text,
-        "workout_id": workout_id,
-        "nutrition_log_id": nutrition_log_id,
-    }
+        # Tool-created records are committed immediately in each tool handler.
+        # Final commit is a no-op safety net in case any tool only flushed.
+        try:
+            await db.commit()
+        except Exception as e:
+            logger.error(f"[Coach] Final commit error (data already committed per-tool): {e}")
+
+        return {
+            "response": assistant_text,
+            "workout_id": workout_id,
+            "nutrition_log_id": nutrition_log_id,
+            "model_used": settings.agent_model,
+        }
+
+    except (APIStatusError, APIConnectionError) as e:
+        # Re-raise auth errors — fallback won't help
+        if isinstance(e, APIStatusError) and e.status_code in (401, 403):
+            raise
+        logger.warning(f"[Coach] Anthropic unavailable ({e}), falling back to MiniMax")
+        fallback_text = await handle_chat_minimax(user_message, history, system_full)
+        return {
+            "response": fallback_text,
+            "workout_id": None,
+            "nutrition_log_id": None,
+            "model_used": settings.minimax_model,
+        }

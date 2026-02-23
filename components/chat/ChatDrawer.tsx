@@ -324,6 +324,15 @@ export function ChatDrawer() {
                       <div className="text-[15px] leading-relaxed text-slate-200">
                         {renderMarkdown(msg.content)}
                       </div>
+                      {msg.modelUsed && (
+                        <span className={`mt-1.5 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                          msg.modelUsed.includes('MiniMax')
+                            ? 'bg-amber-900/40 text-amber-400'
+                            : 'bg-slate-800 text-slate-500'
+                        }`}>
+                          {msg.modelUsed.includes('MiniMax') ? 'MiniMax (fallback)' : 'Haiku'}
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}

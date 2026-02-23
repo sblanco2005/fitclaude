@@ -117,6 +117,15 @@ export default function ChatPage() {
                 />
               )}
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+              {msg.role === 'assistant' && msg.modelUsed && (
+                <span className={`mt-1.5 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                  msg.modelUsed.includes('MiniMax')
+                    ? 'bg-amber-900/40 text-amber-400'
+                    : 'bg-slate-800/60 text-slate-500'
+                }`}>
+                  {msg.modelUsed.includes('MiniMax') ? 'MiniMax (fallback)' : 'Haiku'}
+                </span>
+              )}
             </div>
           </div>
         ))}

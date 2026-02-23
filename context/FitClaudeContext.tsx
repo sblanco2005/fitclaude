@@ -183,6 +183,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
 
       const data = await res.json();
       const response = data.response || data.message || 'No response';
+      const modelUsed = data.model_used || null;
 
       setter((prev) => {
         const updated = prev.map((m) =>
@@ -195,6 +196,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
             role: 'assistant' as const,
             content: response,
             createdAt: new Date().toISOString(),
+            modelUsed,
           },
         ];
       });

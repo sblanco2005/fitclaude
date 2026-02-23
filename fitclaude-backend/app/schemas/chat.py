@@ -13,6 +13,9 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     response: str
     workout_id: Optional[str] = None
     nutrition_log_id: Optional[str] = None
+    model_used: Optional[str] = None

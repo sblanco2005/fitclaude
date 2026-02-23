@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     haiku_model: str = "claude-haiku-4-5-20251001"
     debug: bool = False
 
+    # MiniMax fallback
+    minimax_api_key: str = ""
+    minimax_model: str = "MiniMax-M2.5"
+
     # YouTube subagent
     youtube_api_key: str = ""
     job_api_key: str = ""

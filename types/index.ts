@@ -178,4 +178,5 @@ export interface ChatMessage {
   content: string;
   imageUrl?: string | null;
   createdAt: string;
+  modelUsed?: string | null;
 }
