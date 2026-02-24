@@ -2,11 +2,15 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import { useRouter, usePathname } from 'next/navigation';
 
 export function Header() {
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const isHome = pathname === '/';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -20,9 +24,22 @@ export function Header() {
 
   return (
     <header className="shrink-0 z-30 flex items-center justify-between h-14 px-4 bg-background/80 backdrop-blur-md border-b border-border-dark">
-      <h1 className="text-lg font-bold text-white">
-        Fit<span className="text-primary">Claude</span>
-      </h1>
+      <div className="flex items-center gap-2">
+        {!isHome && (
+          <button
+            onClick={() => router.back()}
+            className="p-1.5 -ml-1.5 text-slate-400 hover:text-white active:text-primary transition-colors"
+            aria-label="Go back"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+        <h1 className="text-lg font-bold text-white">
+          Fit<span className="text-primary">Claude</span>
+        </h1>
+      </div>
       {session?.user?.image && (
         <div className="relative" ref={menuRef}>
           <button onClick={() => setMenuOpen(!menuOpen)}>

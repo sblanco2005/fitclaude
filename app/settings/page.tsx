@@ -176,21 +176,81 @@ export default function SettingsPage() {
       {/* Nutrition Targets */}
       <Card>
         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Nutrition Targets</h3>
-        <p className="text-xs text-muted mb-3">Your coach uses these to track your nutrition progress</p>
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Daily Calories"
-            type="number"
-            value={profile.dailyCalorieTarget ?? ''}
-            onChange={(e) => updateField('dailyCalorieTarget', e.target.value ? parseInt(e.target.value) : null)}
-          />
-          <Input
-            label="Daily Protein (g)"
-            type="number"
-            step="0.1"
-            value={profile.dailyProteinTarget ?? ''}
-            onChange={(e) => updateField('dailyProteinTarget', e.target.value ? parseFloat(e.target.value) : null)}
-          />
+        <p className="text-xs text-muted mb-3">Set your daily calories and protein, then split the remaining calories between carbs and fat</p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Daily Calories"
+              type="number"
+              value={profile.dailyCalorieTarget ?? ''}
+              onChange={(e) => updateField('dailyCalorieTarget', e.target.value ? parseInt(e.target.value) : null)}
+            />
+            <Input
+              label="Protein (g)"
+              type="number"
+              step="0.1"
+              value={profile.dailyProteinTarget ?? ''}
+              onChange={(e) => updateField('dailyProteinTarget', e.target.value ? parseFloat(e.target.value) : null)}
+            />
+          </div>
+
+          {/* Macro split for remaining calories */}
+          {(() => {
+            const cal = profile.dailyCalorieTarget ?? 0;
+            const protG = profile.dailyProteinTarget ?? 0;
+            const protCal = protG * 4;
+            const remaining = Math.max(cal - protCal, 0);
+            const carbsPct = profile.carbsPercent ?? 50;
+            const fatPct = profile.fatPercent ?? 50;
+            const carbsG = Math.round((remaining * (carbsPct / 100)) / 4);
+            const fatG = Math.round((remaining * (fatPct / 100)) / 9);
+
+            if (!cal || !protG) return null;
+
+            return (
+              <div className="space-y-3">
+                <div className="text-xs text-muted">
+                  Protein uses <span className="text-blue-400 font-medium">{Math.round(protCal)} kcal</span> ({cal > 0 ? Math.round((protCal / cal) * 100) : 0}%) — <span className="text-slate-300 font-medium">{remaining} kcal</span> remaining for carbs & fat
+                </div>
+
+                {/* Slider */}
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-amber-400 font-medium">Carbs {carbsPct}%</span>
+                    <span className="text-red-400 font-medium">Fat {fatPct}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={10}
+                    max={90}
+                    value={carbsPct}
+                    onChange={(e) => {
+                      const c = parseInt(e.target.value);
+                      updateField('carbsPercent', c);
+                      updateField('fatPercent', 100 - c);
+                    }}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gradient-to-r from-amber-500 to-red-500 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
+                  />
+                </div>
+
+                {/* Computed grams */}
+                <div className="grid grid-cols-3 gap-2 text-center bg-slate-800/50 rounded-lg py-2.5">
+                  <div>
+                    <div className="text-sm font-semibold text-blue-400">{Math.round(protG)}g</div>
+                    <div className="text-[10px] text-muted">protein</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-amber-400">{carbsG}g</div>
+                    <div className="text-[10px] text-muted">carbs</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-red-400">{fatG}g</div>
+                    <div className="text-[10px] text-muted">fat</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </Card>
 

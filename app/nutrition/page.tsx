@@ -191,28 +191,33 @@ function MealRow({
     );
   }
 
+  const lastTapRef = useRef(0);
+
+  const handleTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 350) {
+      startEdit();
+    }
+    lastTapRef.current = now;
+  };
+
   return (
-    <div className="flex items-start justify-between py-2 border-b border-slate-800 last:border-0 group">
+    <div
+      onClick={handleTap}
+      className="flex items-start justify-between py-2 border-b border-slate-800 last:border-0 group cursor-pointer active:bg-slate-800/30 transition-colors"
+    >
       <div className="min-w-0 flex-1">
         <p className="text-sm text-white">{log.rawInput}</p>
-        {log.mealType && (
-          <span className="text-xs text-muted capitalize">{log.mealType}</span>
-        )}
-      </div>
-      <div className="flex items-start gap-2 shrink-0 ml-3">
-        <div className="text-right text-xs text-muted whitespace-nowrap">
-          {log.calories != null && <div>{Math.round(log.calories)} kcal</div>}
-          {log.proteinG != null && <div>{Math.round(log.proteinG)}g protein</div>}
+        <div className="flex items-center gap-2">
+          {log.mealType && (
+            <span className="text-xs text-muted capitalize">{log.mealType}</span>
+          )}
+          <span className="text-[10px] text-slate-600">double-tap to edit</span>
         </div>
-        <button
-          onClick={startEdit}
-          className="p-1 text-slate-700 hover:text-slate-400 transition-colors opacity-0 group-hover:opacity-100"
-          title="Edit"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-        </button>
+      </div>
+      <div className="text-right text-xs text-muted whitespace-nowrap shrink-0 ml-3">
+        {log.calories != null && <div>{Math.round(log.calories)} kcal</div>}
+        {log.proteinG != null && <div>{Math.round(log.proteinG)}g protein</div>}
       </div>
     </div>
   );
@@ -225,11 +230,13 @@ function HistoryDayCard({
   formatDate,
   onCopied,
   onDeleted,
+  timezone,
 }: {
   summary: DailyNutritionSummary;
   formatDate: (d: string) => string;
   onCopied: () => void;
   onDeleted: () => void;
+  timezone: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [meals, setMeals] = useState<NutritionLog[]>([]);
@@ -244,7 +251,7 @@ function HistoryDayCard({
     if (!expanded && meals.length === 0) {
       setLoadingMeals(true);
       try {
-        const res = await fetch(`/api/nutrition/history?date=${dateKey}`);
+        const res = await fetch(`/api/nutrition/history?date=${dateKey}&tz=${encodeURIComponent(timezone)}`);
         if (res.ok) setMeals(await res.json());
       } catch { /* ignore */ }
       setLoadingMeals(false);
@@ -258,7 +265,7 @@ function HistoryDayCard({
       const res = await fetch('/api/nutrition/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateKey }),
+        body: JSON.stringify({ date: dateKey, timezone }),
       });
       if (res.ok) {
         setCopied(true);
@@ -382,9 +389,151 @@ function HistoryDayCard({
   );
 }
 
+// ─── Week grouping helpers ────────────────────────────────────────────────────
+
+function getWeekKey(dateStr: string): string {
+  // Returns "YYYY-WNN" ISO week key from a date string
+  const d = new Date(dateStr.split('T')[0] + 'T12:00:00Z');
+  // ISO week: Monday is first day
+  const dayOfWeek = d.getUTCDay() || 7; // Sun=7, Mon=1
+  d.setUTCDate(d.getUTCDate() + 4 - dayOfWeek); // Thursday of this week
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+}
+
+function getWeekRange(dateStr: string): string {
+  // Returns "Mon Feb 17 – Sun Feb 23" style label from any date in that week
+  const d = new Date(dateStr.split('T')[0] + 'T12:00:00Z');
+  const dayOfWeek = d.getUTCDay() || 7;
+  const monday = new Date(d);
+  monday.setUTCDate(d.getUTCDate() - dayOfWeek + 1);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  const fmt = (dt: Date) => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return `${fmt(monday)} – ${fmt(sunday)}`;
+}
+
+interface WeekData {
+  key: string;
+  label: string;
+  summaries: DailyNutritionSummary[];
+  avgCalories: number;
+  avgProteinG: number;
+  avgCarbsG: number;
+  avgFatG: number;
+  totalDays: number;
+}
+
+function groupByWeek(summaries: DailyNutritionSummary[]): WeekData[] {
+  const groups: Record<string, DailyNutritionSummary[]> = {};
+  for (const s of summaries) {
+    const wk = getWeekKey(s.date);
+    if (!groups[wk]) groups[wk] = [];
+    groups[wk].push(s);
+  }
+  return Object.entries(groups)
+    .sort(([a], [b]) => b.localeCompare(a)) // newest first
+    .map(([key, days]) => {
+      const n = days.length;
+      return {
+        key,
+        label: getWeekRange(days[0].date),
+        summaries: days,
+        avgCalories: days.reduce((s, d) => s + d.calories, 0) / n,
+        avgProteinG: days.reduce((s, d) => s + d.proteinG, 0) / n,
+        avgCarbsG: days.reduce((s, d) => s + d.carbsG, 0) / n,
+        avgFatG: days.reduce((s, d) => s + d.fatG, 0) / n,
+        totalDays: n,
+      };
+    });
+}
+
+function WeekGroup({
+  week,
+  formatDate,
+  timezone,
+  onCopied,
+  onDeleted,
+}: {
+  week: WeekData;
+  formatDate: (d: string) => string;
+  timezone: string;
+  onCopied: () => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div>
+      {/* Week header */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full"
+      >
+        <Card className="!p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold text-white">{week.label}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted">{week.totalDays} day{week.totalDays !== 1 ? 's' : ''}</span>
+              <svg
+                className={`w-4 h-4 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div>
+              <div className="text-xs font-semibold text-primary">{Math.round(week.avgCalories)}</div>
+              <div className="text-[9px] text-muted">avg kcal</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-blue-400">{Math.round(week.avgProteinG)}g</div>
+              <div className="text-[9px] text-muted">avg prot</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-amber-400">{Math.round(week.avgCarbsG)}g</div>
+              <div className="text-[9px] text-muted">avg carbs</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-red-400">{Math.round(week.avgFatG)}g</div>
+              <div className="text-[9px] text-muted">avg fat</div>
+            </div>
+          </div>
+        </Card>
+      </button>
+
+      {/* Expanded: individual day cards */}
+      {expanded && (
+        <div className="ml-3 mt-2 space-y-2 border-l-2 border-slate-800 pl-3">
+          {week.summaries.map((s) => (
+            <HistoryDayCard
+              key={s.id}
+              summary={s}
+              formatDate={formatDate}
+              timezone={timezone}
+              onCopied={onCopied}
+              onDeleted={() => onDeleted(s.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 type Tab = 'today' | 'history';
+
+interface MacroTargets {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
 
 export default function NutritionPage() {
   const { dataVersion } = useFitClaude();
@@ -395,8 +544,31 @@ export default function NutritionPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [closing, setClosing] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [targets, setTargets] = useState<MacroTargets>({ calories: 2000, proteinG: 150, carbsG: 200, fatG: 65 });
 
   const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  // Fetch user profile targets
+  useEffect(() => {
+    fetch('/api/profile')
+      .then((res) => res.ok ? res.json() : null)
+      .then((p) => {
+        if (!p) return;
+        const cal = p.dailyCalorieTarget ?? 2000;
+        const protG = p.dailyProteinTarget ?? 150;
+        const protCal = protG * 4;
+        const remaining = Math.max(cal - protCal, 0);
+        const carbsPct = p.carbsPercent ?? 50;
+        const fatPct = p.fatPercent ?? 50;
+        setTargets({
+          calories: cal,
+          proteinG: protG,
+          carbsG: Math.round((remaining * (carbsPct / 100)) / 4),
+          fatG: Math.round((remaining * (fatPct / 100)) / 9),
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch today's data (timezone-aware)
   const fetchToday = useCallback(() => {
@@ -478,7 +650,7 @@ export default function NutritionPage() {
       const res = await fetch('/api/nutrition/close-day', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ timezone: userTz }),
       });
       if (res.ok) {
         setHistoryLoaded(false);
@@ -494,14 +666,17 @@ export default function NutritionPage() {
   const totals = today?.totals || { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 };
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    // Summary dates are stored as "YYYY-MM-DDT00:00:00Z" — extract the date part
+    const dStr = dateStr.split('T')[0];
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: userTz });
+    const yestDate = new Date();
+    yestDate.setDate(yestDate.getDate() - 1);
+    const yesterdayStr = yestDate.toLocaleDateString('en-CA', { timeZone: userTz });
 
-    if (d.toDateString() === now.toDateString()) return 'Today';
-    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (dStr === todayStr) return 'Today';
+    if (dStr === yesterdayStr) return 'Yesterday';
+    const d = new Date(dStr + 'T12:00:00Z'); // noon UTC to avoid DST issues
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
   };
 
   if (loading) {
@@ -542,10 +717,10 @@ export default function NutritionPage() {
               Today&apos;s Macros
             </h3>
             <div className="space-y-3">
-              <ProgressBar current={totals.calories} target={2400} label="Calories" color="bg-primary" />
-              <ProgressBar current={totals.proteinG} target={180} label="Protein (g)" color="bg-blue-500" />
-              <ProgressBar current={totals.carbsG} target={300} label="Carbs (g)" color="bg-amber-500" />
-              <ProgressBar current={totals.fatG} target={80} label="Fat (g)" color="bg-red-500" />
+              <ProgressBar current={totals.calories} target={targets.calories} label="Calories" color="bg-primary" />
+              <ProgressBar current={totals.proteinG} target={targets.proteinG} label="Protein (g)" color="bg-blue-500" />
+              <ProgressBar current={totals.carbsG} target={targets.carbsG} label="Carbs (g)" color="bg-amber-500" />
+              <ProgressBar current={totals.fatG} target={targets.fatG} label="Fat (g)" color="bg-red-500" />
             </div>
           </Card>
 
@@ -559,7 +734,7 @@ export default function NutritionPage() {
                 No meals logged yet. Tell your coach what you ate or snap a photo!
               </p>
             ) : (
-              <div>
+              <div className="max-h-[40vh] overflow-y-auto -mr-2 pr-2">
                 {today.logs.map((log: NutritionLog) => (
                   <MealRow
                     key={log.id}
@@ -600,16 +775,17 @@ export default function NutritionPage() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {summaries.map((s) => (
-                <HistoryDayCard
-                  key={s.id}
-                  summary={s}
+              {groupByWeek(summaries).map((week) => (
+                <WeekGroup
+                  key={week.key}
+                  week={week}
                   formatDate={formatDate}
+                  timezone={userTz}
                   onCopied={() => {
                     fetchToday();
                     setTab('today');
                   }}
-                  onDeleted={() => setSummaries((prev) => prev.filter((x) => x.id !== s.id))}
+                  onDeleted={(id) => setSummaries((prev) => prev.filter((x) => x.id !== id))}
                 />
               ))}
             </div>

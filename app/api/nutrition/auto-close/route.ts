@@ -1,32 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
+import { getUserDayBounds, getUserTodayStr } from '@/lib/timezone';
 
 /**
  * POST /api/nutrition/auto-close
  *
  * Called on page load. Finds any nutrition logs from previous days that
  * haven't been closed into DailyNutritionSummary records and closes them.
- * This ensures that when a user connects the next day, yesterday's logs
- * are properly archived to history and today starts fresh.
- *
- * Accepts optional { timezone } in body to determine "today" correctly.
+ * Uses the user's timezone to determine day boundaries correctly.
  */
 export const POST = withAuth(async (request: NextRequest, user) => {
   const body = await request.json().catch(() => ({}));
   const timezone = body.timezone || 'UTC';
 
-  // Determine "today" in the user's timezone
-  const now = new Date();
-  let todayStr: string;
-  try {
-    todayStr = now.toLocaleDateString('en-CA', { timeZone: timezone }); // "YYYY-MM-DD"
-  } catch {
-    todayStr = now.toISOString().split('T')[0];
-  }
-  const todayStart = new Date(todayStr + 'T00:00:00');
+  // "Today" starts at midnight in user's timezone (as UTC)
+  const { start: todayStart } = getUserDayBounds(timezone);
 
-  // Find all nutrition logs BEFORE today that don't have a matching summary
+  // Find all nutrition logs BEFORE today in UTC terms
   const oldLogs = await prisma.nutritionLog.findMany({
     where: {
       userId: user.id,
@@ -39,7 +30,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     return NextResponse.json({ closed: 0 });
   }
 
-  // Group logs by date (YYYY-MM-DD)
+  // Group logs by their local date in the user's timezone
   const dayGroups: Record<string, typeof oldLogs> = {};
   for (const log of oldLogs) {
     let dateKey: string;
@@ -55,16 +46,16 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   // For each day group, check if a summary already exists; if not, create one
   let closedCount = 0;
   for (const [dateKey, logs] of Object.entries(dayGroups)) {
-    const dayDate = new Date(dateKey + 'T00:00:00');
+    const summaryDate = new Date(dateKey + 'T00:00:00Z');
 
     const existingSummary = await prisma.dailyNutritionSummary.findFirst({
       where: {
         userId: user.id,
-        date: dayDate,
+        date: summaryDate,
       },
     });
 
-    if (existingSummary) continue; // Already closed
+    if (existingSummary) continue;
 
     const totals = logs.reduce(
       (acc, log) => ({
@@ -80,7 +71,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     await prisma.dailyNutritionSummary.create({
       data: {
         userId: user.id,
-        date: dayDate,
+        date: summaryDate,
         calories: totals.calories,
         proteinG: totals.proteinG,
         carbsG: totals.carbsG,

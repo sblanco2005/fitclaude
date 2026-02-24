@@ -31,6 +31,8 @@ model User {
   equipmentText      String?   @db.Text
   dailyCalorieTarget Int?
   dailyProteinTarget Float?
+  carbsPercent       Int?      // % of remaining cals after protein for carbs
+  fatPercent         Int?      // % of remaining cals after protein for fat
   sex                String?   // male, female, other, prefer_not_to_say
   trainingFrequency  Int?      // days per week, 1–7
   isOnboarded        Boolean   @default(false)

@@ -14,6 +14,8 @@ export interface UserProfile {
   equipmentText: string | null;
   dailyCalorieTarget: number | null;
   dailyProteinTarget: number | null;
+  carbsPercent: number | null;
+  fatPercent: number | null;
   sex: string | null;
   trainingFrequency: number | null;
   isOnboarded: boolean;

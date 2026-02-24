@@ -20,6 +20,8 @@ export const GET = withAuth(async (_request, user) => {
       equipmentText: true,
       dailyCalorieTarget: true,
       dailyProteinTarget: true,
+      carbsPercent: true,
+      fatPercent: true,
       sex: true,
       trainingFrequency: true,
       isOnboarded: true,
@@ -38,6 +40,7 @@ export const PATCH = withAuth(async (request, user) => {
     'fitnessGoal', 'experienceLevel', 'gymType',
     'injuriesNotes', 'equipmentText',
     'dailyCalorieTarget', 'dailyProteinTarget',
+    'carbsPercent', 'fatPercent',
     'sex', 'trainingFrequency', 'isOnboarded',
   ];
 
@@ -64,6 +67,8 @@ export const PATCH = withAuth(async (request, user) => {
       equipmentText: true,
       dailyCalorieTarget: true,
       dailyProteinTarget: true,
+      carbsPercent: true,
+      fatPercent: true,
       sex: true,
       trainingFrequency: true,
       isOnboarded: true,

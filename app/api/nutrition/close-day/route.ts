@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
+import { getUserDayBounds, getUserTodayStr } from '@/lib/timezone';
 
 export const POST = withAuth(async (request: NextRequest, user) => {
-  // Optionally accept a specific date, defaults to today
   const body = await request.json().catch(() => ({}));
-  const targetDate = body.date ? new Date(body.date) : new Date();
-  targetDate.setHours(0, 0, 0, 0);
+  const timezone = body.timezone || 'UTC';
+  const dateStr = body.date || getUserTodayStr(timezone);
 
-  const nextDay = new Date(targetDate);
-  nextDay.setDate(nextDay.getDate() + 1);
+  const { start, end } = getUserDayBounds(timezone, dateStr);
 
-  // Get all logs for the target date
+  // The summary date is stored as the user's local date at midnight UTC (for the @db.Date column)
+  const summaryDate = new Date(dateStr + 'T00:00:00Z');
+
+  // Get all logs for the target date in user's timezone
   const logs = await prisma.nutritionLog.findMany({
     where: {
       userId: user.id,
-      date: { gte: targetDate, lt: nextDay },
+      date: { gte: start, lt: end },
     },
   });
 
@@ -41,11 +43,11 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   // Upsert: create or update the summary for this date
   const summary = await prisma.dailyNutritionSummary.upsert({
     where: {
-      userId_date: { userId: user.id, date: targetDate },
+      userId_date: { userId: user.id, date: summaryDate },
     },
     create: {
       userId: user.id,
-      date: targetDate,
+      date: summaryDate,
       calories: totals.calories,
       proteinG: totals.proteinG,
       carbsG: totals.carbsG,

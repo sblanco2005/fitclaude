@@ -1,28 +1,18 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
+import { getUserDayBounds } from '@/lib/timezone';
 
 export const GET = withAuth(async (request, user) => {
   const { searchParams } = new URL(request.url);
   const timezone = searchParams.get('tz') || 'UTC';
 
-  // Determine "today" in the user's timezone
-  const now = new Date();
-  let todayStr: string;
-  try {
-    todayStr = now.toLocaleDateString('en-CA', { timeZone: timezone }); // "YYYY-MM-DD"
-  } catch {
-    todayStr = now.toISOString().split('T')[0];
-  }
-
-  const today = new Date(todayStr + 'T00:00:00');
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const { start, end } = getUserDayBounds(timezone);
 
   const logs = await prisma.nutritionLog.findMany({
     where: {
       userId: user.id,
-      date: { gte: today, lt: tomorrow },
+      date: { gte: start, lt: end },
     },
     orderBy: { date: 'asc' },
   });

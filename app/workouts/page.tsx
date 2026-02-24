@@ -1832,12 +1832,10 @@ export default function WorkoutsPage() {
     );
   }
 
-  const pageHeight = chatOpen ? 'h-[calc(100vh-4rem-50vh)]' : 'h-[calc(100vh-4rem)]';
-
   // ── Full-screen detail view ──
   if (selectedRoutine && selectedGroup) {
     return (
-      <div className={`${pageHeight} max-w-lg mx-auto flex flex-col`}>
+      <div className="h-full max-w-lg mx-auto flex flex-col">
         <RoutineDetail
           workouts={selectedGroup}
           onBack={() => setSelectedRoutine(null)}
@@ -1856,7 +1854,7 @@ export default function WorkoutsPage() {
 
   // ── List view ──
   return (
-    <div className={`flex flex-col ${pageHeight} max-w-lg mx-auto`}>
+    <div className="flex flex-col h-full max-w-lg mx-auto">
       {/* Tab bar */}
       <div className="flex gap-1 p-4 pb-2 shrink-0">
         {([

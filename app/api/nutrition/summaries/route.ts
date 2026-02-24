@@ -6,9 +6,10 @@ export const GET = withAuth(async (request: NextRequest, user) => {
   const { searchParams } = new URL(request.url);
   const daysBack = parseInt(searchParams.get('daysBack') || '30', 10);
 
+  // DailyNutritionSummary.date is @db.Date (date-only), so we just need a cutoff date
   const since = new Date();
   since.setDate(since.getDate() - daysBack);
-  since.setHours(0, 0, 0, 0);
+  since.setUTCHours(0, 0, 0, 0);
 
   const summaries = await prisma.dailyNutritionSummary.findMany({
     where: {
