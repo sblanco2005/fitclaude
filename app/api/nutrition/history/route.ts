@@ -33,9 +33,10 @@ export const GET = withAuth(async (request, user) => {
 });
 
 // POST: Copy all logs from a past date to today
+// Body: { date, timezone, mode: "append" | "replace" }
 export const POST = withAuth(async (request: NextRequest, user) => {
   const body = await request.json();
-  const { date: sourceDate, timezone = 'UTC' } = body;
+  const { date: sourceDate, timezone = 'UTC', mode = 'append' } = body;
   if (!sourceDate) {
     return NextResponse.json({ error: 'date is required' }, { status: 400 });
   }
@@ -52,6 +53,15 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   }
 
   const now = new Date();
+
+  // If replace mode, delete today's existing logs first
+  if (mode === 'replace') {
+    const { start: todayStart, end: todayEnd } = getUserDayBounds(timezone);
+    await prisma.nutritionLog.deleteMany({
+      where: { userId: user.id, date: { gte: todayStart, lt: todayEnd } },
+    });
+  }
+
   const created = await prisma.$transaction(
     sourceLogs.map((log) =>
       prisma.nutritionLog.create({

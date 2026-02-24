@@ -243,6 +243,7 @@ function HistoryDayCard({
   const [copying, setCopying] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showCopyOptions, setShowCopyOptions] = useState(false);
 
   const dateKey = summary.date.split('T')[0]; // "2025-02-20"
 
@@ -258,13 +259,14 @@ function HistoryDayCard({
     setExpanded((v) => !v);
   };
 
-  const handleCopy = async () => {
+  const handleCopy = async (mode: 'append' | 'replace') => {
     setCopying(true);
+    setShowCopyOptions(false);
     try {
       const res = await fetch('/api/nutrition/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateKey, timezone }),
+        body: JSON.stringify({ date: dateKey, timezone, mode }),
       });
       if (res.ok) {
         setCopied(true);
@@ -355,17 +357,37 @@ function HistoryDayCard({
           )}
 
           <div className="flex gap-2">
-            <button
-              onClick={handleCopy}
-              disabled={copying || copied}
-              className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${
-                copied
-                  ? 'bg-green-600/20 text-green-400'
-                  : 'bg-primary/15 text-primary hover:bg-primary/25'
-              }`}
-            >
-              {copied ? 'Copied to Today!' : copying ? 'Copying...' : 'Copy All to Today'}
-            </button>
+            {copied ? (
+              <div className="flex-1 py-2 rounded-lg text-xs font-medium text-center bg-green-600/20 text-green-400">
+                Copied to Today!
+              </div>
+            ) : copying ? (
+              <div className="flex-1 py-2 rounded-lg text-xs font-medium text-center bg-primary/15 text-primary opacity-50">
+                Copying...
+              </div>
+            ) : !showCopyOptions ? (
+              <button
+                onClick={() => setShowCopyOptions(true)}
+                className="flex-1 py-2 rounded-lg text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+              >
+                Copy All to Today
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleCopy('append')}
+                  className="flex-1 py-2 rounded-lg text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+                >
+                  Add to Today
+                </button>
+                <button
+                  onClick={() => handleCopy('replace')}
+                  className="flex-1 py-2 rounded-lg text-xs font-medium bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors"
+                >
+                  Replace Today
+                </button>
+              </>
+            )}
             {!confirmDelete ? (
               <button
                 onClick={() => setConfirmDelete(true)}
@@ -644,6 +666,8 @@ export default function NutritionPage() {
   }, [tab, fetchHistory]);
 
   const handleCloseDay = async () => {
+    const ok = window.confirm('Close today and save to history? This cannot be undone.');
+    if (!ok) return;
     setClosing(true);
     try {
       const res = await fetch('/api/nutrition/close-day', {
