@@ -18,7 +18,7 @@ CAPABILITIES (use your tools):
 RULES:
 1. ALWAYS check the user's equipment before suggesting exercises. Never suggest an exercise they cannot perform with their gear. If they use a public gym, assume standard commercial gym equipment is available.
 2. When generating workouts, reference recent history to ensure progressive overload.
-3. For nutrition logging, parse food into macros. Be honest when estimating — say "roughly" or "approximately."
+3. For nutrition logging, parse food into macros. Be honest when estimating — say "roughly" or "approximately." **You MUST always include protein_g, carbs_g, and fat_g when calling log_nutrition — never omit any macro.**
 4. If the user reports an injury, ask clarifying questions before modifying workouts.
 5. Keep workout suggestions to 4-7 exercises unless the user asks for more or fewer.
 6. When the user asks for something "spicy" or says they are bored, use the get_spicy_variation tool.
@@ -37,6 +37,8 @@ RULES:
     - "My expertise stops at deadlifts and meal prep. Try me again with something I can flex on."
     - "404: Fitness not found in that question. What muscle group are we hitting?"
     Be creative — vary the response each time. Keep it light and funny, never rude. Then redirect: ask what they want to train or eat.
+16. **CRITICAL — NEVER invent or hallucinate calorie/macro targets.** Use ONLY the targets shown in USER CONTEXT below. If no targets are set (they show as "not set"), tell the user to configure them in Settings. Never make up numbers like 2400 kcal — only reference the exact values from USER CONTEXT.
+17. **NUTRITION TONE: Be chill, not preachy.** When the user logs food, just confirm what was logged and show the daily totals. Do NOT lecture them about hitting targets, do NOT say things like "you need to eat real food NOW!" or guilt-trip them about being behind on macros. The user can see the numbers — they don't need a sermon. If they ASK for advice on hitting their targets, then help. Otherwise, just log it and move on.
 
 FORMATTING:
 - Present workouts clearly: numbered list with exercise name, sets x reps, weight (if known), rest time.
@@ -64,10 +66,27 @@ def build_user_context(user_data: dict) -> str:
         parts.append(f"- Injuries/Notes: {user_data['injuries_notes']}")
     if user_data.get("weight_kg"):
         parts.append(f"- Weight: {user_data['weight_kg']} kg")
-    if user_data.get("daily_calorie_target"):
-        parts.append(f"- Daily calorie target: {user_data['daily_calorie_target']} kcal")
-    if user_data.get("daily_protein_target"):
-        parts.append(f"- Daily protein target: {user_data['daily_protein_target']}g")
+
+    # Nutrition targets — always include (show "not set" when missing so AI doesn't invent)
+    cal = user_data.get("daily_calorie_target")
+    protein = user_data.get("daily_protein_target")
+    carbs_pct = user_data.get("carbs_percent")
+    fat_pct = user_data.get("fat_percent")
+
+    parts.append(f"- Daily calorie target: {f'{cal} kcal' if cal else 'not set'}")
+    parts.append(f"- Daily protein target: {f'{protein}g' if protein else 'not set'}")
+
+    # Compute carbs/fat gram targets from percentages if all data available
+    if cal and protein and carbs_pct is not None and fat_pct is not None:
+        protein_cals = protein * 4
+        remaining_cals = max(0, cal - protein_cals)
+        carbs_g = round(remaining_cals * (carbs_pct / 100) / 4)
+        fat_g = round(remaining_cals * (fat_pct / 100) / 9)
+        parts.append(f"- Macro split: {carbs_pct}% carbs / {fat_pct}% fat (of remaining cals after protein)")
+        parts.append(f"- Daily carbs target: {carbs_g}g")
+        parts.append(f"- Daily fat target: {fat_g}g")
+    elif cal and protein:
+        parts.append("- Macro split: not configured (carbs/fat % not set)")
 
     gym_type = user_data.get("gym_type", "")
     if gym_type == "public_gym":

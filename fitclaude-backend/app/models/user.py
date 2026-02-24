@@ -47,6 +47,12 @@ class User(Base):
     daily_protein_target: Mapped[Optional[float]] = mapped_column(
         "dailyProteinTarget", nullable=True
     )
+    carbs_percent: Mapped[Optional[int]] = mapped_column(
+        "carbsPercent", nullable=True
+    )
+    fat_percent: Mapped[Optional[int]] = mapped_column(
+        "fatPercent", nullable=True
+    )
     sex: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     training_frequency: Mapped[Optional[int]] = mapped_column(
         "trainingFrequency", nullable=True

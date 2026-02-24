@@ -52,6 +52,7 @@ function MealRow({
   const [fatG, setFatG] = useState(String(log.fatG ?? ''));
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastTapRef = useRef(0);
 
   const startEdit = () => {
     setRawInput(log.rawInput);
@@ -190,8 +191,6 @@ function MealRow({
       </div>
     );
   }
-
-  const lastTapRef = useRef(0);
 
   const handleTap = () => {
     const now = Date.now();

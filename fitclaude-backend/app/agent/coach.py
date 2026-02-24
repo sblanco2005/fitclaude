@@ -53,6 +53,8 @@ async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
         "weight_kg": user.weight_kg,
         "daily_calorie_target": user.daily_calorie_target,
         "daily_protein_target": user.daily_protein_target,
+        "carbs_percent": user.carbs_percent,
+        "fat_percent": user.fat_percent,
     }
 
 
