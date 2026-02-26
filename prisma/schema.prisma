@@ -49,6 +49,7 @@ model User {
   conversations        ConversationHistory[]
   apiTokens            ApiToken[]
   userFoods            UserFood[]
+  magicLinkTokens      MagicLinkToken[]
 
   @@map("users")
 }
@@ -359,4 +360,16 @@ model ApiToken {
   @@index([token])
   @@index([userId])
   @@map("api_tokens")
+}
+
+model MagicLinkToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("magic_link_tokens")
 }

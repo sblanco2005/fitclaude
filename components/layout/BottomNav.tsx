@@ -47,7 +47,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="shrink-0 bg-card/95 backdrop-blur-sm border-t border-border-dark">
+    <nav className="shrink-0 bg-card/95 backdrop-blur-sm border-t border-border-dark pb-[env(safe-area-inset-bottom,0px)]">
       <div className="flex items-center justify-around h-12">
         {navItems.map((item) => {
           const isActive = item.href === '/'

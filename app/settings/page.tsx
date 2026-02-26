@@ -280,6 +280,9 @@ export default function SettingsPage() {
         </Card>
       )}
 
+      {/* Quick Login */}
+      <QuickLoginCard />
+
       {/* Save */}
       <div className="flex gap-3">
         <Button onClick={save} disabled={saving} className="flex-1">
@@ -293,5 +296,63 @@ export default function SettingsPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+function QuickLoginCard() {
+  const [magicUrl, setMagicUrl] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const generate = async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/auth/magic-link', { method: 'POST' });
+      const data = await res.json();
+      setMagicUrl(data.url);
+    } catch {
+      // handle error
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!magicUrl) return;
+    await navigator.clipboard.writeText(magicUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Card>
+      <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Quick Login</h3>
+      <p className="text-xs text-muted mb-3">
+        Generate a link to log in instantly. Add it to an iOS Shortcut on your Home Screen for one-tap access.
+      </p>
+
+      {!magicUrl ? (
+        <Button onClick={generate} disabled={generating} className="w-full">
+          {generating ? 'Generating...' : 'Generate Magic Link'}
+        </Button>
+      ) : (
+        <div className="space-y-2">
+          <div className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 break-all font-mono">
+            {magicUrl}
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={copy} className="flex-1">
+              {copied ? 'Copied!' : 'Copy Link'}
+            </Button>
+            <Button variant="ghost" onClick={generate}>
+              Regenerate
+            </Button>
+          </div>
+          <p className="text-[10px] text-slate-600 leading-relaxed">
+            Open iPhone Shortcuts app &rarr; New Shortcut &rarr; Add &quot;Open URL&quot; action &rarr; Paste this link &rarr; Add to Home Screen
+          </p>
+        </div>
+      )}
+    </Card>
   );
 }

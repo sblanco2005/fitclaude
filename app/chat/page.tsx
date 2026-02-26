@@ -63,7 +63,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7.5rem)]">
+    <div className="flex flex-col h-full">
       {/* Topic toggle */}
       <div className="px-4 pt-3 pb-1">
         <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">

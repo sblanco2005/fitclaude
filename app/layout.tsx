@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Roboto, JetBrains_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -15,6 +15,10 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono-code",
 });
+
+export const viewport: Viewport = {
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: "FitClaude",

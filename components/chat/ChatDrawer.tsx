@@ -201,7 +201,7 @@ export function ChatDrawer() {
   // ── Collapsed: Claude-style input bar ──
   if (!chatOpen) {
     return (
-      <div className="shrink-0 px-3 py-2 bg-background border-t border-primary/20 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
+      <div className="shrink-0 px-3 py-2 bg-background border-t border-primary/20">
         {hiddenFileInput}
         <div
           className="flex items-center gap-2 bg-slate-800/70 border border-primary/30 rounded-2xl px-3 py-2.5 cursor-text shadow-[0_0_12px_rgba(16,185,129,0.08)]"
