@@ -33,8 +33,9 @@ export async function GET(request: NextRequest) {
   // Set the session cookie and redirect to home
   const response = NextResponse.redirect(new URL('/', request.url));
   const isSecure = request.url.startsWith('https');
+  const cookieName = isSecure ? '__Secure-authjs.session-token' : 'authjs.session-token';
 
-  response.cookies.set('authjs.session-token', sessionToken, {
+  response.cookies.set(cookieName, sessionToken, {
     httpOnly: true,
     secure: isSecure,
     sameSite: 'lax',
