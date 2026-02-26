@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useFitClaude } from '@/context/FitClaudeContext';
 
 export function Header() {
   const { data: session } = useSession();
@@ -10,7 +11,8 @@ export function Header() {
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
-  const isHome = pathname === '/';
+  const { customBack } = useFitClaude();
+  const isHome = pathname === '/' && !customBack;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -27,7 +29,7 @@ export function Header() {
       <div className="flex items-center gap-2">
         {!isHome && (
           <button
-            onClick={() => router.back()}
+            onClick={() => customBack ? customBack() : router.back()}
             className="p-1.5 -ml-1.5 text-slate-400 hover:text-white active:text-primary transition-colors"
             aria-label="Go back"
           >

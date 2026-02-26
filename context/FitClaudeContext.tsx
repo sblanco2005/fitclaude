@@ -27,6 +27,9 @@ interface FitClaudeState {
   setChatOpen: (open: boolean) => void;
   setChatTopic: (topic: ChatTopic) => void;
   toggleChat: () => void;
+  /** Pages can set a custom back handler to override Header's router.back() */
+  customBack: (() => void) | null;
+  setCustomBack: (handler: (() => void) | null) => void;
 }
 
 const FitClaudeContext = createContext<FitClaudeState | null>(null);
@@ -41,6 +44,11 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
   const [chatTopic, setChatTopicState] = useState<ChatTopic>('workout');
   const [loading, setLoading] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
+  const [customBack, setCustomBackRaw] = useState<(() => void) | null>(null);
+  // Wrap setter to avoid React treating function values as state updaters
+  const setCustomBack = useCallback((handler: (() => void) | null) => {
+    setCustomBackRaw(() => handler);
+  }, []);
 
   // Separate message arrays per topic
   const [workoutMessages, setWorkoutMessages] = useState<ChatMessage[]>([]);
@@ -235,6 +243,8 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
         chatTopic,
         loading,
         dataVersion,
+        customBack,
+        setCustomBack,
         fetchProfile,
         updateProfile,
         fetchTodayNutrition,

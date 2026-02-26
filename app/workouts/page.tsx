@@ -768,8 +768,6 @@ function SwapExerciseModal({
 
 // ─── RoutineDetail (full-screen view) ────────────────────────────────────────
 
-type DetailTab = 'routine' | 'log';
-
 function RoutineDetail({
   workouts,
   onBack,
@@ -793,7 +791,6 @@ function RoutineDetail({
   onDeleteSession: (workoutId: string) => void;
   onSwapExercise: (workoutId: string, workoutExerciseId: string, newExerciseId: string) => Promise<void>;
 }) {
-  const [detailTab, setDetailTab] = useState<DetailTab>('routine');
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
@@ -806,8 +803,6 @@ function RoutineDetail({
   const totalSets = latest.exercises.reduce((acc, ex) => acc + ex.sets, 0);
   const totalExercises = latest.exercises.length;
   const routineNum = getRoutineDisplayId(workouts);
-
-  const completedSessions = workouts.filter((w) => w.completed);
 
   const groupedByMuscle = useMemo(() => {
     const map = new Map<string, { ex: WorkoutExercise; globalIndex: number }[]>();
@@ -903,17 +898,7 @@ function RoutineDetail({
                 {routineKey(latest).replace(/_/g, ' ')}
               </h2>
             </div>
-            <div className="flex items-center gap-2 shrink-0 ml-2">
-              <button
-                onClick={onHitIt}
-                className={`text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-lg transition-all ${
-                  isInHitIt
-                    ? 'bg-primary/20 text-primary'
-                    : 'bg-primary text-white hover:bg-primary-dark'
-                }`}
-              >
-                {isInHitIt ? 'Queued' : 'Hit It'}
-              </button>
+            <div className="flex items-center shrink-0 ml-2">
               <div className="relative">
                 <button
                   onClick={() => setMenuOpen((v) => !v)}
@@ -983,36 +968,27 @@ function RoutineDetail({
         )}
       </div>
 
-      {/* Tab bar */}
+      {/* Action bar */}
       <div className="flex gap-1 px-4 py-2 shrink-0">
-        {([
-          { key: 'routine' as DetailTab, label: 'Routine' },
-          { key: 'log' as DetailTab, label: 'Log', count: completedSessions.length },
-        ]).map(({ key, label, count }) => (
-          <button
-            key={key}
-            onClick={() => setDetailTab(key)}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold tracking-wide uppercase transition-all duration-200 ${
-              detailTab === key
-                ? 'bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.25)]'
-                : 'text-muted hover:text-white hover:bg-card-hover'
-            }`}
-          >
-            {label}
-            {count != null && count > 0 && (
-              <span className={`ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black ${
-                detailTab === key ? 'bg-white/20' : 'bg-slate-700'
-              }`}>
-                {count}
-              </span>
-            )}
-          </button>
-        ))}
+        <button
+          className="flex-1 py-2 rounded-lg text-xs font-bold tracking-wide uppercase bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.25)]"
+        >
+          Routine
+        </button>
+        <button
+          onClick={onHitIt}
+          className={`flex-1 py-2 rounded-lg text-xs font-bold tracking-wide uppercase transition-all duration-200 ${
+            isInHitIt
+              ? 'bg-primary/20 text-primary'
+              : 'text-muted hover:text-white hover:bg-card-hover'
+          }`}
+        >
+          {isInHitIt ? 'Queued' : 'Hit It'}
+        </button>
       </div>
 
-      {/* Routine Tab */}
-      {detailTab === 'routine' && (
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5 scrollbar-hide">
+      {/* Routine exercises */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5 scrollbar-hide">
           {/* Exercise breakdown — grouped by muscle for lifting, flat list for cardio/HIIT */}
           {(latest.category || 'lifting') !== 'lifting' ? (
             <div className="space-y-1">
@@ -1065,34 +1041,6 @@ function RoutineDetail({
             </div>
           )}
         </div>
-      )}
-
-      {/* Log Tab — only show sessions that have been started (have logs or marked complete) */}
-      {detailTab === 'log' && (() => {
-        const startedSessions = workouts.filter((w) => w.completed || sessionHasLogs(w));
-        return (
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scrollbar-hide">
-            {startedSessions.length === 0 ? (
-              <div className="flex items-center justify-center min-h-[30vh]">
-                <p className="text-sm text-muted font-medium">No sessions logged yet</p>
-              </div>
-            ) : (
-              <>
-                {startedSessions.map((w) => (
-                  <SessionLogCard
-                    key={w.id}
-                    workout={w}
-                    onDeleteLogs={onDeleteLogs}
-                    onEditLog={onEditLog}
-                    onDeleteSession={onDeleteSession}
-                    canDeleteSession={workouts.length > 1}
-                  />
-                ))}
-              </>
-            )}
-          </div>
-        );
-      })()}
 
       {/* Swap Exercise Modal */}
       <SwapExerciseModal
@@ -1745,7 +1693,7 @@ const SPIN_CONFIRMS = [
 ];
 
 export default function WorkoutsPage() {
-  const { chatOpen, dataVersion, sendMessage, setChatOpen, setChatTopic } = useFitClaude();
+  const { chatOpen, dataVersion, sendMessage, setChatOpen, setChatTopic, setCustomBack } = useFitClaude();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('routines');
@@ -1763,6 +1711,16 @@ export default function WorkoutsPage() {
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
+
+  // Override Header back button when routine detail is open
+  useEffect(() => {
+    if (selectedRoutine) {
+      setCustomBack(() => setSelectedRoutine(null));
+    } else {
+      setCustomBack(null);
+    }
+    return () => setCustomBack(null);
+  }, [selectedRoutine, setCustomBack]);
 
   const fetchWorkouts = useCallback(() => {
     fetch('/api/workouts?daysBack=90')
