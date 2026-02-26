@@ -176,6 +176,11 @@ function RoutineCard({
               {latest.category}
             </span>
           )}
+          {latest.source === 'manual' && (
+            <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/20">
+              ext
+            </span>
+          )}
         </div>
 
         {/* Hit It — solid CTA */}
@@ -1730,7 +1735,7 @@ function FinishedWorkoutCard({
 
 type Tab = 'routines' | 'hitit' | 'activities';
 
-const CATEGORIES = ['all', 'lifting', 'hiit', 'cardio', 'mobility', 'calisthenics', 'sport'] as const;
+const CATEGORIES = ['all', 'lifting', 'hiit', 'cardio', 'mobility', 'calisthenics', 'sport', 'external'] as const;
 type Category = typeof CATEGORIES[number];
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -1740,6 +1745,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   mobility: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
   calisthenics: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
   sport: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+  external: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
 };
 
 const SPIN_CONFIRMS = [
@@ -1814,7 +1820,9 @@ export default function WorkoutsPage() {
   // Filter routine groups by category + search
   const filteredRoutineGroups = useMemo(() => {
     let filtered = routineGroups;
-    if (categoryFilter !== 'all') {
+    if (categoryFilter === 'external') {
+      filtered = filtered.filter(([, group]) => group[0].source === 'manual');
+    } else if (categoryFilter !== 'all') {
       filtered = filtered.filter(([, group]) => {
         return (group[0].category || 'lifting') === categoryFilter;
       });
@@ -1848,6 +1856,7 @@ export default function WorkoutsPage() {
     const cats = new Set<string>();
     for (const [, group] of routineGroups) {
       cats.add(group[0].category || 'lifting');
+      if (group[0].source === 'manual') cats.add('external');
     }
     return cats;
   }, [routineGroups]);
