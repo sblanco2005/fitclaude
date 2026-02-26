@@ -169,39 +169,23 @@ function RoutineCard({
           )}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Spin — icon only */}
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); onSpin(); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onSpin(); } }}
-            className="p-1.5 rounded-md transition-colors cursor-pointer text-amber-400/40 hover:text-amber-400 hover:bg-amber-500/10"
-            title="Regenerate routine"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-            </svg>
-          </span>
-
-          {/* Hit It — solid CTA */}
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); onSendToHitIt(); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onSendToHitIt(); } }}
-            className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-              isInHitIt
-                ? 'bg-primary text-white'
-                : 'bg-primary/15 text-primary hover:bg-primary hover:text-white'
-            }`}
-          >
-            {isInHitIt ? '→ Go' : 'Hit It'}
-          </span>
-        </div>
+        {/* Hit It — solid CTA */}
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onSendToHitIt(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onSendToHitIt(); } }}
+          className={`shrink-0 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+            isInHitIt
+              ? 'bg-primary text-white'
+              : 'bg-primary/15 text-primary hover:bg-primary hover:text-white'
+          }`}
+        >
+          {isInHitIt ? '→ Go' : 'Hit It'}
+        </span>
       </div>
 
-      {/* Row 2: stats + inline muscles */}
+      {/* Row 2: stats + inline muscles + spin */}
       <div className="flex items-center gap-2 mt-1 ml-0.5">
         <span className="text-[11px] text-slate-500">{workouts.length}x done</span>
         {isLifting && muscles.length > 0 && (
@@ -213,6 +197,20 @@ function RoutineCard({
             </span>
           </>
         )}
+        <span className="flex-1" />
+        {/* Spin — separated from Hit It to avoid accidental taps */}
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onSpin(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onSpin(); } }}
+          className="p-1 rounded-md transition-colors cursor-pointer text-amber-400/40 hover:text-amber-400 hover:bg-amber-500/10"
+          title="Regenerate routine"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+          </svg>
+        </span>
       </div>
     </button>
   );
