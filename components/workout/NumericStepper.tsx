@@ -83,6 +83,7 @@ export default function NumericStepper({
         pattern="[0-9]*\.?[0-9]*"
         value={value || ''}
         onChange={handleInputChange}
+        onFocus={(e) => e.target.select()}
         className={`${inputWidth} h-8 text-center bg-slate-900 border border-slate-700 rounded-md text-[16px] text-white tabular-nums font-bold focus:outline-none focus:ring-1 focus:ring-primary`}
       />
 

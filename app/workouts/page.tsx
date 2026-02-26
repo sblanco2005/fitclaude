@@ -846,16 +846,15 @@ function RoutineDetail({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Sticky header */}
+      {/* Sticky header — flush with app header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 shrink-0">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-muted hover:text-white transition-colors"
+          className="p-1 text-slate-500 hover:text-white transition-colors rounded-lg"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
-          <span className="text-sm font-medium">Back</span>
         </button>
         <div className="flex items-center gap-2">
           <button
