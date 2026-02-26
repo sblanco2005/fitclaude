@@ -136,15 +136,11 @@ function RoutineCard({
   name,
   workouts,
   onClick,
-  onSendToHitIt,
-  isInHitIt,
   onSpin,
 }: {
   name: string;
   workouts: Workout[];
   onClick: () => void;
-  onSendToHitIt: () => void;
-  isInHitIt: boolean;
   onSpin: () => void;
 }) {
   const latest = workouts[0];
@@ -182,21 +178,6 @@ function RoutineCard({
             </span>
           )}
         </div>
-
-        {/* Hit It — solid CTA */}
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => { e.stopPropagation(); onSendToHitIt(); }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onSendToHitIt(); } }}
-          className={`shrink-0 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-            isInHitIt
-              ? 'bg-primary text-white'
-              : 'bg-primary/15 text-primary hover:bg-primary hover:text-white'
-          }`}
-        >
-          {isInHitIt ? '→ Go' : 'Hit It'}
-        </span>
       </div>
 
       {/* Row 2: swap (left) + stats + muscles */}
@@ -979,8 +960,8 @@ function RoutineDetail({
           onClick={onHitIt}
           className={`flex-1 py-2 rounded-lg text-xs font-bold tracking-wide uppercase transition-all duration-200 ${
             isInHitIt
-              ? 'bg-primary/20 text-primary'
-              : 'text-muted hover:text-white hover:bg-card-hover'
+              ? 'bg-amber-400 text-black shadow-[0_2px_12px_rgba(251,191,36,0.3)]'
+              : 'bg-amber-400/15 text-amber-400 hover:bg-amber-400 hover:text-black'
           }`}
         >
           {isInHitIt ? 'Queued' : 'Hit It'}
@@ -2091,8 +2072,6 @@ export default function WorkoutsPage() {
                 name={key}
                 workouts={group}
                 onClick={() => setSelectedRoutine(key)}
-                onSendToHitIt={() => addToHitIt(key)}
-                isInHitIt={hitItQueue.includes(key)}
                 onSpin={() => requestSpin(key)}
               />
             ))
