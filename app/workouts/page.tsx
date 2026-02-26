@@ -846,62 +846,6 @@ function RoutineDetail({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Sticky header — flush with app header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 shrink-0">
-        <button
-          onClick={onBack}
-          className="p-1 text-slate-500 hover:text-white transition-colors rounded-lg"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onHitIt}
-            className={`text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-lg transition-all ${
-              isInHitIt
-                ? 'bg-primary/20 text-primary'
-                : 'bg-primary text-white hover:bg-primary-dark'
-            }`}
-          >
-            {isInHitIt ? 'Queued' : 'Hit It'}
-          </button>
-          {/* ... menu */}
-          <div className="relative">
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className="p-1.5 text-slate-500 hover:text-white transition-colors rounded-lg hover:bg-slate-800"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <circle cx="12" cy="6" r="1.5" fill="currentColor" />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-                <circle cx="12" cy="18" r="1.5" fill="currentColor" />
-              </svg>
-            </button>
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1 min-w-[140px]">
-                  <button
-                    onClick={startRename}
-                    className="w-full text-left px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-                  >
-                    Rename
-                  </button>
-                  <button
-                    onClick={startDelete}
-                    className="w-full text-left px-4 py-2 text-xs font-medium text-red-400 hover:bg-slate-700 transition-colors"
-                  >
-                    Delete Routine
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Confirm delete overlay */}
       {confirmDelete && (
         <>
@@ -929,8 +873,8 @@ function RoutineDetail({
         </>
       )}
 
-      {/* Title + stats (always visible) */}
-      <div className="px-4 pt-4 pb-2 shrink-0">
+      {/* Title + actions + stats */}
+      <div className="px-4 pt-3 pb-2 shrink-0">
         {renaming ? (
           <div className="flex gap-2">
             <input
@@ -948,15 +892,60 @@ function RoutineDetail({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2.5">
-            {routineNum != null && (
-              <span className="text-sm font-black text-primary bg-primary/10 px-2 py-0.5 rounded-lg tabular-nums tracking-tight">
-                #{routineNum}
-              </span>
-            )}
-            <h2 className="text-xl font-black text-white capitalize tracking-wide">
-              {routineKey(latest).replace(/_/g, ' ')}
-            </h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {routineNum != null && (
+                <span className="text-sm font-black text-primary bg-primary/10 px-2 py-0.5 rounded-lg tabular-nums tracking-tight shrink-0">
+                  #{routineNum}
+                </span>
+              )}
+              <h2 className="text-xl font-black text-white capitalize tracking-wide truncate">
+                {routineKey(latest).replace(/_/g, ' ')}
+              </h2>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              <button
+                onClick={onHitIt}
+                className={`text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-lg transition-all ${
+                  isInHitIt
+                    ? 'bg-primary/20 text-primary'
+                    : 'bg-primary text-white hover:bg-primary-dark'
+                }`}
+              >
+                {isInHitIt ? 'Queued' : 'Hit It'}
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="p-1.5 text-slate-500 hover:text-white transition-colors rounded-lg hover:bg-slate-800"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="12" cy="6" r="1.5" fill="currentColor" />
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                    <circle cx="12" cy="18" r="1.5" fill="currentColor" />
+                  </svg>
+                </button>
+                {menuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1 min-w-[140px]">
+                      <button
+                        onClick={startRename}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        onClick={startDelete}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-red-400 hover:bg-slate-700 transition-colors"
+                      >
+                        Delete Routine
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
