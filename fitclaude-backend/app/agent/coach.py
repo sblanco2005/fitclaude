@@ -20,6 +20,7 @@ from app.agent.tools import TOOL_DEFINITIONS
 from app.agent.minimax_fallback import handle_chat_minimax
 from app.config import settings
 from app.models import (
+    Activity,
     ConversationHistory,
     Exercise,
     NutritionLog,
@@ -104,6 +105,8 @@ async def _execute_tool(
         return await _tool_lookup_user_foods(db, user_id, tool_input)
     elif tool_name == "parse_youtube_video":
         return await import_exercises_from_youtube(db, tool_input["youtube_url"])
+    elif tool_name == "log_activity":
+        return await _tool_log_activity(db, user_id, tool_input)
     else:
         return {"error": f"Unknown tool: {tool_name}"}
 
@@ -479,6 +482,7 @@ async def _tool_generate_workout(
         user_id=user_id,
         workout_type=params["workout_type"],
         category=params.get("category", "lifting"),
+        source=params.get("source", "coach"),
         name=workout_name,
         date=datetime.utcnow(),
         display_id=next_display_id,
@@ -780,6 +784,31 @@ async def _tool_lookup_user_foods(
             for f in foods
         ],
         "not_found": [n for n in names if n not in found_names],
+    }
+
+
+async def _tool_log_activity(
+    db: AsyncSession, user_id: str, params: dict
+) -> dict:
+    """Log a generic activity (no exercises)."""
+    activity = Activity(
+        id=cuid_generator.generate(),
+        user_id=user_id,
+        name=params["name"],
+        duration_minutes=params.get("duration_minutes"),
+        notes=params.get("notes"),
+        date=datetime.utcnow(),
+    )
+    db.add(activity)
+    await db.commit()
+    logger.info(f"[Coach] Activity {activity.id} logged: {activity.name}")
+
+    duration_str = f" ({activity.duration_minutes} min)" if activity.duration_minutes else ""
+    return {
+        "activity_id": activity.id,
+        "name": activity.name,
+        "duration_minutes": activity.duration_minutes,
+        "message": f"Logged '{activity.name}'{duration_str}. This shows in the Activities tab.",
     }
 
 

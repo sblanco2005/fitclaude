@@ -50,6 +50,7 @@ model User {
   apiTokens            ApiToken[]
   userFoods            UserFood[]
   magicLinkTokens      MagicLinkToken[]
+  activities           Activity[]
 
   @@map("users")
 }
@@ -147,6 +148,7 @@ model Workout {
   name            String?
   workoutType     String   // push, pull, legs, upper, lower, full_body, cardio, custom
   category        String   @default("lifting") // lifting, hiit, cardio, mobility, calisthenics, sport
+  source          String   @default("coach")   // "coach" = AI-generated, "manual" = user-logged external
   durationMinutes Int?
   notes           String?  @db.Text
   fatigueRating   Int?     // 1-10
@@ -372,4 +374,24 @@ model MagicLinkToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("magic_link_tokens")
+}
+
+// ============================================
+// Activities (external classes / generic logs)
+// ============================================
+
+model Activity {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  durationMinutes Int?
+  date            DateTime @default(now())
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, date])
+  @@map("activities")
 }

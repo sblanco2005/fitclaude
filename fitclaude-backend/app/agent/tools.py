@@ -95,8 +95,40 @@ TOOL_DEFINITIONS = [
                     "items": {"type": "string"},
                     "description": "Exercises to avoid (e.g., due to injury)",
                 },
+                "source": {
+                    "type": "string",
+                    "enum": ["coach", "manual"],
+                    "description": "Source: 'coach' for AI-generated (default), 'manual' for user-logged external workouts/classes",
+                },
             },
             "required": ["workout_type", "category", "exercises"],
+        },
+    },
+    {
+        "name": "log_activity",
+        "description": (
+            "Log a generic external activity or class without specific exercise details "
+            "(e.g. 'Alpha Fit 60 minutes', 'Yoga class', 'Basketball pickup game'). "
+            "Use this when the user describes an activity WITHOUT specific sets/reps. "
+            "If they provide exercise details, use generate_workout with source='manual' instead."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the activity or class (e.g. 'Alpha Fit', 'Yoga')",
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Duration in minutes",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional notes about the activity",
+                },
+            },
+            "required": ["name"],
         },
     },
     {

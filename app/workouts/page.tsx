@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { Modal } from '@/components/ui/Modal';
-import type { Workout, WorkoutExercise, Exercise } from '@/types';
+import type { Workout, WorkoutExercise, Exercise, Activity } from '@/types';
 import SetRow from '@/components/workout/SetRow';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -36,6 +36,15 @@ const MUSCLE_COLORS: Record<string, string> = {
   calves: 'bg-yellow-500/20 text-yellow-300',
   cardio: 'bg-red-500/20 text-red-300',
 };
+
+const MUSCLE_GROUP_MAP: Record<string, string> = {
+  glutes: 'legs', hamstrings: 'legs', quadriceps: 'legs', calves: 'legs',
+  biceps: 'arms', triceps: 'arms',
+};
+const MUSCLE_PILL_ORDER = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
+function consolidateMuscle(m: string): string {
+  return MUSCLE_GROUP_MAP[m.toLowerCase()] ?? m.toLowerCase();
+}
 
 function muscleChip(muscle: string) {
   const cls = MUSCLE_COLORS[muscle.toLowerCase()] ?? 'bg-slate-500/20 text-slate-300';
@@ -1719,7 +1728,7 @@ function FinishedWorkoutCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'routines' | 'hitit';
+type Tab = 'routines' | 'hitit' | 'activities';
 
 const CATEGORIES = ['all', 'lifting', 'hiit', 'cardio', 'mobility', 'calisthenics', 'sport'] as const;
 type Category = typeof CATEGORIES[number];
@@ -1751,6 +1760,7 @@ export default function WorkoutsPage() {
   const [spinTarget, setSpinTarget] = useState<{ name: string; muscles: string[]; exerciseCount: number; category: string; confirm: typeof SPIN_CONFIRMS[number] } | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<Category>('all');
+  const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
   const [routineSearch, setRoutineSearch] = useState('');
   const [finishedWorkouts, setFinishedWorkouts] = useState<
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
@@ -1758,6 +1768,7 @@ export default function WorkoutsPage() {
   const [queueToast, setQueueToast] = useState<string | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
   const fetchWorkouts = useCallback(() => {
     fetch('/api/workouts?daysBack=90')
@@ -1775,10 +1786,18 @@ export default function WorkoutsPage() {
       });
   }, []);
 
+  const fetchActivities = useCallback(() => {
+    fetch('/api/activities?daysBack=90')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setActivities(Array.isArray(data) ? data : []))
+      .catch(() => setActivities([]));
+  }, []);
+
   // Initial load + re-fetch when chat creates/modifies workouts
   useEffect(() => {
     fetchWorkouts();
-  }, [fetchWorkouts, dataVersion]);
+    fetchActivities();
+  }, [fetchWorkouts, fetchActivities, dataVersion]);
 
   const routineGroups = useMemo(() => {
     const map = new Map<string, Workout[]>();
@@ -1800,6 +1819,11 @@ export default function WorkoutsPage() {
         return (group[0].category || 'lifting') === categoryFilter;
       });
     }
+    if (muscleFilter) {
+      filtered = filtered.filter(([, group]) =>
+        uniqueMuscles(group[0]).some((m) => consolidateMuscle(m) === muscleFilter)
+      );
+    }
     if (routineSearch.trim()) {
       const q = routineSearch.toLowerCase().trim();
       filtered = filtered.filter(([key, group]) => {
@@ -1817,7 +1841,7 @@ export default function WorkoutsPage() {
       });
     }
     return filtered;
-  }, [routineGroups, categoryFilter, routineSearch]);
+  }, [routineGroups, categoryFilter, muscleFilter, routineSearch]);
 
   // Categories that actually have routines (for showing only relevant pills)
   const activeCategories = useMemo(() => {
@@ -1826,6 +1850,14 @@ export default function WorkoutsPage() {
       cats.add(group[0].category || 'lifting');
     }
     return cats;
+  }, [routineGroups]);
+
+  const activeMuscles = useMemo(() => {
+    const ms = new Set<string>();
+    for (const [, group] of routineGroups) {
+      for (const m of uniqueMuscles(group[0])) ms.add(consolidateMuscle(m));
+    }
+    return ms;
   }, [routineGroups]);
 
   const selectedGroup = selectedRoutine
@@ -1992,6 +2024,7 @@ export default function WorkoutsPage() {
         {([
           { key: 'routines' as Tab, label: 'Routines' },
           { key: 'hitit' as Tab, label: 'Hit It' },
+          { key: 'activities' as Tab, label: 'Activities' },
         ]).map(({ key, label }) => (
           <button
             key={key}
@@ -2021,7 +2054,7 @@ export default function WorkoutsPage() {
               {CATEGORIES.filter((c) => c === 'all' || activeCategories.has(c)).map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setCategoryFilter(cat)}
+                  onClick={() => { setCategoryFilter(cat); setMuscleFilter(null); }}
                   className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
                     categoryFilter === cat
                       ? cat === 'all'
@@ -2031,6 +2064,25 @@ export default function WorkoutsPage() {
                   }`}
                 >
                   {cat}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Muscle group filter pills */}
+          {activeMuscles.size > 1 && (
+            <div className="flex gap-1.5 px-4 pb-2 overflow-x-auto scrollbar-hide">
+              {MUSCLE_PILL_ORDER.filter((m) => activeMuscles.has(m)).map((muscle) => (
+                <button
+                  key={muscle}
+                  onClick={() => setMuscleFilter(muscleFilter === muscle ? null : muscle)}
+                  className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
+                    muscleFilter === muscle
+                      ? (MUSCLE_COLORS[muscle] || 'bg-slate-500/20 text-slate-300') + ' border-transparent'
+                      : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
+                  }`}
+                >
+                  {muscle}
                 </button>
               ))}
             </div>
@@ -2071,7 +2123,9 @@ export default function WorkoutsPage() {
                     ? 'No routines yet. Chat with your coach to generate one!'
                     : routineSearch
                       ? `No routines match "${routineSearch}"`
-                      : `No ${categoryFilter} routines yet.`}
+                      : muscleFilter
+                        ? `No ${muscleFilter} routines${categoryFilter !== 'all' ? ` in ${categoryFilter}` : ''}.`
+                        : `No ${categoryFilter} routines yet.`}
                 </p>
               </Card>
             </div>
@@ -2186,6 +2240,38 @@ export default function WorkoutsPage() {
             </>
           )}
           </div>
+        </div>
+      )}
+
+      {/* Activities Tab */}
+      {tab === 'activities' && (
+        <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide">
+          {activities.length === 0 ? (
+            <div className="flex items-center justify-center min-h-[40vh]">
+              <Card className="text-center">
+                <p className="text-muted text-sm font-medium">
+                  No activities logged yet. Tell Coach about a class or activity you did!
+                </p>
+              </Card>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {activities.map((a) => (
+                <div key={a.id} className="px-4 py-3 rounded-xl glass">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-white text-sm capitalize">{a.name}</p>
+                    {a.durationMinutes && (
+                      <span className="text-xs text-muted tabular-nums">{a.durationMinutes} min</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{formatDate(a.date)}</p>
+                  {a.notes && (
+                    <p className="text-xs text-slate-400 mt-1">{a.notes}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

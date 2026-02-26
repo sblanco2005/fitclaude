@@ -6,6 +6,7 @@ from app.models.workout import Workout, WorkoutExercise
 from app.models.nutrition import DailyNutritionSummary, NutritionLog
 from app.models.conversation import ConversationHistory
 from app.models.user_food import UserFood
+from app.models.activity import Activity
 
 __all__ = [
     "User",
@@ -20,4 +21,5 @@ __all__ = [
     "DailyNutritionSummary",
     "ConversationHistory",
     "UserFood",
+    "Activity",
 ]

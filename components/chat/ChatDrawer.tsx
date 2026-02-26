@@ -214,7 +214,7 @@ export function ChatDrawer() {
             </svg>
           </div>
           <span className="text-slate-400 text-sm flex-1">
-            {chatTopic === 'nutrition' ? 'Log food, ask about macros...' : 'Message Coach Fit...'}
+            {chatTopic === 'nutrition' ? 'Log food, snap a label...' : 'Message Coach Fit...'}
           </span>
           <button
             onClick={(e) => {
@@ -403,7 +403,7 @@ export function ChatDrawer() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={chatTopic === 'nutrition' ? 'Log food, ask about macros...' : 'Message Coach Fit...'}
+              placeholder={chatTopic === 'nutrition' ? 'Log food, snap a label...' : 'Message Coach Fit...'}
               rows={1}
               className="flex-1 bg-transparent text-white placeholder-slate-500 focus:outline-none resize-none text-[15px] leading-relaxed py-1.5 px-2 max-h-[120px]"
             />

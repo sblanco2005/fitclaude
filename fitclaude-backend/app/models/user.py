@@ -64,3 +64,4 @@ class User(Base):
     nutrition_logs: Mapped[List["NutritionLog"]] = relationship(back_populates="user")  # noqa: F821
     nutrition_summaries: Mapped[List["DailyNutritionSummary"]] = relationship(back_populates="user")  # noqa: F821
     conversations: Mapped[List["ConversationHistory"]] = relationship(back_populates="user")  # noqa: F821
+    activities: Mapped[List["Activity"]] = relationship(back_populates="user")  # noqa: F821

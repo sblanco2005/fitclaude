@@ -107,6 +107,7 @@ export interface Workout {
   name: string | null;
   workoutType: string;
   category: string;
+  source: string; // "coach" | "manual"
   durationMinutes: number | null;
   notes: string | null;
   fatigueRating: number | null;
@@ -130,6 +131,17 @@ export interface WorkoutExercise {
   wasSpicy: boolean;
   exercise?: { name: string; muscleGroup: string; videos?: { youtubeVideoId: string; title: string }[] } | null;
   variation?: { name: string; spicyLevel: number } | null;
+}
+
+// Activity (external classes / generic logs)
+export interface Activity {
+  id: string;
+  userId: string;
+  name: string;
+  durationMinutes: number | null;
+  date: string;
+  notes: string | null;
+  createdAt: string;
 }
 
 // Nutrition

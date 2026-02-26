@@ -17,6 +17,7 @@ class Workout(Base):
     name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     workout_type: Mapped[str] = mapped_column("workoutType", String)
     category: Mapped[str] = mapped_column(String, default="lifting")
+    source: Mapped[str] = mapped_column(String, default="coach")
     duration_minutes: Mapped[Optional[int]] = mapped_column(
         "durationMinutes", nullable=True
     )
