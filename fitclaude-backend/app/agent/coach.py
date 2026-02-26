@@ -134,7 +134,8 @@ def _looks_like_food_log(message: str) -> bool:
 _WORKOUT_GEN_KEYWORDS = re.compile(
     r"\b(generate|create|make|build|give me|new workout|new routine|spin|replace|"
     r"different exercises|fresh routine|remix|regenerate|another workout|"
-    r"new .{0,20} workout|workout with \d+ exercises)\b",
+    r"new .{0,20} workout|workout with \d+ exercises|"
+    r"i did|log this|log my|this morning|this routine|can you log)\b",
     re.IGNORECASE,
 )
 
@@ -980,9 +981,13 @@ async def handle_chat(
         ):
             parsed = _parse_workout_from_text(assistant_text)
             if parsed and len(parsed.get("exercises", [])) >= 3:
+                # Detect if user was logging an external workout (past tense)
+                _past_tense = re.search(r"\b(i did|this morning|log this|log my|we did)\b", user_message, re.IGNORECASE)
+                if _past_tense:
+                    parsed["source"] = "manual"
                 logger.warning(
                     f"[Coach] Model skipped generate_workout — auto-saving {len(parsed['exercises'])} "
-                    f"exercises parsed from text response"
+                    f"exercises parsed from text response (source={parsed.get('source', 'coach')})"
                 )
                 try:
                     result = await _tool_generate_workout(db, user_id, parsed)
