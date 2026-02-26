@@ -46,6 +46,7 @@ function MealRow({
 
   // Edit form state
   const [rawInput, setRawInput] = useState(log.rawInput);
+  const [mealType, setMealType] = useState(log.mealType ?? '');
   const [calories, setCalories] = useState(String(log.calories ?? ''));
   const [proteinG, setProteinG] = useState(String(log.proteinG ?? ''));
   const [carbsG, setCarbsG] = useState(String(log.carbsG ?? ''));
@@ -56,6 +57,7 @@ function MealRow({
 
   const startEdit = () => {
     setRawInput(log.rawInput);
+    setMealType(log.mealType ?? '');
     setCalories(String(log.calories ?? ''));
     setProteinG(String(log.proteinG ?? ''));
     setCarbsG(String(log.carbsG ?? ''));
@@ -77,6 +79,7 @@ function MealRow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           rawInput,
+          mealType: mealType || null,
           calories: calories ? parseFloat(calories) : null,
           proteinG: proteinG ? parseFloat(proteinG) : null,
           carbsG: carbsG ? parseFloat(carbsG) : null,
@@ -113,6 +116,24 @@ function MealRow({
           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary"
           placeholder="What did you eat?"
         />
+
+        {/* Meal type selector */}
+        <div className="flex gap-1.5">
+          {['breakfast', 'lunch', 'dinner', 'snack'].map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setMealType(mealType === type ? '' : type)}
+              className={`flex-1 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                mealType === type
+                  ? 'bg-primary/20 text-primary border border-primary/30'
+                  : 'bg-slate-800 text-slate-500 border border-transparent hover:text-slate-300'
+              }`}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
 
         {/* Macros grid */}
         <div className="grid grid-cols-4 gap-2">
