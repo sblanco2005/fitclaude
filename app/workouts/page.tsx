@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { Modal } from '@/components/ui/Modal';
 import type { Workout, WorkoutExercise, Exercise } from '@/types';
+import SetRow from '@/components/workout/SetRow';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -252,11 +253,10 @@ function SessionLogCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editingExId, setEditingExId] = useState<string | null>(null);
-  const [editInput, setEditInput] = useState('');
+  const [editLogs, setEditLogs] = useState<SetLog[]>([]);
   const [confirmDeleteSession, setConfirmDeleteSession] = useState(false);
   const [confirmClearLogs, setConfirmClearLogs] = useState(false);
 
-  const editRef = useRef<HTMLInputElement>(null);
   const hasLogs = sessionHasLogs(workout);
   const loggedExercises = workout.exercises.filter(
     (ex) => parseStoredSetLogs(ex.setLogs).length > 0
@@ -265,15 +265,20 @@ function SessionLogCard({
   const startEdit = (ex: WorkoutExercise) => {
     const logs = parseStoredSetLogs(ex.setLogs);
     setEditingExId(ex.id);
-    setEditInput(logs.map((l) => `${l.set}@${l.weight}x${l.reps}`).join(' '));
-    setTimeout(() => editRef.current?.focus(), 50);
+    setEditLogs([...logs]);
+  };
+
+  const handleEditSetLog = (setNum: number, weight: number, reps: number) => {
+    setEditLogs((prev) =>
+      [...prev.filter((l) => l.set !== setNum), { set: setNum, weight, reps }]
+        .sort((a, b) => a.set - b.set)
+    );
   };
 
   const submitEdit = (exerciseId: string) => {
-    const parsed = parseSetLogs(editInput);
-    onEditLog(workout.id, exerciseId, parsed);
+    onEditLog(workout.id, exerciseId, editLogs);
     setEditingExId(null);
-    setEditInput('');
+    setEditLogs([]);
   };
 
   return (
@@ -374,37 +379,43 @@ function SessionLogCard({
                   </div>
                 </div>
 
-                {/* Edit mode */}
+                {/* Edit mode — per-set stepper rows */}
                 {isEditing && (
-                  <div className="ml-7 mt-1.5 flex gap-1.5">
-                    <input
-                      ref={editRef}
-                      value={editInput}
-                      onChange={(e) => setEditInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); submitEdit(ex.id); }
-                        if (e.key === 'Escape') { setEditingExId(null); setEditInput(''); }
-                      }}
-                      className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary tabular-nums font-medium"
-                    />
-                    <button
-                      onClick={() => submitEdit(ex.id)}
-                      className="px-2 py-1.5 bg-primary rounded-lg text-white text-[10px] font-bold shrink-0"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => { setEditingExId(null); setEditInput(''); }}
-                      className="px-2 py-1.5 bg-slate-700 rounded-lg text-slate-300 text-[10px] font-bold shrink-0"
-                    >
-                      Cancel
-                    </button>
+                  <div className="ml-7 mt-1.5 space-y-0.5">
+                    {editLogs.map((l) => (
+                      <SetRow
+                        key={l.set}
+                        setNumber={l.set}
+                        weight={l.weight}
+                        reps={l.reps}
+                        isLogged={false}
+                        onLog={(w, r) => handleEditSetLog(l.set, w, r)}
+                        onUnlog={() => setEditLogs((prev) => prev.filter((x) => x.set !== l.set))}
+                      />
+                    ))}
+                    <div className="flex gap-1.5 mt-2">
+                      <button
+                        onClick={() => submitEdit(ex.id)}
+                        className="px-3 py-1.5 bg-primary rounded-lg text-white text-[10px] font-bold shrink-0"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => { setEditingExId(null); setEditLogs([]); }}
+                        className="px-3 py-1.5 bg-slate-700 rounded-lg text-slate-300 text-[10px] font-bold shrink-0"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {/* Set log chips */}
+                {/* Set log chips — tap to edit */}
                 {hasExLogs && !isEditing && (
-                  <div className="flex flex-wrap gap-1 ml-7 mt-1">
+                  <div
+                    className="flex flex-wrap gap-1 ml-7 mt-1 cursor-pointer"
+                    onClick={() => startEdit(ex)}
+                  >
                     {logs.map((l) => (
                       <span
                         key={l.set}
@@ -1145,62 +1156,88 @@ function ExerciseLogRow({
   isRunning,
   logs,
   onUpdateLogs,
+  lastLogs,
+  onSwap,
 }: {
   ex: WorkoutExercise;
   index: number;
   isRunning: boolean;
   logs: SetLog[];
   onUpdateLogs: (logs: SetLog[]) => void;
+  lastLogs?: SetLog[] | null;
+  onSwap?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showShorthand, setShowShorthand] = useState(false);
   const [input, setInput] = useState('');
   const [showVideo, setShowVideo] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasLogs = logs.length > 0;
 
-  const handleSubmit = () => {
-    const parsed = parseSetLogs(input);
-    if (parsed.length > 0) {
-      onUpdateLogs(parsed);
-      setInput('');
-      setExpanded(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSubmit();
-    }
-    if (e.key === 'Escape') {
-      setExpanded(false);
-      setInput('');
-    }
-  };
-
   const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
-
   const numSets = ex.sets || 3;
 
-  const toggleExpand = () => {
-    const opening = !expanded;
-    setExpanded(opening);
-    if (opening && isRunning) {
-      // Pre-fill with set numbers so user just types weight x reps
-      if (!hasLogs && !input) {
-        const template = Array.from({ length: numSets }, (_, i) => `${i + 1}@`).join(' ');
-        setInput(template);
-        // Place cursor right after "1@"
-        setTimeout(() => {
-          if (inputRef.current) {
-            inputRef.current.focus();
-            inputRef.current.setSelectionRange(2, 2);
-          }
-        }, 50);
-        return;
-      }
-      setTimeout(() => inputRef.current?.focus(), 50);
+  // Parse prescribed reps (e.g. "8-10" → 8, "12" → 12)
+  const prescribedReps = parseInt(ex.reps ?? '0') || 0;
+
+  // Get default weight/reps for a given set number
+  const getDefaults = (setNum: number) => {
+    // 1. If this set already has a log, use it
+    const existing = logs.find((l) => l.set === setNum);
+    if (existing) return { weight: existing.weight, reps: existing.reps };
+
+    // 2. Carry forward from the last logged set in this session
+    const lastLogged = logs.length > 0 ? logs[logs.length - 1] : null;
+    if (lastLogged) return { weight: lastLogged.weight, reps: lastLogged.reps };
+
+    // 3. Use last session's data for this set
+    if (lastLogs) {
+      const lastForSet = lastLogs.find((l) => l.set === setNum) ?? lastLogs[lastLogs.length - 1];
+      if (lastForSet) return { weight: lastForSet.weight, reps: lastForSet.reps };
     }
+
+    // 4. Fallback
+    return { weight: 0, reps: prescribedReps || 8 };
+  };
+
+  const handleSetLog = (setNum: number, weight: number, reps: number) => {
+    const updated = [...logs.filter((l) => l.set !== setNum), { set: setNum, weight, reps }]
+      .sort((a, b) => a.set - b.set);
+    onUpdateLogs(updated);
+  };
+
+  const handleUnlogSet = (setNum: number) => {
+    onUpdateLogs(logs.filter((l) => l.set !== setNum));
+  };
+
+  const handleFillRemaining = () => {
+    const last = logs[logs.length - 1];
+    if (!last) return;
+    const filled = [...logs];
+    for (let i = 1; i <= numSets; i++) {
+      if (!filled.find((l) => l.set === i)) {
+        filled.push({ set: i, weight: last.weight, reps: last.reps });
+      }
+    }
+    onUpdateLogs(filled.sort((a, b) => a.set - b.set));
+  };
+
+  // Shorthand fallback
+  const handleShorthandSubmit = () => {
+    const parsed = parseSetLogs(input);
+    if (parsed.length > 0) {
+      // Blur to dismiss keyboard & reset iOS zoom
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      onUpdateLogs(parsed);
+      setInput('');
+      setShowShorthand(false);
+    }
+  };
+
+  const toggleExpand = () => {
+    setExpanded((v) => !v);
   };
 
   return (
@@ -1240,7 +1277,7 @@ function ExerciseLogRow({
         </div>
       </div>
 
-      {/* Logged sets chips */}
+      {/* Logged sets chips — collapsed view */}
       {hasLogs && !expanded && (
         <div className="flex flex-wrap gap-1 ml-7 mt-0.5 mb-1">
           {logs.map((l) => (
@@ -1251,48 +1288,80 @@ function ExerciseLogRow({
         </div>
       )}
 
-      {/* Quick input */}
+      {/* Per-set logging UI */}
       {expanded && isRunning && (
-        <div className="mt-1.5 ml-7">
-          {hasLogs && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {logs.map((l) => (
-                <span key={l.set} className="text-[10px] tabular-nums bg-primary/15 text-primary px-1.5 py-0.5 rounded font-medium">
-                  S{l.set} {formatSetLog(l)}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-1.5">
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="1@195x4 2@200x5"
-              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary tabular-nums font-medium"
-            />
+        <div className="mt-1.5 ml-3 space-y-0.5">
+          {Array.from({ length: numSets }, (_, i) => i + 1).map((setNum) => {
+            const existingLog = logs.find((l) => l.set === setNum);
+            const defaults = getDefaults(setNum);
+            return (
+              <SetRow
+                key={setNum}
+                setNumber={setNum}
+                weight={existingLog?.weight ?? defaults.weight}
+                reps={existingLog?.reps ?? defaults.reps}
+                isLogged={!!existingLog}
+                onLog={(w, r) => handleSetLog(setNum, w, r)}
+                onUnlog={() => handleUnlogSet(setNum)}
+              />
+            );
+          })}
+
+          {/* Fill remaining button */}
+          {logs.length > 0 && logs.length < numSets && (
             <button
-              onClick={handleSubmit}
-              disabled={!input.trim()}
-              className="px-2.5 py-1.5 bg-primary rounded-lg text-white text-xs font-bold disabled:opacity-30 transition-colors shrink-0"
+              onClick={handleFillRemaining}
+              className="w-full py-1.5 mt-1 rounded-lg text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/15 transition-colors"
             >
-              Log
+              Fill Remaining ({logs[logs.length - 1].weight}lb × {logs[logs.length - 1].reps})
+            </button>
+          )}
+
+          {/* Action row: swap + shorthand */}
+          <div className="flex items-center gap-2 pt-1">
+            {onSwap && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onSwap(); }}
+                className="flex items-center gap-1 text-[10px] font-medium text-slate-500 hover:text-amber-400 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+                Swap
+              </button>
+            )}
+            <button
+              onClick={() => setShowShorthand((v) => !v)}
+              className="text-[10px] text-slate-600 hover:text-slate-400 font-medium transition-colors"
+            >
+              {showShorthand ? 'Hide shorthand' : 'Type shorthand'}
             </button>
           </div>
-          <p className="text-[9px] text-slate-600 mt-1 font-medium">
-            <span className="text-primary/60">1</span>
-            <span className="text-slate-700">@</span>
-            <span className="text-blue-400/60">195</span>
-            <span className="text-slate-700">x</span>
-            <span className="text-amber-400/60">4</span>
-            <span className="mx-1">→</span>
-            <span className="text-primary/60">set</span>
-            <span className="text-slate-700">@</span>
-            <span className="text-blue-400/60">weight(lb)</span>
-            <span className="text-slate-700">x</span>
-            <span className="text-amber-400/60">reps</span>
-          </p>
+
+          {/* Shorthand fallback input */}
+          {showShorthand && (
+            <div className="flex gap-1.5 mt-1">
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); handleShorthandSubmit(); }
+                  if (e.key === 'Escape') { setShowShorthand(false); setInput(''); }
+                }}
+                placeholder="1@195x4 2@200x5"
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[16px] text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary tabular-nums font-medium"
+                autoFocus
+              />
+              <button
+                onClick={handleShorthandSubmit}
+                disabled={!input.trim()}
+                className="px-2.5 py-1.5 bg-primary rounded-lg text-white text-xs font-bold disabled:opacity-30 transition-colors shrink-0"
+              >
+                Log
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1329,25 +1398,36 @@ function ExerciseLogRow({
 function ActiveWorkout({
   routineName,
   workouts,
+  allWorkouts,
   onFinish,
   onRemove,
+  onSwapExercise,
 }: {
   routineName: string;
   workouts: Workout[];
+  allWorkouts: Workout[];
   onFinish: (routineName: string, elapsed: number, exerciseLogs: Map<string, SetLog[]>) => void;
   onRemove: (routineName: string) => void;
+  onSwapExercise?: (workoutId: string, workoutExerciseId: string) => void;
 }) {
   const latest = workouts[0];
   const muscles = uniqueMuscles(latest);
+  const INACTIVITY_LIMIT = 15 * 60; // 15 minutes with no set logged
+  const HARD_CAP = 2 * 60 * 60; // 2 hours max
+
   const [isRunning, setIsRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [autoStopped, setAutoStopped] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
 
   // Map of exerciseId -> SetLog[]
   const [exerciseLogs, setExerciseLogs] = useState<Map<string, SetLog[]>>(new Map());
 
   const updateLogs = useCallback((exerciseId: string, logs: SetLog[]) => {
+    lastActivityRef.current = Date.now();
     setExerciseLogs((prev) => {
       const next = new Map(prev);
       next.set(exerciseId, logs);
@@ -1355,27 +1435,60 @@ function ActiveWorkout({
     });
   }, []);
 
+  const stopRef = useRef<() => void>(() => {});
+
+  const tick = useCallback(() => {
+    if (startTimeRef.current == null) return;
+    const now = Date.now();
+    const secs = Math.floor((now - startTimeRef.current) / 1000);
+    setElapsed(secs);
+
+    // Auto-stop: 15 min inactivity or 2 hour hard cap
+    const idleSecs = Math.floor((now - lastActivityRef.current) / 1000);
+    if (secs >= HARD_CAP || idleSecs >= INACTIVITY_LIMIT) {
+      setAutoStopped(true);
+      stopRef.current();
+    }
+  }, [HARD_CAP, INACTIVITY_LIMIT]);
+
   const start = useCallback(() => {
     if (isRunning) return;
+    const now = Date.now();
+    startTimeRef.current = now;
+    lastActivityRef.current = now;
+    setAutoStopped(false);
     setIsRunning(true);
-    intervalRef.current = setInterval(() => {
-      setElapsed((prev) => prev + 1);
-    }, 1000);
-  }, [isRunning]);
+    intervalRef.current = setInterval(tick, 1000);
+  }, [isRunning, tick]);
 
   const stop = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    // Compute final elapsed from real clock
+    if (startTimeRef.current != null) {
+      setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    }
     setIsRunning(false);
   }, []);
 
+  // Keep stopRef in sync so tick can call it without stale closure
+  stopRef.current = stop;
+
+  // Recalculate elapsed when screen wakes up (visibilitychange)
   useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && startTimeRef.current != null) {
+        tick();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
+      document.removeEventListener('visibilitychange', onVisible);
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [tick]);
 
   const handleFinish = async () => {
     stop();
@@ -1456,6 +1569,8 @@ function ActiveWorkout({
             isRunning={isRunning}
             logs={exerciseLogs.get(ex.id) ?? []}
             onUpdateLogs={(logs) => updateLogs(ex.id, logs)}
+            lastLogs={getLastLogForExercise(allWorkouts, getExerciseName(ex), latest.id)}
+            onSwap={onSwapExercise ? () => onSwapExercise(latest.id, ex.id) : undefined}
           />
         ))}
       </div>
@@ -1495,8 +1610,8 @@ function ActiveWorkout({
           </button>
         )}
         {!isRunning && elapsed > 0 && (
-          <div className="flex-1 py-2.5 rounded-lg bg-primary/20 text-primary font-bold text-sm tracking-wide uppercase text-center">
-            Completed — {formatTimer(elapsed)}
+          <div className={`flex-1 py-2.5 rounded-lg font-bold text-sm tracking-wide uppercase text-center ${autoStopped ? 'bg-amber-500/20 text-amber-400' : 'bg-primary/20 text-primary'}`}>
+            {autoStopped ? `Auto-stopped — ${formatTimer(elapsed)}` : `Completed — ${formatTimer(elapsed)}`}
           </div>
         )}
       </div>
@@ -1626,6 +1741,7 @@ export default function WorkoutsPage() {
   >([]);
   const [queueToast, setQueueToast] = useState<string | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
 
   const fetchWorkouts = useCallback(() => {
     fetch('/api/workouts?daysBack=90')
@@ -2021,8 +2137,18 @@ export default function WorkoutsPage() {
                     key={name}
                     routineName={name}
                     workouts={group}
+                    allWorkouts={workouts}
                     onFinish={handleFinish}
                     onRemove={removeFromHitIt}
+                    onSwapExercise={(workoutId, workoutExerciseId) => {
+                      const wo = workouts.find((w) => w.id === workoutId);
+                      const we = wo?.exercises.find((e) => e.id === workoutExerciseId);
+                      setHitItSwapping({
+                        workoutId,
+                        workoutExerciseId,
+                        exerciseName: we ? getExerciseName(we) : '',
+                      });
+                    }}
                   />
                 );
               })}
@@ -2042,6 +2168,18 @@ export default function WorkoutsPage() {
           </div>
         </div>
       )}
+
+      {/* Swap Exercise Modal for Hit It tab */}
+      <SwapExerciseModal
+        isOpen={!!hitItSwapping}
+        onClose={() => setHitItSwapping(null)}
+        currentExerciseName={hitItSwapping?.exerciseName ?? ''}
+        onSelect={async (exercise) => {
+          if (!hitItSwapping) return;
+          await handleSwapExercise(hitItSwapping.workoutId, hitItSwapping.workoutExerciseId, exercise.id);
+          setHitItSwapping(null);
+        }}
+      />
 
       {/* Spin confirmation overlay */}
       {spinTarget && (

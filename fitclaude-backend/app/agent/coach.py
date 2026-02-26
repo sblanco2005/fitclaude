@@ -24,6 +24,7 @@ from app.models import (
     Exercise,
     NutritionLog,
     User,
+    UserFood,
     Workout,
     WorkoutExercise,
 )
@@ -99,6 +100,8 @@ async def _execute_tool(
         )
     elif tool_name == "mark_workout_complete":
         return await _tool_mark_workout_complete(db, tool_input)
+    elif tool_name == "lookup_user_foods":
+        return await _tool_lookup_user_foods(db, user_id, tool_input)
     elif tool_name == "parse_youtube_video":
         return await import_exercises_from_youtube(db, tool_input["youtube_url"])
     else:
@@ -469,7 +472,8 @@ async def _tool_generate_workout(
     max_id = max_result.scalar() or 0
     next_display_id = max_id + 1
 
-    workout_name = params.get("name") or f"{params['workout_type'].replace('_', ' ').title()} Day"
+    raw_name = params.get("name") or f"{params['workout_type'].replace('_', ' ')} day"
+    workout_name = raw_name.lower().strip().rstrip("*")
     workout = Workout(
         id=cuid_generator.generate(),
         user_id=user_id,
@@ -740,6 +744,42 @@ async def _tool_mark_workout_complete(db: AsyncSession, params: dict) -> dict:
         "workout_id": workout.id,
         "completed": True,
         "fatigue_rating": workout.fatigue_rating,
+    }
+
+
+async def _tool_lookup_user_foods(
+    db: AsyncSession, user_id: str, params: dict
+) -> dict:
+    """Look up foods in the user's personal food database."""
+    names = [n.lower().strip() for n in params.get("food_names", [])]
+    if not names:
+        return {"found": [], "not_found": []}
+
+    result = await db.execute(
+        select(UserFood).where(
+            UserFood.user_id == user_id,
+            func.lower(UserFood.name).in_(names),
+        )
+    )
+    foods = result.scalars().all()
+    found_names = {f.name.lower() for f in foods}
+
+    return {
+        "found": [
+            {
+                "name": f.name,
+                "serving_amount": f.serving_amount,
+                "serving_unit": f.serving_unit,
+                "per_serving": {
+                    "calories": round(f.calories, 2),
+                    "protein_g": round(f.protein_g, 2),
+                    "carbs_g": round(f.carbs_g, 2),
+                    "fat_g": round(f.fat_g, 2),
+                },
+            }
+            for f in foods
+        ],
+        "not_found": [n for n in names if n not in found_names],
     }
 
 

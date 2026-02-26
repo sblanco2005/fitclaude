@@ -173,6 +173,23 @@ export interface DailyNutritionSummary {
   createdAt: string;
 }
 
+// Personal Food Database
+export interface UserFood {
+  id: string;
+  userId: string;
+  name: string;
+  servingAmount: number;
+  servingUnit: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  fiberG: number | null;
+  timesUsed: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Chat
 export interface ChatMessage {
   id: string;

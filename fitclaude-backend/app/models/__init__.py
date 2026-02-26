@@ -5,6 +5,7 @@ from app.models.pending_exercise import PendingExercise, PendingVariation
 from app.models.workout import Workout, WorkoutExercise
 from app.models.nutrition import DailyNutritionSummary, NutritionLog
 from app.models.conversation import ConversationHistory
+from app.models.user_food import UserFood
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "NutritionLog",
     "DailyNutritionSummary",
     "ConversationHistory",
+    "UserFood",
 ]

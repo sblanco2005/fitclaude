@@ -48,6 +48,7 @@ model User {
   nutritionSummaries   DailyNutritionSummary[]
   conversations        ConversationHistory[]
   apiTokens            ApiToken[]
+  userFoods            UserFood[]
 
   @@map("users")
 }
@@ -313,6 +314,32 @@ model ExerciseVideo {
   @@index([status])
   @@index([exerciseId])
   @@map("exercise_videos")
+}
+
+// ============================================
+// Personal Food Database
+// ============================================
+
+model UserFood {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  servingAmount Float
+  servingUnit   String
+  calories      Float
+  proteinG      Float
+  carbsG        Float
+  fatG          Float
+  fiberG        Float?
+  timesUsed     Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("user_foods")
 }
 
 // ============================================

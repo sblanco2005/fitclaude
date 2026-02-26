@@ -215,6 +215,26 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "lookup_user_foods",
+        "description": (
+            "Search the user's personal food database for previously logged foods with "
+            "verified macros. ALWAYS call this before log_nutrition to check if the food "
+            "has known macros. Returns macros per base serving unit — multiply by the "
+            "user's requested quantity to get final values."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "food_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of food names to look up (e.g. ['chicken breast', 'protein shake'])",
+                },
+            },
+            "required": ["food_names"],
+        },
+    },
+    {
         "name": "parse_youtube_video",
         "description": (
             "Extract exercises from a YouTube video transcript and add them to the "
