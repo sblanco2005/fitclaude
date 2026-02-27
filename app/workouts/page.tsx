@@ -1256,7 +1256,7 @@ function ExerciseLogRow({
                 isLogged={!!existingLog}
                 onLog={(w, r) => handleSetLog(setNum, w, r)}
                 onUnlog={() => handleUnlogSet(setNum)}
-                equipmentRequired={ex.exercise?.equipmentRequired ?? null}
+                equipmentRequired={ex.exercise?.equipmentRequired ?? (getExerciseName(ex).toLowerCase().includes('barbell') ? 'barbell' : null)}
               />
             );
           })}
