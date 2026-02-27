@@ -61,9 +61,16 @@ CONVERSATION STYLE:
 """
 
 
-def build_user_context(user_data: dict) -> str:
+def build_user_context(user_data: dict, user_tz=None) -> str:
     """Build a context string injected into the system prompt with user-specific info."""
-    parts = [f"\nUSER CONTEXT:\n- Name: {user_data['name']}"]
+    from datetime import datetime, timezone as _tz
+    if user_tz:
+        now = datetime.now(user_tz)
+    else:
+        now = datetime.now(_tz.utc)
+    today = now.date()
+    tz_label = str(user_tz) if user_tz else "UTC"
+    parts = [f"\nUSER CONTEXT:\n- Today's date: {today.strftime('%A, %B %d, %Y')} ({tz_label})\n- Name: {user_data['name']}"]
 
     if user_data.get("fitness_goal"):
         parts.append(f"- Goal: {user_data['fitness_goal']}")

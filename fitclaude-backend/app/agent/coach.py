@@ -86,11 +86,11 @@ async def _execute_tool(
 ) -> dict:
     """Execute a tool call and return the result."""
     if tool_name == "generate_workout":
-        return await _tool_generate_workout(db, user_id, tool_input)
+        return await _tool_generate_workout(db, user_id, tool_input, user_tz=user_tz)
     elif tool_name == "log_nutrition":
         return await _tool_log_nutrition(db, user_id, tool_input, user_tz=user_tz)
     elif tool_name == "get_workout_history":
-        return await _tool_get_workout_history(db, user_id, tool_input)
+        return await _tool_get_workout_history(db, user_id, tool_input, user_tz=user_tz)
     elif tool_name == "get_daily_nutrition":
         return await _tool_get_daily_nutrition(db, user_id, tool_input, user_tz=user_tz)
     elif tool_name == "get_spicy_variation":
@@ -106,7 +106,7 @@ async def _execute_tool(
     elif tool_name == "parse_youtube_video":
         return await import_exercises_from_youtube(db, tool_input["youtube_url"])
     elif tool_name == "log_activity":
-        return await _tool_log_activity(db, user_id, tool_input)
+        return await _tool_log_activity(db, user_id, tool_input, user_tz=user_tz)
     else:
         return {"error": f"Unknown tool: {tool_name}"}
 
@@ -451,7 +451,7 @@ def _match_exercise(name: str, all_exercises: list) -> "Exercise | None":
 
 
 async def _tool_generate_workout(
-    db: AsyncSession, user_id: str, params: dict
+    db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
     """Create a workout record with exercises and return its structure."""
     print(f"[Coach] generate_workout called with keys: {list(params.keys())}", flush=True)
@@ -485,7 +485,7 @@ async def _tool_generate_workout(
         category=params.get("category", "lifting"),
         source=params.get("source", "coach"),
         name=workout_name,
-        date=datetime.utcnow(),
+        date=datetime.now(user_tz).astimezone(tz.utc).replace(tzinfo=None) if user_tz else datetime.utcnow(),
         display_id=next_display_id,
         notes=tips or None,
     )
@@ -643,11 +643,14 @@ async def _tool_log_nutrition(
 
 
 async def _tool_get_workout_history(
-    db: AsyncSession, user_id: str, params: dict
+    db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
     """Get recent workout history."""
     days_back = params.get("days_back", 14)
-    cutoff = datetime.utcnow() - timedelta(days=days_back)
+    if user_tz:
+        cutoff = (datetime.now(user_tz) - timedelta(days=days_back)).astimezone(tz.utc).replace(tzinfo=None)
+    else:
+        cutoff = datetime.utcnow() - timedelta(days=days_back)
 
     query = (
         select(Workout)
@@ -789,7 +792,7 @@ async def _tool_lookup_user_foods(
 
 
 async def _tool_log_activity(
-    db: AsyncSession, user_id: str, params: dict
+    db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
     """Log a generic activity (no exercises)."""
     activity = Activity(
@@ -798,7 +801,7 @@ async def _tool_log_activity(
         name=params["name"],
         duration_minutes=params.get("duration_minutes"),
         notes=params.get("notes"),
-        date=datetime.utcnow(),
+        date=datetime.now(user_tz).astimezone(tz.utc).replace(tzinfo=None) if user_tz else datetime.utcnow(),
     )
     db.add(activity)
     await db.commit()
@@ -839,7 +842,7 @@ async def handle_chat(
 
     # Load context
     user_data = await _load_user_context(db, user_id)
-    context = build_user_context(user_data)
+    context = build_user_context(user_data, user_tz=user_tz)
     history = await _load_conversation_history(db, user_id, topic=topic)
 
     # Build user content — text only, or text + image for vision

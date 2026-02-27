@@ -65,6 +65,16 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setProfile(data);
+
+        // Auto-sync browser timezone to profile
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (browserTz && data.timezone !== browserTz) {
+          fetch('/api/profile', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timezone: browserTz }),
+          }).catch(() => {}); // fire-and-forget
+        }
       }
     } catch (err) {
       console.error('Failed to fetch profile:', err);
@@ -102,7 +112,8 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
 
   const fetchWorkouts = useCallback(async (daysBack = 30): Promise<Workout[]> => {
     try {
-      const res = await fetch(`/api/workouts?daysBack=${daysBack}`);
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await fetch(`/api/workouts?daysBack=${daysBack}&tz=${encodeURIComponent(tz)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.length > 0) {
