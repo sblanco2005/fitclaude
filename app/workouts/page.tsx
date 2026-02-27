@@ -634,11 +634,13 @@ function SwapExerciseModal({
   onClose,
   onSelect,
   currentExerciseName,
+  title = 'Swap Exercise',
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (exercise: Exercise) => void;
   currentExerciseName: string;
+  title?: string;
 }) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(false);
@@ -680,7 +682,7 @@ function SwapExerciseModal({
   }, [exercises, search, muscleFilter, currentExerciseName]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Swap Exercise" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={title} size="md">
       <div className="space-y-3">
         {/* Search */}
         <input
@@ -760,6 +762,7 @@ function RoutineDetail({
   onEditLog,
   onDeleteSession,
   onSwapExercise,
+  onAddExercise,
 }: {
   workouts: Workout[];
   onBack: () => void;
@@ -771,12 +774,14 @@ function RoutineDetail({
   onEditLog: (workoutId: string, exerciseId: string, logs: SetLog[]) => void;
   onDeleteSession: (workoutId: string) => void;
   onSwapExercise: (workoutId: string, workoutExerciseId: string, newExerciseId: string) => Promise<void>;
+  onAddExercise: (workoutId: string, exerciseId: string) => Promise<void>;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [swappingExercise, setSwappingExercise] = useState<WorkoutExercise | null>(null);
+  const [addingExercise, setAddingExercise] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
 
   const latest = workouts[0];
@@ -895,6 +900,12 @@ function RoutineDetail({
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                     <div className="absolute right-0 top-full mt-1 z-50 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1 min-w-[140px]">
+                      <button
+                        onClick={() => { setMenuOpen(false); setAddingExercise(true); }}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      >
+                        Add Exercise
+                      </button>
                       <button
                         onClick={startRename}
                         className="w-full text-left px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
@@ -1032,6 +1043,18 @@ function RoutineDetail({
           if (!swappingExercise) return;
           await onSwapExercise(latest.id, swappingExercise.id, exercise.id);
           setSwappingExercise(null);
+        }}
+      />
+
+      {/* Add Exercise Modal */}
+      <SwapExerciseModal
+        isOpen={addingExercise}
+        onClose={() => setAddingExercise(false)}
+        currentExerciseName=""
+        title="Add Exercise"
+        onSelect={async (exercise) => {
+          await onAddExercise(latest.id, exercise.id);
+          setAddingExercise(false);
         }}
       />
     </div>
@@ -1650,7 +1673,7 @@ function FinishedWorkoutCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'routines' | 'activities' | 'history';
+type Tab = 'routines' | 'activities' | 'history' | 'hit-it';
 
 const CATEGORIES = ['all', 'lifting', 'hiit', 'cardio', 'mobility', 'calisthenics', 'sport', 'external'] as const;
 type Category = typeof CATEGORIES[number];
@@ -1688,8 +1711,6 @@ export default function WorkoutsPage() {
   const [finishedWorkouts, setFinishedWorkouts] = useState<
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
   >([]);
-  const [queueToast, setQueueToast] = useState<string | null>(null);
-  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
 
@@ -1804,15 +1825,17 @@ export default function WorkoutsPage() {
     const alreadyQueued = hitItQueue.includes(name);
     if (!alreadyQueued) {
       setHitItQueue((prev) => [...prev, name]);
-      setQueueToast(name);
-      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-      toastTimeoutRef.current = setTimeout(() => setQueueToast(null), 3000);
     }
     setSelectedRoutine(null);
+    setTab('hit-it');
   };
 
   const removeFromHitIt = (name: string) => {
-    setHitItQueue((prev) => prev.filter((n) => n !== name));
+    setHitItQueue((prev) => {
+      const next = prev.filter((n) => n !== name);
+      if (next.length === 0) setTab('routines');
+      return next;
+    });
   };
 
   const handleFinish = (name: string, elapsed: number, exerciseLogs: Map<string, SetLog[]>) => {
@@ -1823,7 +1846,11 @@ export default function WorkoutsPage() {
     } else {
       setFinishedWorkouts((prev) => [...prev, { name, elapsed, finishedAt: new Date(), exerciseLogs: new Map(), workout: {} as Workout }]);
     }
-    setHitItQueue((prev) => prev.filter((n) => n !== name));
+    setHitItQueue((prev) => {
+      const next = prev.filter((n) => n !== name);
+      if (next.length === 0) setTab('history');
+      return next;
+    });
     fetchWorkouts(); // Refresh to show updated logs
   };
 
@@ -1895,6 +1922,17 @@ export default function WorkoutsPage() {
     }
   };
 
+  const handleAddExercise = async (workoutId: string, exerciseId: string) => {
+    const res = await fetch(`/api/workouts/${workoutId}/exercises`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exerciseId }),
+    });
+    if (res.ok) {
+      fetchWorkouts();
+    }
+  };
+
   const requestSpin = (routineName: string) => {
     const group = routineGroups.find(([k]) => k === routineName)?.[1];
     if (!group) return;
@@ -1946,6 +1984,7 @@ export default function WorkoutsPage() {
           onEditLog={handleEditLog}
           onDeleteSession={handleDeleteSession}
           onSwapExercise={handleSwapExercise}
+          onAddExercise={handleAddExercise}
         />
       </div>
     );
@@ -1958,6 +1997,7 @@ export default function WorkoutsPage() {
       <div className="flex gap-1 p-4 pb-2 shrink-0">
         {([
           { key: 'routines' as Tab, label: 'Routines' },
+          ...(hitItQueue.length > 0 ? [{ key: 'hit-it' as Tab, label: `Hit It (${hitItQueue.length})` }] : []),
           { key: 'activities' as Tab, label: 'Activities' },
           { key: 'history' as Tab, label: 'History' },
         ]).map(({ key, label }) => (
@@ -1966,8 +2006,12 @@ export default function WorkoutsPage() {
             onClick={() => setTab(key)}
             className={`flex-1 py-2.5 rounded-lg text-sm font-bold tracking-wide uppercase transition-all duration-200 ${
               tab === key
-                ? 'bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.25)]'
-                : 'text-muted hover:text-white hover:bg-card-hover'
+                ? key === 'hit-it'
+                  ? 'bg-amber-400 text-black shadow-[0_2px_12px_rgba(251,191,36,0.3)]'
+                  : 'bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.25)]'
+                : key === 'hit-it'
+                  ? 'text-amber-400 bg-amber-400/10 hover:bg-amber-400/20'
+                  : 'text-muted hover:text-white hover:bg-card-hover'
             }`}
           >
             {label}
@@ -2071,6 +2115,44 @@ export default function WorkoutsPage() {
             ))
           )}
           </div>
+        </div>
+      )}
+
+      {/* Hit It Tab — active workouts */}
+      {tab === 'hit-it' && (
+        <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide">
+          {hitItQueue.length === 0 ? (
+            <div className="flex items-center justify-center min-h-[40vh]">
+              <div className="text-center px-6">
+                <p className="text-2xl font-black text-slate-600 tracking-wide uppercase">
+                  No Active Workouts
+                </p>
+                <p className="text-sm text-muted mt-2 font-medium">
+                  Queue a routine to start training
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 mt-1">
+              {hitItQueue.map((name) => {
+                const group = routineGroups.find(([k]) => k === name)?.[1];
+                if (!group) return null;
+                return (
+                  <ActiveWorkout
+                    key={name}
+                    routineName={name}
+                    workouts={group}
+                    allWorkouts={workouts}
+                    onFinish={handleFinish}
+                    onRemove={removeFromHitIt}
+                    onSwapExercise={(workoutId, workoutExerciseId) =>
+                      setHitItSwapping({ workoutId, workoutExerciseId, exerciseName: '' })
+                    }
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
