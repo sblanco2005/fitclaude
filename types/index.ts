@@ -129,7 +129,7 @@ export interface WorkoutExercise {
   notes: string | null;
   setLogs: string | null; // JSON: [{"set":1,"weight":195,"reps":4},...]
   wasSpicy: boolean;
-  exercise?: { name: string; muscleGroup: string; videos?: { youtubeVideoId: string; title: string }[] } | null;
+  exercise?: { name: string; muscleGroup: string; equipmentRequired?: string | null; videos?: { youtubeVideoId: string; title: string }[] } | null;
   variation?: { name: string; spicyLevel: number } | null;
 }
 

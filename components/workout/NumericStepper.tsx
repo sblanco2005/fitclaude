@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 
 interface NumericStepperProps {
   value: number;
@@ -25,6 +25,10 @@ export default function NumericStepper({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const valueRef = useRef(value);
   valueRef.current = value;
+
+  // Track whether the input is focused and what the user is typing
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState('');
 
   const clamp = useCallback(
     (v: number) => Math.max(min, Math.min(max, v)),
@@ -55,13 +59,27 @@ export default function NumericStepper({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/[^0-9.]/g, '');
-    if (raw === '') {
-      onChange(0);
-      return;
-    }
+    setDraft(raw);
+    if (raw === '') return; // keep draft empty, commit on blur
     const num = parseFloat(raw);
     if (!isNaN(num)) onChange(clamp(num));
   };
+
+  const handleFocus = () => {
+    setFocused(true);
+    setDraft(''); // clear so user starts fresh
+  };
+
+  const handleBlur = () => {
+    setFocused(false);
+    // If user left it empty, keep the original value
+    if (draft === '') return;
+    const num = parseFloat(draft);
+    if (!isNaN(num)) onChange(clamp(num));
+  };
+
+  // Display: when focused show draft (empty until user types), otherwise show value
+  const displayValue = focused ? draft : (value || '');
 
   return (
     <div className="flex items-center gap-0.5">
@@ -81,9 +99,10 @@ export default function NumericStepper({
         type="text"
         inputMode="decimal"
         pattern="[0-9]*\.?[0-9]*"
-        value={value || ''}
+        value={displayValue}
         onChange={handleInputChange}
-        onFocus={(e) => e.target.select()}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         className={`${inputWidth} h-8 text-center bg-slate-900 border border-slate-700 rounded-md text-[16px] text-white tabular-nums font-bold focus:outline-none focus:ring-1 focus:ring-primary`}
       />
 

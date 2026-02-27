@@ -29,6 +29,7 @@ export const GET = withAuth(async (request, user) => {
               select: {
                 name: true,
                 muscleGroup: true,
+                equipmentRequired: true,
                 videos: {
                   where: { status: 'approved' },
                   orderBy: [{ videoType: 'asc' }, { isPrimary: 'desc' }],
