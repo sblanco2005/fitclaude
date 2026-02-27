@@ -1069,33 +1069,6 @@ interface SetLog {
   reps: number;
 }
 
-/**
- * Parse shorthand like "1@195x4 2@200x5" or "195x4, 200x5"
- * Flexible: handles spaces around @/x, commas, mixed separators.
- * Formats: <set>@<weight>x<reps> | <weight>x<reps> (auto-numbers)
- */
-function parseSetLogs(input: string): SetLog[] {
-  if (!input.trim()) return [];
-  // Normalize: remove commas, collapse spaces, trim
-  const clean = input.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
-  // Extract all set entries with a single regex scan
-  // Matches: optional(set @) weight x reps — with flexible spacing
-  const pattern = /(?:(\d+)\s*@\s*)?([\d.]+)\s*x\s*(\d+)/gi;
-  const logs: SetLog[] = [];
-  let autoSet = 1;
-  let match;
-
-  while ((match = pattern.exec(clean)) !== null) {
-    const setNum = match[1] ? parseInt(match[1]) : autoSet;
-    logs.push({
-      set: setNum,
-      weight: parseFloat(match[2]),
-      reps: parseInt(match[3]),
-    });
-    autoSet = setNum + 1;
-  }
-  return logs;
-}
 
 function formatSetLog(log: SetLog): string {
   return `${log.weight}lb × ${log.reps}`;
@@ -1121,10 +1094,7 @@ function ExerciseLogRow({
   onSwap?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [showShorthand, setShowShorthand] = useState(false);
-  const [input, setInput] = useState('');
   const [showVideo, setShowVideo] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const hasLogs = logs.length > 0;
 
   const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
@@ -1173,20 +1143,6 @@ function ExerciseLogRow({
       }
     }
     onUpdateLogs(filled.sort((a, b) => a.set - b.set));
-  };
-
-  // Shorthand fallback
-  const handleShorthandSubmit = () => {
-    const parsed = parseSetLogs(input);
-    if (parsed.length > 0) {
-      // Blur to dismiss keyboard & reset iOS zoom
-      if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
-      }
-      onUpdateLogs(parsed);
-      setInput('');
-      setShowShorthand(false);
-    }
   };
 
   const toggleExpand = () => {
@@ -1284,38 +1240,7 @@ function ExerciseLogRow({
                 Swap
               </button>
             )}
-            <button
-              onClick={() => setShowShorthand((v) => !v)}
-              className="text-[10px] text-slate-600 hover:text-slate-400 font-medium transition-colors"
-            >
-              {showShorthand ? 'Hide shorthand' : 'Type shorthand'}
-            </button>
           </div>
-
-          {/* Shorthand fallback input */}
-          {showShorthand && (
-            <div className="flex gap-1.5 mt-1">
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); handleShorthandSubmit(); }
-                  if (e.key === 'Escape') { setShowShorthand(false); setInput(''); }
-                }}
-                placeholder="1@195x4 2@200x5"
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[16px] text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary tabular-nums font-medium"
-                autoFocus
-              />
-              <button
-                onClick={handleShorthandSubmit}
-                disabled={!input.trim()}
-                className="px-2.5 py-1.5 bg-primary rounded-lg text-white text-xs font-bold disabled:opacity-30 transition-colors shrink-0"
-              >
-                Log
-              </button>
-            </div>
-          )}
         </div>
       )}
 
