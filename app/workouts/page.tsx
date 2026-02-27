@@ -1650,7 +1650,7 @@ function FinishedWorkoutCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'routines' | 'hitit' | 'activities';
+type Tab = 'routines' | 'activities' | 'history';
 
 const CATEGORIES = ['all', 'lifting', 'hiit', 'cardio', 'mobility', 'calisthenics', 'sport', 'external'] as const;
 type Category = typeof CATEGORIES[number];
@@ -1809,7 +1809,6 @@ export default function WorkoutsPage() {
       toastTimeoutRef.current = setTimeout(() => setQueueToast(null), 3000);
     }
     setSelectedRoutine(null);
-    setTab('hitit');
   };
 
   const removeFromHitIt = (name: string) => {
@@ -1959,8 +1958,8 @@ export default function WorkoutsPage() {
       <div className="flex gap-1 p-4 pb-2 shrink-0">
         {([
           { key: 'routines' as Tab, label: 'Routines' },
-          { key: 'hitit' as Tab, label: 'Hit It' },
           { key: 'activities' as Tab, label: 'Activities' },
+          { key: 'history' as Tab, label: 'History' },
         ]).map(({ key, label }) => (
           <button
             key={key}
@@ -1972,11 +1971,6 @@ export default function WorkoutsPage() {
             }`}
           >
             {label}
-            {key === 'hitit' && hitItQueue.length > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/20 text-[10px] font-black">
-                {hitItQueue.length}
-              </span>
-            )}
           </button>
         ))}
       </div>
@@ -2080,102 +2074,41 @@ export default function WorkoutsPage() {
         </div>
       )}
 
-      {/* Hit It Tab */}
-      {tab === 'hitit' && (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide">
-          {/* Toast notification */}
-          {queueToast && (
-            <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary/15 border border-primary/20 animate-in fade-in slide-in-from-top-2 duration-300">
-              <svg className="w-4 h-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              <p className="text-xs font-semibold text-primary flex-1 capitalize">
-                {queueToast.replace(/_/g, ' ')} added to queue
-              </p>
-              <button onClick={() => setQueueToast(null)} className="text-primary/50 hover:text-primary transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          )}
-
-          {/* Back to routines link */}
-          {(hitItQueue.length > 0 || finishedWorkouts.length > 0) && (
-            <button
-              onClick={() => setTab('routines')}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors mb-3 group"
-            >
-              <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-              <span className="text-xs font-medium">Back to Routines</span>
-            </button>
-          )}
-
-          <div className="space-y-3">
-          {hitItQueue.length === 0 && finishedWorkouts.length === 0 ? (
-            <div className="flex items-center justify-center min-h-[40vh]">
-              <div className="text-center px-6">
-                <p className="text-2xl font-black text-slate-600 tracking-wide uppercase">
-                  Queue Empty
-                </p>
-                <p className="text-sm text-muted mt-2 font-medium">
-                  Go to Routines and tap &quot;Hit It&quot; to queue a workout
-                </p>
-                <button
-                  onClick={() => setTab('routines')}
-                  className="mt-4 px-5 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 hover:text-white transition-all"
-                >
-                  Browse Routines
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {hitItQueue.map((name) => {
-                const group = routineGroups.find(([k]) => k === name)?.[1];
-                if (!group) return null;
-                return (
-                  <ActiveWorkout
-                    key={name}
-                    routineName={name}
-                    workouts={group}
-                    allWorkouts={workouts}
-                    onFinish={handleFinish}
-                    onRemove={removeFromHitIt}
-                    onSwapExercise={(workoutId, workoutExerciseId) => {
-                      const wo = workouts.find((w) => w.id === workoutId);
-                      const we = wo?.exercises.find((e) => e.id === workoutExerciseId);
-                      setHitItSwapping({
-                        workoutId,
-                        workoutExerciseId,
-                        exerciseName: we ? getExerciseName(we) : '',
-                      });
-                    }}
-                  />
-                );
-              })}
-
-              {finishedWorkouts.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-[10px] text-muted uppercase tracking-[0.15em] font-bold mb-3 px-1">
-                    Completed This Session
+      {/* History Tab — all completed workout sessions */}
+      {tab === 'history' && (() => {
+        const completedWorkouts = workouts
+          .filter((w) => w.completed || sessionHasLogs(w))
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return (
+          <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide">
+            {completedWorkouts.length === 0 ? (
+              <div className="flex items-center justify-center min-h-[40vh]">
+                <div className="text-center px-6">
+                  <p className="text-2xl font-black text-slate-600 tracking-wide uppercase">
+                    No History
                   </p>
-                  {finishedWorkouts.map((fw, i) => (
-                    <FinishedWorkoutCard
-                      key={i}
-                      fw={fw}
-                      onDelete={() => setFinishedWorkouts((prev) => prev.filter((_, j) => j !== i))}
-                    />
-                  ))}
+                  <p className="text-sm text-muted mt-2 font-medium">
+                    Complete a workout to see it here
+                  </p>
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            ) : (
+              <div className="space-y-2 mt-1">
+                {completedWorkouts.map((w) => (
+                  <SessionLogCard
+                    key={w.id}
+                    workout={w}
+                    onDeleteLogs={handleDeleteLogs}
+                    onEditLog={handleEditLog}
+                    onDeleteSession={handleDeleteSession}
+                    canDeleteSession={true}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Activities Tab */}
       {tab === 'activities' && (
