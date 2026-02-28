@@ -1170,10 +1170,14 @@ function ExerciseLogRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  const [plateMode, setPlateMode] = useState(false);
+  const [barWeight, setBarWeight] = useState(45);
   const hasLogs = logs.length > 0;
 
   const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
   const numSets = ex.sets || 3;
+  const isBarbell = (ex.exercise?.equipmentRequired?.toLowerCase().includes('barbell') ?? false)
+    || getExerciseName(ex).toLowerCase().includes('barbell');
 
   // Parse prescribed reps (e.g. "8-10" → 8, "12" → 12)
   const prescribedReps = parseInt(ex.reps ?? '0') || 0;
@@ -1275,6 +1279,45 @@ function ExerciseLogRow({
       {/* Per-set logging UI */}
       {expanded && isRunning && (
         <div className="mt-1.5 ml-3 space-y-0.5">
+          {/* Per-Side toggle — exercise level, for barbell exercises */}
+          {isBarbell && (
+            <div className="flex items-center gap-2 mb-1 pb-1 border-b border-slate-800/40">
+              <button
+                type="button"
+                onClick={() => setPlateMode(!plateMode)}
+                className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                  plateMode
+                    ? 'text-amber-400'
+                    : 'text-slate-600 hover:text-slate-400'
+                }`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="shrink-0">
+                  <line x1="2" y1="12" x2="22" y2="12" strokeLinecap="round" />
+                  <rect x="4" y="8" width="3" height="8" rx="0.5" fill="currentColor" stroke="none" />
+                  <rect x="17" y="8" width="3" height="8" rx="0.5" fill="currentColor" stroke="none" />
+                </svg>
+                Per Side
+              </button>
+              {plateMode && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-slate-600">bar:</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={barWeight}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value) || 0;
+                      setBarWeight(Math.max(0, Math.min(100, v)));
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    className="w-8 h-5 text-center bg-slate-900 border border-slate-700 rounded text-[10px] text-slate-400 tabular-nums font-medium focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:text-white"
+                  />
+                  <span className="text-[10px] text-slate-600">lb</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {Array.from({ length: numSets }, (_, i) => i + 1).map((setNum) => {
             const existingLog = logs.find((l) => l.set === setNum);
             const defaults = getDefaults(setNum);
@@ -1287,7 +1330,8 @@ function ExerciseLogRow({
                 isLogged={!!existingLog}
                 onLog={(w, r) => handleSetLog(setNum, w, r)}
                 onUnlog={() => handleUnlogSet(setNum)}
-                equipmentRequired={ex.exercise?.equipmentRequired ?? (getExerciseName(ex).toLowerCase().includes('barbell') ? 'barbell' : null)}
+                plateMode={plateMode}
+                barWeight={barWeight}
               />
             );
           })}

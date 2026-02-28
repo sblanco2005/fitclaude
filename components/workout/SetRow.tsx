@@ -11,7 +11,8 @@ interface SetRowProps {
   onLog: (weight: number, reps: number) => void;
   onUnlog: () => void;
   weightStep?: number;
-  equipmentRequired?: string | null;
+  plateMode?: boolean;
+  barWeight?: number;
 }
 
 export default function SetRow({
@@ -22,17 +23,15 @@ export default function SetRow({
   onLog,
   onUnlog,
   weightStep = 5,
-  equipmentRequired,
+  plateMode = false,
+  barWeight = 45,
 }: SetRowProps) {
   const [editing, setEditing] = useState(false);
   const [weight, setWeight] = useState(initialWeight);
   const [reps, setReps] = useState(initialReps);
 
-  const isBarbell = equipmentRequired?.toLowerCase().includes('barbell') ?? false;
-  const [plateMode, setPlateMode] = useState(false);
-  const [barWeight, setBarWeight] = useState(45);
   const [perSide, setPerSide] = useState(() => {
-    const calc = (initialWeight - 45) / 2;
+    const calc = (initialWeight - barWeight) / 2;
     return calc > 0 ? calc : 0;
   });
 
@@ -55,20 +54,6 @@ export default function SetRow({
     setWeight(v * 2 + barWeight);
   };
 
-  const handleBarWeightChange = (v: number) => {
-    setBarWeight(v);
-    setWeight(perSide * 2 + v);
-  };
-
-  const togglePlateMode = () => {
-    if (!plateMode) {
-      // Entering plate mode — back-calculate perSide from current weight
-      const calc = (weight - barWeight) / 2;
-      setPerSide(calc > 0 ? calc : 0);
-    }
-    setPlateMode(!plateMode);
-  };
-
   const handleConfirm = () => {
     // Blur active input to dismiss keyboard & reset iOS zoom
     if (document.activeElement instanceof HTMLElement) {
@@ -81,6 +66,16 @@ export default function SetRow({
   const handleEdit = () => {
     setEditing(true);
   };
+
+  // When plateMode changes externally, recalc perSide from current weight
+  const [lastPlateMode, setLastPlateMode] = useState(plateMode);
+  if (plateMode !== lastPlateMode) {
+    setLastPlateMode(plateMode);
+    if (plateMode) {
+      const calc = (weight - barWeight) / 2;
+      setPerSide(calc > 0 ? calc : 0);
+    }
+  }
 
   // Logged state — compact chip, tappable to edit
   if (isLogged && !editing) {
@@ -126,14 +121,14 @@ export default function SetRow({
 
   // Editable state
   return (
-    <div className="py-1 space-y-1">
+    <div className="py-1">
       <div className="flex items-center gap-1.5">
         <span className="text-[10px] tabular-nums font-bold text-slate-500 w-5 shrink-0">
           S{setNumber}
         </span>
 
         {plateMode ? (
-          /* Plate calc mode: per-side input + bar weight + total readout */
+          /* Plate calc mode: per-side input + total readout */
           <div className="flex items-center gap-1">
             <NumericStepper
               value={perSide}
@@ -194,47 +189,6 @@ export default function SetRow({
           </button>
         )}
       </div>
-
-      {/* Plate calc toggle + bar weight — only for barbell exercises */}
-      {isBarbell && (
-        <div className="flex items-center gap-2 ml-5">
-          <button
-            type="button"
-            onClick={togglePlateMode}
-            className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-              plateMode
-                ? 'text-amber-400'
-                : 'text-slate-600 hover:text-slate-400'
-            }`}
-          >
-            {/* Barbell icon */}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="shrink-0">
-              <line x1="2" y1="12" x2="22" y2="12" strokeLinecap="round" />
-              <rect x="4" y="8" width="3" height="8" rx="0.5" fill="currentColor" stroke="none" />
-              <rect x="17" y="8" width="3" height="8" rx="0.5" fill="currentColor" stroke="none" />
-            </svg>
-            {plateMode ? 'Per side' : 'Per side'}
-          </button>
-
-          {plateMode && (
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-slate-600">bar:</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={barWeight}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value) || 0;
-                  handleBarWeightChange(Math.max(0, Math.min(100, v)));
-                }}
-                onFocus={(e) => e.target.select()}
-                className="w-8 h-5 text-center bg-slate-900 border border-slate-700 rounded text-[10px] text-slate-400 tabular-nums font-medium focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:text-white"
-              />
-              <span className="text-[10px] text-slate-600">lb</span>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
