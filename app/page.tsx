@@ -24,7 +24,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (status !== 'authenticated') return;
 
-    fetch('/api/nutrition/today')
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    fetch(`/api/nutrition/today?tz=${encodeURIComponent(tz)}`)
       .then((res) => res.ok ? res.json() : null)
       .then((data) => { if (data) setNutrition(data); })
       .catch(() => {});
