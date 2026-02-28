@@ -235,8 +235,10 @@ export default function AdminPage() {
     }
     setExpandedUserId(userId);
     const user = usageData?.users.find((u) => u.userId === userId);
+    const tierKey = (user?.user?.tier ?? 'free') as UserTier;
+    const tierDefault = TIER_CONFIGS[tierKey].maxMessagesPerDay;
     setEditingLimits({
-      maxCallsPerDay: String(user?.limits?.maxCallsPerDay ?? ''),
+      maxCallsPerDay: String(user?.limits?.maxCallsPerDay ?? tierDefault ?? ''),
       maxCallsPerWeek: String(user?.limits?.maxCallsPerWeek ?? ''),
       maxCallsPerMonth: String(user?.limits?.maxCallsPerMonth ?? ''),
       maxCostPerMonth: String(user?.limits?.maxCostPerMonth ?? ''),
@@ -253,6 +255,9 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tier }),
       });
+      // Update calls/day field to match the new tier default
+      const tierDefault = TIER_CONFIGS[tier].maxMessagesPerDay;
+      setEditingLimits((prev) => ({ ...prev, maxCallsPerDay: String(tierDefault ?? '') }));
       await fetchUsage();
       if (expandedUserId === userId) await fetchUserDetail(userId);
     } catch { /* ignore */ }
