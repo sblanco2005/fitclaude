@@ -6,13 +6,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import type { DailyNutrition, Workout } from '@/types';
+import type { Activity, DailyNutrition, Workout } from '@/types';
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [nutrition, setNutrition] = useState<DailyNutrition | null>(null);
   const [todayWorkouts, setTodayWorkouts] = useState<Workout[]>([]);
+  const [todayActivities, setTodayActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.isOnboarded === false) {
@@ -35,6 +36,14 @@ export default function DashboardPage() {
       .then((workouts: Workout[]) => {
         const today = new Date().toDateString();
         setTodayWorkouts(workouts.filter((w) => new Date(w.date).toDateString() === today && w.completed));
+      })
+      .catch(() => {});
+
+    fetch('/api/activities?daysBack=1')
+      .then((res) => res.ok ? res.json() : [])
+      .then((acts: Activity[]) => {
+        const today = new Date().toDateString();
+        setTodayActivities(acts.filter((a) => new Date(a.date).toDateString() === today));
       })
       .catch(() => {});
   }, [status]);
@@ -66,7 +75,7 @@ export default function DashboardPage() {
   const totals = nutrition?.totals;
   const mealCount = nutrition?.logs?.length || 0;
   const hasNutrition = totals && totals.calories > 0;
-  const hasWorkouts = todayWorkouts.length > 0;
+  const hasWorkouts = todayWorkouts.length > 0 || todayActivities.length > 0;
 
   return (
     <div className="p-3 pb-1 space-y-3 max-w-lg mx-auto">
@@ -148,8 +157,17 @@ export default function DashboardPage() {
                   </div>
                 </Link>
               ))}
-              {todayWorkouts.length > 2 && (
-                <div className="text-[10px] text-muted text-center">+{todayWorkouts.length - 2} more</div>
+              {todayActivities.slice(0, todayWorkouts.length >= 2 ? 0 : 2 - todayWorkouts.length).map((a) => (
+                <div key={a.id} className="py-1.5 px-2 rounded-lg bg-slate-800/50">
+                  <div className="text-xs font-medium text-white truncate capitalize">{a.name}</div>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-[10px] text-muted">{a.durationMinutes ? `${a.durationMinutes} min` : 'Activity'}</span>
+                    <span className="text-[9px] font-medium text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded-full">Activity</span>
+                  </div>
+                </div>
+              ))}
+              {(todayWorkouts.length + todayActivities.length) > 2 && (
+                <div className="text-[10px] text-muted text-center">+{todayWorkouts.length + todayActivities.length - 2} more</div>
               )}
             </div>
           ) : (
