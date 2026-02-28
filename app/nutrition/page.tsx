@@ -5,6 +5,15 @@ import { Card } from '@/components/ui/Card';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import type { DailyNutrition, DailyNutritionSummary, NutritionLog } from '@/types';
 
+/** Strip XML parameter tags that Claude sometimes injects into raw_text */
+function cleanRawInput(text: string): string {
+  return text
+    .replace(/["']?\s*>\s*<parameter\s+name="[^"]*">[^<]*(<\/parameter>)?/g, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/["']\s*$/, '')
+    .trim();
+}
+
 function ProgressBar({ current, target, label, color }: {
   current: number;
   target: number;
@@ -227,7 +236,7 @@ function MealRow({
       className="flex items-start justify-between py-2 border-b border-slate-800 last:border-0 group cursor-pointer active:bg-slate-800/30 transition-colors"
     >
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-white">{log.rawInput}</p>
+        <p className="text-sm text-white">{cleanRawInput(log.rawInput)}</p>
         <div className="flex items-center gap-2">
           {log.mealType && (
             <span className="text-xs text-muted capitalize">{log.mealType}</span>
@@ -364,7 +373,7 @@ function HistoryDayCard({
               {meals.map((m) => (
                 <div key={m.id} className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-white truncate">{m.rawInput}</p>
+                    <p className="text-xs text-white truncate">{cleanRawInput(m.rawInput)}</p>
                     {m.mealType && (
                       <span className="text-[10px] text-slate-500 capitalize">{m.mealType}</span>
                     )}

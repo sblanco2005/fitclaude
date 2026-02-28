@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta, timezone as tz
 from zoneinfo import ZoneInfo
 
@@ -595,6 +596,17 @@ async def _tool_generate_workout(
     return result
 
 
+def _sanitize_raw_text(text: str) -> str:
+    """Strip XML/HTML-like parameter tags that Claude sometimes injects into raw_text."""
+    # Remove patterns like: "> <parameter name="calories">200
+    cleaned = re.sub(r'["\']?\s*>\s*<parameter\s+name="[^"]*">[^<]*(?:</parameter>)?', '', text)
+    # Remove any remaining XML-like tags
+    cleaned = re.sub(r'<[^>]+>', '', cleaned)
+    # Clean up trailing quotes and whitespace
+    cleaned = cleaned.strip().rstrip('"').rstrip("'").strip()
+    return cleaned
+
+
 async def _tool_log_nutrition(
     db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
@@ -604,13 +616,17 @@ async def _tool_log_nutrition(
         user_now = datetime.now(user_tz)
     else:
         user_now = datetime.now(tz.utc)
+
+    # Sanitize raw_text — Claude sometimes injects XML parameter tags
+    raw_text = _sanitize_raw_text(params["raw_text"])
+
     # Store as UTC but ensure the date component matches the user's local date
     log = NutritionLog(
         id=cuid_generator.generate(),
         user_id=user_id,
         date=user_now.astimezone(tz.utc).replace(tzinfo=None),
         meal_type=params.get("meal_type"),
-        raw_input=params["raw_text"],
+        raw_input=raw_text,
         calories=params.get("calories"),
         protein_g=params.get("protein_g"),
         carbs_g=params.get("carbs_g"),
