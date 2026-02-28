@@ -64,10 +64,18 @@ async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
     }
 
 
+HISTORY_LIMITS: dict[str, int] = {
+    "nutrition": 8,   # Nutrition logs are short, don't need much context
+    "workout": 14,    # Workout generation needs more context for progressive overload
+}
+
+
 async def _load_conversation_history(
-    db: AsyncSession, user_id: str, topic: str = "workout", limit: int = 20
+    db: AsyncSession, user_id: str, topic: str = "workout", limit: int | None = None
 ) -> list[dict]:
-    """Load recent conversation history filtered by topic."""
+    """Load recent conversation history filtered by topic.
+    Uses tiered limits per topic to reduce input tokens."""
+    effective_limit = limit if limit is not None else HISTORY_LIMITS.get(topic, 10)
     result = await db.execute(
         select(ConversationHistory)
         .where(
@@ -75,7 +83,7 @@ async def _load_conversation_history(
             ConversationHistory.topic == topic,
         )
         .order_by(ConversationHistory.created_at.desc())
-        .limit(limit)
+        .limit(effective_limit)
     )
     rows = list(reversed(result.scalars().all()))
     # Filter out messages with empty content — can happen when user sends image-only
@@ -894,7 +902,15 @@ async def handle_chat(
     messages = history + [{"role": "user", "content": user_content}]
 
     # Call Claude with MiniMax fallback on transient errors
-    system_full = COACH_SYSTEM_PROMPT + "\n" + context
+    # Use prompt caching: system prompt is stable, user context changes per user
+    system_blocks = [
+        {"type": "text", "text": COACH_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": context},
+    ]
+    # Cache tool definitions (add cache_control to last tool)
+    cached_tools = TOOL_DEFINITIONS[:-1] + [
+        {**TOOL_DEFINITIONS[-1], "cache_control": {"type": "ephemeral"}}
+    ]
 
     # Rate limiting
     allowed, limit_reason = await check_rate_limit(db, user_id)
@@ -914,9 +930,9 @@ async def handle_chat(
         response = await client.messages.create(
             model=active_model,
             max_tokens=2048,
-            system=system_full,
+            system=system_blocks,
             messages=messages,
-            tools=TOOL_DEFINITIONS,
+            tools=cached_tools,
         )
 
         # Log initial API call usage
@@ -955,9 +971,9 @@ async def handle_chat(
             response = await client.messages.create(
                 model=active_model,
                 max_tokens=2048,
-                system=system_full,
+                system=system_blocks,
                 messages=messages,
-                tools=TOOL_DEFINITIONS,
+                tools=cached_tools,
             )
             await log_token_usage(db, user_id, "chat", active_model, response.usage, request_id=request_id)
 
@@ -987,9 +1003,9 @@ async def handle_chat(
             response = await client.messages.create(
                 model=active_model,
                 max_tokens=2048,
-                system=system_full,
+                system=system_blocks,
                 messages=messages,
-                tools=TOOL_DEFINITIONS,
+                tools=cached_tools,
             )
             await log_token_usage(db, user_id, "chat_retry", active_model, response.usage, request_id=request_id)
             # Process tool calls from the retry
@@ -1012,9 +1028,9 @@ async def handle_chat(
                 response = await client.messages.create(
                     model=active_model,
                     max_tokens=2048,
-                    system=system_full,
+                    system=system_blocks,
                     messages=messages,
-                    tools=TOOL_DEFINITIONS,
+                    tools=cached_tools,
                 )
                 await log_token_usage(db, user_id, "chat_retry", active_model, response.usage, request_id=request_id)
             # Use the retry response text
@@ -1090,7 +1106,8 @@ async def handle_chat(
             }
 
         logger.warning("[Coach] Falling back to MiniMax")
-        fallback_text = await handle_chat_minimax(user_message, history, system_full)
+        system_plain = COACH_SYSTEM_PROMPT + "\n" + context
+        fallback_text = await handle_chat_minimax(user_message, history, system_plain)
         # Strip any leaked <think> tags
         fallback_text = re.sub(r"<think>[\s\S]*?</think>\s*", "", fallback_text).strip()
         return {
