@@ -1164,7 +1164,7 @@ function ExerciseLogRow({
   index: number;
   isRunning: boolean;
   logs: SetLog[];
-  onUpdateLogs: (logs: SetLog[]) => void;
+  onUpdateLogs: (logs: SetLog[], restSeconds?: number) => void;
   lastLogs?: SetLog[] | null;
   onSwap?: () => void;
 }) {
@@ -1201,7 +1201,7 @@ function ExerciseLogRow({
   const handleSetLog = (setNum: number, weight: number, reps: number) => {
     const updated = [...logs.filter((l) => l.set !== setNum), { set: setNum, weight, reps }]
       .sort((a, b) => a.set - b.set);
-    onUpdateLogs(updated);
+    onUpdateLogs(updated, ex.restSeconds ?? undefined);
   };
 
   const handleUnlogSet = (setNum: number) => {
@@ -1377,17 +1377,86 @@ function ActiveWorkout({
   const startTimeRef = useRef<number | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
 
+  // Rest timer state
+  const [restRemaining, setRestRemaining] = useState<number | null>(null);
+  const [restTotal, setRestTotal] = useState(0);
+  const restIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restRemainingRef = useRef<number | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const hasRestPeriods = latest.exercises.some((ex) => ex.restSeconds && ex.restSeconds > 0);
+
+  const playBeep = useCallback((frequency: number, duration: number) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = frequency;
+      osc.type = 'sine';
+      gain.gain.value = 0.3;
+      osc.start();
+      osc.stop(ctx.currentTime + duration / 1000);
+    } catch { /* ignore audio errors */ }
+  }, []);
+
+  const cancelRest = useCallback(() => {
+    if (restIntervalRef.current) {
+      clearInterval(restIntervalRef.current);
+      restIntervalRef.current = null;
+    }
+    restRemainingRef.current = null;
+    setRestRemaining(null);
+  }, []);
+
+  const startRest = useCallback((seconds: number) => {
+    cancelRest();
+    if (seconds <= 0) return;
+    setRestTotal(seconds);
+    setRestRemaining(seconds);
+    restRemainingRef.current = seconds;
+    restIntervalRef.current = setInterval(() => {
+      const curr = restRemainingRef.current;
+      if (curr === null || curr <= 0) {
+        if (restIntervalRef.current) {
+          clearInterval(restIntervalRef.current);
+          restIntervalRef.current = null;
+        }
+        restRemainingRef.current = null;
+        setRestRemaining(null);
+        return;
+      }
+      const next = curr - 1;
+      restRemainingRef.current = next;
+      setRestRemaining(next);
+      // Audio beeps in last 5 seconds
+      if (next > 0 && next <= 5) {
+        playBeep(800, 100);
+      } else if (next === 0) {
+        // Done — double beep
+        playBeep(600, 200);
+        setTimeout(() => playBeep(600, 200), 300);
+      }
+    }, 1000);
+  }, [cancelRest, playBeep]);
+
   // Map of exerciseId -> SetLog[]
   const [exerciseLogs, setExerciseLogs] = useState<Map<string, SetLog[]>>(new Map());
 
-  const updateLogs = useCallback((exerciseId: string, logs: SetLog[]) => {
+  const updateLogs = useCallback((exerciseId: string, logs: SetLog[], restSeconds?: number) => {
     lastActivityRef.current = Date.now();
     setExerciseLogs((prev) => {
       const next = new Map(prev);
+      const prevLogs = prev.get(exerciseId) ?? [];
       next.set(exerciseId, logs);
+      // Start rest timer only when a new set was added (not removed)
+      if (logs.length > prevLogs.length && restSeconds && restSeconds > 0) {
+        startRest(restSeconds);
+      }
       return next;
     });
-  }, []);
+  }, [startRest]);
 
   const stopRef = useRef<() => void>(() => {});
 
@@ -1413,6 +1482,10 @@ function ActiveWorkout({
     setAutoStopped(false);
     setIsRunning(true);
     intervalRef.current = setInterval(tick, 1000);
+    // Initialize AudioContext on user gesture
+    if (!audioCtxRef.current) {
+      try { audioCtxRef.current = new AudioContext(); } catch { /* no audio support */ }
+    }
   }, [isRunning, tick]);
 
   const stop = useCallback(() => {
@@ -1420,12 +1493,13 @@ function ActiveWorkout({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    cancelRest();
     // Compute final elapsed from real clock
     if (startTimeRef.current != null) {
       setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
     }
     setIsRunning(false);
-  }, []);
+  }, [cancelRest]);
 
   // Keep stopRef in sync so tick can call it without stale closure
   stopRef.current = stop;
@@ -1441,6 +1515,7 @@ function ActiveWorkout({
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (restIntervalRef.current) clearInterval(restIntervalRef.current);
     };
   }, [tick]);
 
@@ -1506,6 +1581,28 @@ function ActiveWorkout({
         <span className={`text-3xl font-black tabular-nums tracking-tight ${isRunning ? 'text-primary' : 'text-slate-400'}`}>
           {formatTimer(elapsed)}
         </span>
+        {/* Rest countdown timer */}
+        {isRunning && hasRestPeriods && restRemaining !== null && (
+          <div className="flex items-center gap-1">
+            <span className="text-slate-600">|</span>
+            <span className={`text-xl font-bold tabular-nums tracking-tight transition-all ${
+              restRemaining <= 5
+                ? 'text-red-400 animate-pulse'
+                : 'text-amber-400'
+            }`}>
+              {formatTimer(restRemaining)}
+            </span>
+          </div>
+        )}
+        {/* Show 0:00 placeholder when routine has rest but timer isn't active */}
+        {isRunning && hasRestPeriods && restRemaining === null && (
+          <div className="flex items-center gap-1">
+            <span className="text-slate-600">|</span>
+            <span className="text-xl font-bold tabular-nums tracking-tight text-slate-600">
+              00:00
+            </span>
+          </div>
+        )}
         {isRunning && totalExercises > 0 && (
           <span className="text-[10px] text-muted font-bold tabular-nums">
             {loggedCount}/{totalExercises}
@@ -1522,7 +1619,7 @@ function ActiveWorkout({
             index={i}
             isRunning={isRunning}
             logs={exerciseLogs.get(ex.id) ?? []}
-            onUpdateLogs={(logs) => updateLogs(ex.id, logs)}
+            onUpdateLogs={(logs, restSecs) => updateLogs(ex.id, logs, restSecs)}
             lastLogs={getLastLogForExercise(allWorkouts, getExerciseName(ex), latest.id)}
             onSwap={onSwapExercise ? () => onSwapExercise(latest.id, ex.id) : undefined}
           />
