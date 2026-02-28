@@ -13,6 +13,7 @@ from app.config import settings
 from app.database import async_session
 from app.models.user import User
 from app.models.workout import Workout, WorkoutExercise
+from app.services.usage_service import log_token_usage
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,13 @@ async def get_insights(user_id: str = Query(...)):
                 ),
             }],
         )
+
+        # Log token usage
+        async with async_session() as usage_db:
+            await log_token_usage(
+                usage_db, user_id, "analytics", settings.agent_model, response.usage
+            )
+            await usage_db.commit()
 
         text = response.content[0].text if response.content and response.content[0].type == "text" else ""
         result_data = {

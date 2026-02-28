@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import uuid
 from datetime import date, datetime, timedelta, timezone as tz
 from zoneinfo import ZoneInfo
 
@@ -20,6 +21,7 @@ from app.services.youtube_service import import_exercises_from_youtube
 from app.agent.tools import TOOL_DEFINITIONS
 from app.agent.minimax_fallback import handle_chat_minimax
 from app.config import settings
+from app.services.usage_service import check_rate_limit, log_token_usage
 from app.models import (
     Activity,
     ConversationHistory,
@@ -885,6 +887,18 @@ async def handle_chat(
     # Call Claude with MiniMax fallback on transient errors
     system_full = COACH_SYSTEM_PROMPT + "\n" + context
 
+    # Rate limiting
+    allowed, limit_reason = await check_rate_limit(db, user_id)
+    if not allowed:
+        return {
+            "response": f"I can't process your request right now. {limit_reason}",
+            "workout_id": None,
+            "nutrition_log_id": None,
+            "model_used": None,
+        }
+
+    request_id = str(uuid.uuid4())[:8]
+
     try:
         response = await client.messages.create(
             model=settings.agent_model,
@@ -893,6 +907,9 @@ async def handle_chat(
             messages=messages,
             tools=TOOL_DEFINITIONS,
         )
+
+        # Log initial API call usage
+        await log_token_usage(db, user_id, "chat", settings.agent_model, response.usage, request_id=request_id)
 
         # Tool-use loop
         workout_id = None
@@ -931,6 +948,7 @@ async def handle_chat(
                 messages=messages,
                 tools=TOOL_DEFINITIONS,
             )
+            await log_token_usage(db, user_id, "chat", settings.agent_model, response.usage, request_id=request_id)
 
         # Extract final text
         assistant_text = "".join(
@@ -962,6 +980,7 @@ async def handle_chat(
                 messages=messages,
                 tools=TOOL_DEFINITIONS,
             )
+            await log_token_usage(db, user_id, "chat_retry", settings.agent_model, response.usage, request_id=request_id)
             # Process tool calls from the retry
             while response.stop_reason == "tool_use":
                 tool_results = []
@@ -986,6 +1005,7 @@ async def handle_chat(
                     messages=messages,
                     tools=TOOL_DEFINITIONS,
                 )
+                await log_token_usage(db, user_id, "chat_retry", settings.agent_model, response.usage, request_id=request_id)
             # Use the retry response text
             assistant_text = "".join(
                 block.text for block in response.content if hasattr(block, "text")

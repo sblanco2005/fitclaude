@@ -52,6 +52,8 @@ model User {
   userFoods            UserFood[]
   magicLinkTokens      MagicLinkToken[]
   activities           Activity[]
+  tokenUsages          TokenUsage[]
+  usageLimit           UserUsageLimit?
 
   @@map("users")
 }
@@ -395,4 +397,43 @@ model Activity {
   @@index([userId])
   @@index([userId, date])
   @@map("activities")
+}
+
+// ============================================
+// Token Usage Tracking (Admin)
+// ============================================
+
+model TokenUsage {
+  id                  String   @id @default(cuid())
+  userId              String
+  endpoint            String   // "chat", "analytics", "chat_retry"
+  model               String   // e.g. "claude-sonnet-4-20250514"
+  inputTokens         Int      @default(0)
+  outputTokens        Int      @default(0)
+  cacheCreationTokens Int      @default(0)
+  cacheReadTokens     Int      @default(0)
+  estimatedCostUsd    Float    @default(0)
+  requestId           String?  // groups multiple API calls from one chat message
+  createdAt           DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("token_usage")
+}
+
+model UserUsageLimit {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  maxCallsPerDay   Int?
+  maxCallsPerWeek  Int?
+  maxCallsPerMonth Int?
+  maxCostPerMonth  Float?   // USD
+  isThrottled      Boolean  @default(false)
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_usage_limits")
 }

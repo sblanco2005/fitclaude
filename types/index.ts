@@ -320,3 +320,55 @@ export interface ChatMessage {
   createdAt: string;
   modelUsed?: string | null;
 }
+
+// Admin — Token Usage
+export interface UserUsageLimitData {
+  id: string;
+  userId: string;
+  maxCallsPerDay: number | null;
+  maxCallsPerWeek: number | null;
+  maxCallsPerMonth: number | null;
+  maxCostPerMonth: number | null;
+  isThrottled: boolean;
+  updatedAt: string;
+}
+
+export interface UserUsageSummary {
+  userId: string;
+  user: { id: string; name: string | null; email: string | null; image: string | null } | null;
+  limits: UserUsageLimitData | null;
+  totalCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCacheCreationTokens: number;
+  totalCacheReadTokens: number;
+  totalCostUsd: number;
+}
+
+export interface UsageResponse {
+  users: UserUsageSummary[];
+  totals: {
+    totalCalls: number;
+    totalCostUsd: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+  };
+  period: string;
+  since: string;
+}
+
+export interface DailyUsageBreakdown {
+  date: string;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+export interface UserUsageDetail {
+  user: { id: string; name: string | null; email: string | null; image: string | null } | null;
+  limits: UserUsageLimitData | null;
+  dailyBreakdown: DailyUsageBreakdown[];
+  byEndpoint: Record<string, { calls: number; costUsd: number }>;
+  totalRecords: number;
+}

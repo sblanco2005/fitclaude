@@ -7,6 +7,7 @@ from app.models.nutrition import DailyNutritionSummary, NutritionLog
 from app.models.conversation import ConversationHistory
 from app.models.user_food import UserFood
 from app.models.activity import Activity
+from app.models.token_usage import TokenUsage, UserUsageLimit
 
 __all__ = [
     "User",
@@ -22,4 +23,6 @@ __all__ = [
     "ConversationHistory",
     "UserFood",
     "Activity",
+    "TokenUsage",
+    "UserUsageLimit",
 ]

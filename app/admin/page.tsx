@@ -4,10 +4,10 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
-import type { ExerciseVideoLink } from '@/types';
+import type { ExerciseVideoLink, UsageResponse, UserUsageDetail, UserUsageSummary } from '@/types';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected';
-type VideoTab = 'tutorials' | 'reference';
+type AdminTab = 'tutorials' | 'reference' | 'usage';
 
 interface UnlinkedExercise {
   id: string | null;
@@ -23,7 +23,7 @@ export default function AdminPage() {
   const router = useRouter();
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<VideoTab>('tutorials');
+  const [activeTab, setActiveTab] = useState<AdminTab>('tutorials');
 
   // Videos state
   const [videos, setVideos] = useState<ExerciseVideoLink[]>([]);
@@ -41,6 +41,16 @@ export default function AdminPage() {
   // Jobs state
   const [runningJob, setRunningJob] = useState<string | null>(null);
   const [jobResult, setJobResult] = useState<string | null>(null);
+
+  // Usage state
+  const [usagePeriod, setUsagePeriod] = useState<'1d' | '7d' | '30d'>('7d');
+  const [usageData, setUsageData] = useState<UsageResponse | null>(null);
+  const [loadingUsage, setLoadingUsage] = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [userDetail, setUserDetail] = useState<UserUsageDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [editingLimits, setEditingLimits] = useState<Record<string, string>>({});
+  const [savingLimits, setSavingLimits] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -63,10 +73,34 @@ export default function AdminPage() {
     setLoadingUnlinked(false);
   }, []);
 
+  // Fetch usage data
+  const fetchUsage = useCallback(async () => {
+    setLoadingUsage(true);
+    try {
+      const res = await fetch(`/api/admin/usage?period=${usagePeriod}`);
+      if (res.ok) setUsageData(await res.json());
+    } catch { /* ignore */ }
+    setLoadingUsage(false);
+  }, [usagePeriod]);
+
+  const fetchUserDetail = useCallback(async (userId: string) => {
+    setLoadingDetail(true);
+    try {
+      const days = usagePeriod === '1d' ? 1 : usagePeriod === '7d' ? 7 : 30;
+      const res = await fetch(`/api/admin/usage/${userId}?days=${days}`);
+      if (res.ok) setUserDetail(await res.json());
+    } catch { /* ignore */ }
+    setLoadingDetail(false);
+  }, [usagePeriod]);
+
   useEffect(() => {
     fetchVideos();
     fetchUnlinked();
   }, [fetchVideos, fetchUnlinked]);
+
+  useEffect(() => {
+    if (activeTab === 'usage') fetchUsage();
+  }, [activeTab, fetchUsage]);
 
   // Filter videos by tab (tutorial vs reference) and search query
   const filteredVideos = useMemo(() => {
@@ -169,6 +203,70 @@ export default function AdminPage() {
     else setSelectedVidIds(new Set(visibleIds));
   };
 
+  // Format token counts (1.2M, 450K)
+  const fmtTokens = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return String(n);
+  };
+
+  // Format cost
+  const fmtCost = (n: number) => `$${n.toFixed(4)}`;
+
+  // Summarize limits
+  const fmtLimits = (u: UserUsageSummary) => {
+    if (!u.limits) return '--';
+    const parts: string[] = [];
+    if (u.limits.isThrottled) return 'Throttled';
+    if (u.limits.maxCallsPerDay != null) parts.push(`${u.limits.maxCallsPerDay}/day`);
+    if (u.limits.maxCallsPerWeek != null) parts.push(`${u.limits.maxCallsPerWeek}/wk`);
+    if (u.limits.maxCallsPerMonth != null) parts.push(`${u.limits.maxCallsPerMonth}/mo`);
+    if (u.limits.maxCostPerMonth != null) parts.push(`$${u.limits.maxCostPerMonth}/mo`);
+    return parts.length > 0 ? parts.join(', ') : '--';
+  };
+
+  const handleExpandUser = async (userId: string) => {
+    if (expandedUserId === userId) {
+      setExpandedUserId(null);
+      setUserDetail(null);
+      return;
+    }
+    setExpandedUserId(userId);
+    const user = usageData?.users.find((u) => u.userId === userId);
+    setEditingLimits({
+      maxCallsPerDay: String(user?.limits?.maxCallsPerDay ?? ''),
+      maxCallsPerWeek: String(user?.limits?.maxCallsPerWeek ?? ''),
+      maxCallsPerMonth: String(user?.limits?.maxCallsPerMonth ?? ''),
+      maxCostPerMonth: String(user?.limits?.maxCostPerMonth ?? ''),
+      isThrottled: String(user?.limits?.isThrottled ?? false),
+    });
+    await fetchUserDetail(userId);
+  };
+
+  const handleSaveLimits = async (userId: string) => {
+    setSavingLimits(true);
+    try {
+      const body: Record<string, unknown> = {};
+      const d = editingLimits.maxCallsPerDay;
+      const w = editingLimits.maxCallsPerWeek;
+      const m = editingLimits.maxCallsPerMonth;
+      const c = editingLimits.maxCostPerMonth;
+      body.maxCallsPerDay = d ? parseInt(d) : null;
+      body.maxCallsPerWeek = w ? parseInt(w) : null;
+      body.maxCallsPerMonth = m ? parseInt(m) : null;
+      body.maxCostPerMonth = c ? parseFloat(c) : null;
+      body.isThrottled = editingLimits.isThrottled === 'true';
+      await fetch(`/api/admin/usage/${userId}/limits`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      await fetchUsage();
+      await fetchUserDetail(userId);
+    } catch { /* ignore */ }
+    setSavingLimits(false);
+  };
+
   if (sessionStatus === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bg">
@@ -216,8 +314,249 @@ export default function AdminPage() {
           >
             Reference
           </button>
+          <button
+            onClick={() => { setActiveTab('usage'); }}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+              activeTab === 'usage'
+                ? 'bg-amber-500/15 text-amber-400 shadow-sm'
+                : 'text-muted hover:text-slate-300'
+            }`}
+          >
+            Usage
+          </button>
         </div>
 
+        {/* ─── Usage Tab ─── */}
+        {activeTab === 'usage' && (
+          <div className="space-y-4">
+            {/* Period selector */}
+            <div className="flex gap-1.5">
+              {(['1d', '7d', '30d'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setUsagePeriod(p)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    usagePeriod === p
+                      ? 'bg-amber-500/15 text-amber-400'
+                      : 'bg-card text-muted hover:text-slate-300'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {loadingUsage ? (
+              <p className="text-center text-muted text-sm py-12">Loading usage data...</p>
+            ) : !usageData ? (
+              <p className="text-center text-muted text-sm py-12">No usage data available</p>
+            ) : (
+              <>
+                {/* Global summary cards */}
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="bg-card border border-border-dark rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-white">{usageData.totals.totalCalls.toLocaleString()}</div>
+                    <div className="text-[9px] text-muted uppercase tracking-wider font-bold">API Calls</div>
+                  </div>
+                  <div className="bg-card border border-border-dark rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-amber-400">{fmtCost(usageData.totals.totalCostUsd)}</div>
+                    <div className="text-[9px] text-muted uppercase tracking-wider font-bold">Total Cost</div>
+                  </div>
+                  <div className="bg-card border border-border-dark rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-blue-400">{fmtTokens(usageData.totals.totalInputTokens)}</div>
+                    <div className="text-[9px] text-muted uppercase tracking-wider font-bold">Input</div>
+                  </div>
+                  <div className="bg-card border border-border-dark rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-emerald-400">{fmtTokens(usageData.totals.totalOutputTokens)}</div>
+                    <div className="text-[9px] text-muted uppercase tracking-wider font-bold">Output</div>
+                  </div>
+                </div>
+
+                {/* Per-user table */}
+                <div className="rounded-xl border border-border-dark overflow-hidden">
+                  <div className="px-4 py-2 bg-slate-800/30 border-b border-border-dark">
+                    <div className="grid grid-cols-12 gap-2 text-[9px] text-muted uppercase tracking-widest font-bold">
+                      <div className="col-span-3">User</div>
+                      <div className="col-span-1 text-right">Calls</div>
+                      <div className="col-span-2 text-right">Input</div>
+                      <div className="col-span-2 text-right">Output</div>
+                      <div className="col-span-2 text-right">Cost</div>
+                      <div className="col-span-2 text-right">Limits</div>
+                    </div>
+                  </div>
+
+                  {usageData.users.length === 0 ? (
+                    <div className="py-8 text-center text-muted text-sm">No usage in this period</div>
+                  ) : (
+                    <div className="divide-y divide-slate-800/60">
+                      {usageData.users.map((u) => (
+                        <div key={u.userId}>
+                          <button
+                            onClick={() => handleExpandUser(u.userId)}
+                            className="w-full px-4 py-2.5 grid grid-cols-12 gap-2 items-center text-left hover:bg-card-hover transition-colors"
+                          >
+                            <div className="col-span-3 min-w-0">
+                              <p className="text-xs text-white font-medium truncate">
+                                {u.user?.name || u.user?.email || u.userId.slice(0, 8)}
+                              </p>
+                            </div>
+                            <div className="col-span-1 text-right text-xs text-slate-300 tabular-nums">
+                              {u.totalCalls}
+                            </div>
+                            <div className="col-span-2 text-right text-xs text-blue-400 tabular-nums">
+                              {fmtTokens(u.totalInputTokens)}
+                            </div>
+                            <div className="col-span-2 text-right text-xs text-emerald-400 tabular-nums">
+                              {fmtTokens(u.totalOutputTokens)}
+                            </div>
+                            <div className="col-span-2 text-right text-xs text-amber-400 font-semibold tabular-nums">
+                              {fmtCost(u.totalCostUsd)}
+                            </div>
+                            <div className="col-span-2 text-right">
+                              <span className={`text-[10px] font-medium ${
+                                u.limits?.isThrottled ? 'text-red-400' : 'text-muted'
+                              }`}>
+                                {fmtLimits(u)}
+                              </span>
+                            </div>
+                          </button>
+
+                          {/* Expanded detail */}
+                          {expandedUserId === u.userId && (
+                            <div className="px-4 pb-4 pt-1 bg-slate-800/20 border-t border-slate-800/40">
+                              {loadingDetail ? (
+                                <p className="text-xs text-muted py-4 text-center">Loading details...</p>
+                              ) : userDetail ? (
+                                <div className="space-y-4">
+                                  {/* Daily breakdown */}
+                                  <div>
+                                    <h4 className="text-[10px] text-muted uppercase tracking-widest font-bold mb-2">Daily Breakdown</h4>
+                                    <div className="space-y-1">
+                                      {userDetail.dailyBreakdown.slice(0, 10).map((day) => (
+                                        <div key={day.date} className="grid grid-cols-4 gap-2 text-xs py-1">
+                                          <span className="text-slate-400">{day.date}</span>
+                                          <span className="text-right text-slate-300">{day.calls} calls</span>
+                                          <span className="text-right text-blue-400/70 tabular-nums">
+                                            {fmtTokens(day.inputTokens)}/{fmtTokens(day.outputTokens)}
+                                          </span>
+                                          <span className="text-right text-amber-400 tabular-nums">{fmtCost(day.costUsd)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* By endpoint */}
+                                  {Object.keys(userDetail.byEndpoint).length > 0 && (
+                                    <div>
+                                      <h4 className="text-[10px] text-muted uppercase tracking-widest font-bold mb-2">By Endpoint</h4>
+                                      <div className="flex gap-3">
+                                        {Object.entries(userDetail.byEndpoint).map(([ep, data]) => (
+                                          <div key={ep} className="text-xs">
+                                            <span className="text-primary font-medium">{ep}</span>
+                                            <span className="text-muted ml-1">{data.calls} calls</span>
+                                            <span className="text-amber-400 ml-1">{fmtCost(data.costUsd)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Break-even */}
+                                  {usagePeriod === '30d' && u.totalCostUsd > 0 && (
+                                    <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                                      <h4 className="text-[10px] text-amber-400 uppercase tracking-widest font-bold mb-1">Break-Even</h4>
+                                      <p className="text-xs text-slate-300">
+                                        Monthly cost: <span className="text-amber-400 font-semibold">{fmtCost(u.totalCostUsd)}</span>
+                                        {' '}&rarr; charge at least{' '}
+                                        <span className="text-white font-bold">${(u.totalCostUsd * 1.2).toFixed(2)}</span>
+                                        <span className="text-muted"> (20% margin)</span>
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Rate limits editor */}
+                                  <div>
+                                    <h4 className="text-[10px] text-muted uppercase tracking-widest font-bold mb-2">Rate Limits</h4>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="text-[10px] text-slate-500 block mb-0.5">Calls/Day</label>
+                                        <input
+                                          type="number"
+                                          value={editingLimits.maxCallsPerDay ?? ''}
+                                          onChange={(e) => setEditingLimits((prev) => ({ ...prev, maxCallsPerDay: e.target.value }))}
+                                          placeholder="Unlimited"
+                                          className="w-full px-2 py-1.5 rounded-lg bg-card border border-border-dark text-xs text-white placeholder-slate-600 focus:outline-none focus:border-slate-500"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-slate-500 block mb-0.5">Calls/Week</label>
+                                        <input
+                                          type="number"
+                                          value={editingLimits.maxCallsPerWeek ?? ''}
+                                          onChange={(e) => setEditingLimits((prev) => ({ ...prev, maxCallsPerWeek: e.target.value }))}
+                                          placeholder="Unlimited"
+                                          className="w-full px-2 py-1.5 rounded-lg bg-card border border-border-dark text-xs text-white placeholder-slate-600 focus:outline-none focus:border-slate-500"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-slate-500 block mb-0.5">Calls/Month</label>
+                                        <input
+                                          type="number"
+                                          value={editingLimits.maxCallsPerMonth ?? ''}
+                                          onChange={(e) => setEditingLimits((prev) => ({ ...prev, maxCallsPerMonth: e.target.value }))}
+                                          placeholder="Unlimited"
+                                          className="w-full px-2 py-1.5 rounded-lg bg-card border border-border-dark text-xs text-white placeholder-slate-600 focus:outline-none focus:border-slate-500"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-slate-500 block mb-0.5">Cost/Month ($)</label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={editingLimits.maxCostPerMonth ?? ''}
+                                          onChange={(e) => setEditingLimits((prev) => ({ ...prev, maxCostPerMonth: e.target.value }))}
+                                          placeholder="Unlimited"
+                                          className="w-full px-2 py-1.5 rounded-lg bg-card border border-border-dark text-xs text-white placeholder-slate-600 focus:outline-none focus:border-slate-500"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mt-3">
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={editingLimits.isThrottled === 'true'}
+                                          onChange={(e) => setEditingLimits((prev) => ({ ...prev, isThrottled: String(e.target.checked) }))}
+                                          className="rounded border-slate-600"
+                                        />
+                                        <span className="text-xs text-red-400 font-medium">Throttle user</span>
+                                      </label>
+                                      <button
+                                        onClick={() => handleSaveLimits(u.userId)}
+                                        disabled={savingLimits}
+                                        className="px-4 py-1.5 rounded-lg bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest hover:bg-primary/30 transition-colors disabled:opacity-50"
+                                      >
+                                        {savingLimits ? 'Saving...' : 'Save Limits'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ─── Video Tabs Content ─── */}
+        {activeTab !== 'usage' && (
+        <>
         {/* ─── Job Button (contextual per tab) ─── */}
         <button
           onClick={() => runJob(activeTab === 'tutorials' ? 'video-linking' : 'video-discovery')}
@@ -584,6 +923,8 @@ export default function AdminPage() {
             </>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
