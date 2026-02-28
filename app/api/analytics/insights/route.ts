@@ -165,9 +165,10 @@ ${JSON.stringify(workoutSummary, null, 2)}`,
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('[analytics/insights] GET error:', error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('[analytics/insights] GET error:', errMsg, error);
     return NextResponse.json(
-      { error: 'Failed to generate insights' },
+      { error: 'Failed to generate insights', details: errMsg },
       { status: 500 }
     );
   }
