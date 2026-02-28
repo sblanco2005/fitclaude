@@ -1019,7 +1019,22 @@ async def handle_chat(
         # Re-raise auth errors — fallback won't help
         if isinstance(e, APIStatusError) and e.status_code in (401, 403):
             raise
-        logger.warning(f"[Coach] Anthropic unavailable ({e}), falling back to MiniMax")
+
+        status = getattr(e, 'status_code', None)
+        logger.warning(f"[Coach] Anthropic error (status={status}): {e}")
+
+        # If the request had an image, don't fall back to MiniMax (it can't handle images).
+        # Instead, return a clear error so the user knows to retry.
+        if image_base64:
+            logger.warning("[Coach] Image request failed — cannot fallback to MiniMax for images")
+            return {
+                "response": "I couldn't process that image right now. Please try again in a moment, or try a smaller/clearer photo.",
+                "workout_id": None,
+                "nutrition_log_id": None,
+                "model_used": None,
+            }
+
+        logger.warning("[Coach] Falling back to MiniMax")
         fallback_text = await handle_chat_minimax(user_message, history, system_full)
         return {
             "response": fallback_text,
