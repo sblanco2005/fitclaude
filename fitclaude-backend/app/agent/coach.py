@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 from app.agent.prompts import COACH_SYSTEM_PROMPT, build_user_context
 from app.agent.spicy import get_spicy_variation
 from app.services.youtube_service import import_exercises_from_youtube
+from app.jobs.video_linker import _link_best_video
 from app.agent.tools import TOOL_DEFINITIONS
 from app.agent.minimax_fallback import handle_chat_minimax
 from app.config import settings
@@ -542,6 +543,14 @@ async def _tool_generate_workout(
                 exercise_id = new_exercise.id
                 all_exercises.append(new_exercise)
                 logger.info(f"[Coach] Auto-added exercise '{ex_name}' to library -> {new_exercise.id}")
+
+                # Auto-search YouTube for a tutorial video (fire-and-forget)
+                try:
+                    added = await _link_best_video(db, new_exercise)
+                    if added:
+                        logger.info(f"[Coach] Auto-linked tutorial video for '{ex_name}'")
+                except Exception as e:
+                    logger.warning(f"[Coach] Video auto-link failed for '{ex_name}': {e}")
 
         # Store notes in pipe-delimited format: name|muscleGroup|coachingTip
         # This allows the frontend to parse exercise info even when not linked to DB
