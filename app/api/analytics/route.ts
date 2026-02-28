@@ -250,6 +250,136 @@ export const GET = withAuth(async (request, user) => {
     const totalWorkouts = workouts.length;
     const avgVolumePerSession = totalWorkouts > 0 ? Math.round(totalVolume / totalWorkouts) : 0;
 
+    // ── Nutrition analytics ──
+    const sinceDate = since
+      ? new Date(since.toISOString().split('T')[0] + 'T00:00:00Z')
+      : undefined;
+
+    const nutritionSummaries = await prisma.dailyNutritionSummary.findMany({
+      where: {
+        userId: user.id,
+        ...(sinceDate ? { date: { gte: sinceDate } } : {}),
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // User targets for compliance calculation
+    const userProfile = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        dailyCalorieTarget: true,
+        dailyProteinTarget: true,
+        carbsPercent: true,
+        fatPercent: true,
+      },
+    });
+
+    const calTarget = userProfile?.dailyCalorieTarget ?? 0;
+    const protTarget = userProfile?.dailyProteinTarget ?? 0;
+    const carbsPct = userProfile?.carbsPercent ?? 50;
+    const fatPct = userProfile?.fatPercent ?? 50;
+    const remainingCal = Math.max(calTarget - protTarget * 4, 0);
+    const carbsTarget = Math.round((remainingCal * (carbsPct / 100)) / 4);
+    const fatTarget = Math.round((remainingCal * (fatPct / 100)) / 9);
+
+    const daysLogged = nutritionSummaries.length;
+    const totalCalories = nutritionSummaries.reduce((s, d) => s + d.calories, 0);
+    const totalProtein = nutritionSummaries.reduce((s, d) => s + d.proteinG, 0);
+    const totalCarbs = nutritionSummaries.reduce((s, d) => s + d.carbsG, 0);
+    const totalFat = nutritionSummaries.reduce((s, d) => s + d.fatG, 0);
+
+    const avgCalories = daysLogged > 0 ? Math.round(totalCalories / daysLogged) : 0;
+    const avgProteinG = daysLogged > 0 ? Math.round(totalProtein / daysLogged) : 0;
+    const avgCarbsG = daysLogged > 0 ? Math.round(totalCarbs / daysLogged) : 0;
+    const avgFatG = daysLogged > 0 ? Math.round(totalFat / daysLogged) : 0;
+
+    // Daily calories/macros for chart
+    const caloriesByDay = nutritionSummaries.map((d) => ({
+      date: d.date.toISOString().split('T')[0],
+      calories: Math.round(d.calories),
+      target: calTarget,
+    }));
+
+    const macrosByDay = nutritionSummaries.map((d) => ({
+      date: d.date.toISOString().split('T')[0],
+      protein: Math.round(d.proteinG),
+      carbs: Math.round(d.carbsG),
+      fat: Math.round(d.fatG),
+    }));
+
+    // Compliance: % of days meeting targets (within 10% tolerance)
+    let daysCalorieHit = 0;
+    let daysProteinHit = 0;
+    for (const d of nutritionSummaries) {
+      if (calTarget > 0 && d.calories >= calTarget * 0.9 && d.calories <= calTarget * 1.1) {
+        daysCalorieHit++;
+      }
+      if (protTarget > 0 && d.proteinG >= protTarget * 0.9) {
+        daysProteinHit++;
+      }
+    }
+    const calorieCompliance = daysLogged > 0 ? Math.round((daysCalorieHit / daysLogged) * 100) : 0;
+    const proteinCompliance = daysLogged > 0 ? Math.round((daysProteinHit / daysLogged) * 100) : 0;
+
+    // Meal pattern: average meals per day, most common meal types
+    const totalMeals = nutritionSummaries.reduce((s, d) => s + d.mealCount, 0);
+    const avgMealsPerDay = daysLogged > 0 ? Math.round((totalMeals / daysLogged) * 10) / 10 : 0;
+
+    // Most common foods (from raw logs within period)
+    const nutritionLogs = await prisma.nutritionLog.findMany({
+      where: {
+        userId: user.id,
+        ...(sinceDate ? { date: { gte: sinceDate } } : {}),
+      },
+      select: { rawInput: true, mealType: true, calories: true, proteinG: true },
+      orderBy: { date: 'desc' },
+    });
+
+    // Count meal type distribution
+    const mealTypeCounts: Record<string, number> = {};
+    for (const log of nutritionLogs) {
+      const type = log.mealType || 'unspecified';
+      mealTypeCounts[type] = (mealTypeCounts[type] || 0) + 1;
+    }
+    const mealTypeDistribution = Object.entries(mealTypeCounts)
+      .map(([type, count]) => ({
+        type,
+        count,
+        percentage: nutritionLogs.length > 0 ? Math.round((count / nutritionLogs.length) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Top foods by frequency (simple word extraction from rawInput)
+    const foodCounts = new Map<string, { count: number; avgCalories: number; avgProtein: number; totalCal: number; totalProt: number }>();
+    for (const log of nutritionLogs) {
+      const key = log.rawInput.toLowerCase().trim().slice(0, 60);
+      if (!key) continue;
+      const existing = foodCounts.get(key);
+      if (existing) {
+        existing.count++;
+        existing.totalCal += log.calories || 0;
+        existing.totalProt += log.proteinG || 0;
+      } else {
+        foodCounts.set(key, {
+          count: 1,
+          avgCalories: 0,
+          avgProtein: 0,
+          totalCal: log.calories || 0,
+          totalProt: log.proteinG || 0,
+        });
+      }
+    }
+    const topFoods = Array.from(foodCounts.entries())
+      .map(([name, data]) => ({
+        name,
+        count: data.count,
+        avgCalories: Math.round(data.totalCal / data.count),
+        avgProtein: Math.round(data.totalProt / data.count),
+      }))
+      .filter((f) => f.count >= 2)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
     return NextResponse.json({
       period,
       totalWorkouts,
@@ -261,6 +391,29 @@ export const GET = withAuth(async (request, user) => {
       personalRecords,
       plateaus,
       repRangeAnalysis,
+      // Nutrition
+      nutrition: {
+        daysLogged,
+        avgCalories,
+        avgProteinG,
+        avgCarbsG,
+        avgFatG,
+        caloriesByDay,
+        macrosByDay,
+        targets: {
+          calories: calTarget,
+          proteinG: protTarget,
+          carbsG: carbsTarget,
+          fatG: fatTarget,
+        },
+        compliance: {
+          calorie: calorieCompliance,
+          protein: proteinCompliance,
+        },
+        avgMealsPerDay,
+        mealTypeDistribution,
+        topFoods,
+      },
     });
   } catch (error) {
     console.error('[analytics] GET error:', error);

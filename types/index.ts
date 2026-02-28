@@ -214,6 +214,7 @@ export interface AnalyticsData {
   personalRecords: PersonalRecord[];
   plateaus: PlateauAlert[];
   repRangeAnalysis: RepRangeData[];
+  nutrition: NutritionAnalytics;
 }
 
 export interface VolumeDataPoint {
@@ -258,6 +259,56 @@ export interface RepRangeData {
 export interface WeeklyInsights {
   insights: string;
   generatedAt: string;
+}
+
+// Nutrition Analytics
+export interface NutritionAnalytics {
+  daysLogged: number;
+  avgCalories: number;
+  avgProteinG: number;
+  avgCarbsG: number;
+  avgFatG: number;
+  caloriesByDay: CalorieDayPoint[];
+  macrosByDay: MacroDayPoint[];
+  targets: {
+    calories: number;
+    proteinG: number;
+    carbsG: number;
+    fatG: number;
+  };
+  compliance: {
+    calorie: number;
+    protein: number;
+  };
+  avgMealsPerDay: number;
+  mealTypeDistribution: MealTypeCount[];
+  topFoods: TopFood[];
+}
+
+export interface CalorieDayPoint {
+  date: string;
+  calories: number;
+  target: number;
+}
+
+export interface MacroDayPoint {
+  date: string;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface MealTypeCount {
+  type: string;
+  count: number;
+  percentage: number;
+}
+
+export interface TopFood {
+  name: string;
+  count: number;
+  avgCalories: number;
+  avgProtein: number;
 }
 
 // Chat
