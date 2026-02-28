@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, exercises, jobs, nutrition, users, workouts
+from app.routers import analytics, chat, exercises, jobs, nutrition, users, workouts
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,6 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(analytics.router)
 app.include_router(chat.router)
 app.include_router(users.router)
 app.include_router(workouts.router)
