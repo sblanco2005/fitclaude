@@ -158,13 +158,40 @@ export function ChatDrawer() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setImagePreview(result);
-      setImageData({ base64: result.split(',')[1], mediaType: file.type });
+
+    // Compress image via canvas to reduce payload size
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX_DIM = 1200;
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const scale = MAX_DIM / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      setImagePreview(dataUrl);
+      setImageData({ base64: dataUrl.split(',')[1], mediaType: 'image/jpeg' });
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => {
+      // Fallback: send raw if canvas fails
+      URL.revokeObjectURL(objectUrl);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        setImagePreview(result);
+        setImageData({ base64: result.split(',')[1], mediaType: file.type });
+      };
+      reader.readAsDataURL(file);
+    };
+    img.src = objectUrl;
   };
 
   const clearImage = () => {

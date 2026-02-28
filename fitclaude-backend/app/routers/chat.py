@@ -26,5 +26,5 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         )
         return ChatResponse(**result)
     except Exception as e:
-        logger.error(f"[Chat] Unexpected error: {e}")
+        logger.error(f"[Chat] Unexpected error: {type(e).__name__}: {e}", exc_info=True)
         return ChatResponse(response="Something went wrong. Please try again.", workout_id=None, nutrition_log_id=None)

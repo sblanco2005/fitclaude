@@ -198,7 +198,11 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      if (!res.ok) throw new Error('Chat request failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        const detail = errData?.error || `Request failed (${res.status})`;
+        throw new Error(detail);
+      }
 
       const data = await res.json();
       const response = data.response || data.message || 'No response';
@@ -224,11 +228,13 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
       setDataVersion((v) => v + 1);
 
       return response;
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      console.error('[Chat] Error:', message);
       const errorMsg: ChatMessage = {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: 'Sorry, I had trouble responding. Please try again.',
+        content: `Sorry, I had trouble responding. ${message}`,
         createdAt: new Date().toISOString(),
       };
       setter((prev) => [...prev, errorMsg]);
