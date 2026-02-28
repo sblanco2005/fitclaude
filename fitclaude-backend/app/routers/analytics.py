@@ -56,7 +56,8 @@ async def get_insights(user_id: str = Query(...)):
 
     async with async_session() as db:
         # Fetch last 14 days of completed workouts
-        since = datetime.now(timezone.utc) - timedelta(days=14)
+        # Strip tzinfo — DB column is TIMESTAMP WITHOUT TIME ZONE
+        since = (datetime.now(timezone.utc) - timedelta(days=14)).replace(tzinfo=None)
 
         result = await db.execute(
             select(Workout)
