@@ -7,6 +7,7 @@ or log nutrition.
 """
 
 import logging
+import re
 
 from openai import AsyncOpenAI
 
@@ -72,5 +73,7 @@ async def handle_chat_minimax(
     )
 
     text = completion.choices[0].message.content or ""
+    # Strip <think>...</think> blocks — MiniMax sometimes outputs chain-of-thought
+    text = re.sub(r"<think>[\s\S]*?</think>\s*", "", text).strip()
     logger.info(f"[MiniMax] Response received ({len(text)} chars)")
     return text

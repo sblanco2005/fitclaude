@@ -1008,6 +1008,9 @@ async def handle_chat(
         except Exception as e:
             logger.error(f"[Coach] Final commit error (data already committed per-tool): {e}")
 
+        # Strip any leaked <think> tags from the response
+        assistant_text = re.sub(r"<think>[\s\S]*?</think>\s*", "", assistant_text).strip()
+
         return {
             "response": assistant_text,
             "workout_id": workout_id,
@@ -1021,7 +1024,10 @@ async def handle_chat(
             raise
 
         status = getattr(e, 'status_code', None)
-        logger.warning(f"[Coach] Anthropic error (status={status}): {e}")
+        body = getattr(e, 'body', None)
+        logger.error(f"[Coach] Anthropic error (status={status}, model={settings.agent_model}): {e}")
+        if body:
+            logger.error(f"[Coach] Error body: {body}")
 
         # If the request had an image, don't fall back to MiniMax (it can't handle images).
         # Instead, return a clear error so the user knows to retry.
@@ -1036,6 +1042,8 @@ async def handle_chat(
 
         logger.warning("[Coach] Falling back to MiniMax")
         fallback_text = await handle_chat_minimax(user_message, history, system_full)
+        # Strip any leaked <think> tags
+        fallback_text = re.sub(r"<think>[\s\S]*?</think>\s*", "", fallback_text).strip()
         return {
             "response": fallback_text,
             "workout_id": None,
