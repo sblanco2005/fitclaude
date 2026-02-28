@@ -2,15 +2,15 @@
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from anthropic import AsyncAnthropic
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.database import AsyncSessionLocal
+from app.database import async_session
 from app.models.user import User
 from app.models.workout import Workout, WorkoutExercise
 
@@ -54,11 +54,8 @@ async def get_insights(user_id: str = Query(...)):
     if cache_key in _insights_cache:
         return _insights_cache[cache_key]
 
-    async with AsyncSessionLocal() as db:
+    async with async_session() as db:
         # Fetch last 14 days of completed workouts
-        since = datetime.now(timezone.utc)
-        since = since.replace(day=since.day)
-        from datetime import timedelta
         since = datetime.now(timezone.utc) - timedelta(days=14)
 
         result = await db.execute(
@@ -116,7 +113,17 @@ async def get_insights(user_id: str = Query(...)):
                 "exercises": exercises,
             })
 
-    # Call Claude
+        # Build user profile string
+        user_goal = user.fitness_goal if user else "not set"
+        user_exp = user.experience_level if user else "not set"
+        user_age = user.age if user else "not set"
+        user_weight = (
+            f"{round(user.weight_kg * 2.205)} lb"
+            if user and user.weight_kg
+            else "not set"
+        )
+
+    # Call Claude (outside db session — we only need the summary data)
     try:
         response = await client.messages.create(
             model=settings.agent_model,
@@ -137,11 +144,11 @@ async def get_insights(user_id: str = Query(...)):
                 "role": "user",
                 "content": (
                     f"User profile:\n"
-                    f"- Goal: {user.fitness_goal or 'not set'}\n"
-                    f"- Experience: {user.experience_level or 'not set'}\n"
-                    f"- Age: {user.age or 'not set'}\n"
-                    f"- Weight: {str(round(user.weight_kg * 2.205)) + ' lb' if user.weight_kg else 'not set'}\n\n"
-                    f"Recent workout data (last 14 days, {len(workouts)} sessions):\n"
+                    f"- Goal: {user_goal}\n"
+                    f"- Experience: {user_exp}\n"
+                    f"- Age: {user_age}\n"
+                    f"- Weight: {user_weight}\n\n"
+                    f"Recent workout data (last 14 days, {len(workout_summary)} sessions):\n"
                     f"{json.dumps(workout_summary, indent=2)}"
                 ),
             }],
@@ -164,4 +171,4 @@ async def get_insights(user_id: str = Query(...)):
 
     except Exception as e:
         logger.error(f"[analytics/insights] Claude API error: {e}")
-        raise
+        raise HTTPException(status_code=502, detail=str(e))
