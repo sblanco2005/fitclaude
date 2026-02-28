@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
-import type { ExerciseVideoLink, UsageResponse, UserUsageDetail, UserUsageSummary } from '@/types';
+import type { ExerciseVideoLink, UsageResponse, UserUsageDetail, UserUsageSummary, UserTier } from '@/types';
+import { TIER_CONFIGS } from '@/types';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected';
 type AdminTab = 'tutorials' | 'reference' | 'usage';
@@ -51,6 +52,7 @@ export default function AdminPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [editingLimits, setEditingLimits] = useState<Record<string, string>>({});
   const [savingLimits, setSavingLimits] = useState(false);
+  const [savingTier, setSavingTier] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -243,6 +245,28 @@ export default function AdminPage() {
     await fetchUserDetail(userId);
   };
 
+  const handleSetTier = async (userId: string, tier: UserTier) => {
+    setSavingTier(true);
+    try {
+      await fetch(`/api/admin/usage/${userId}/tier`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      });
+      await fetchUsage();
+      if (expandedUserId === userId) await fetchUserDetail(userId);
+    } catch { /* ignore */ }
+    setSavingTier(false);
+  };
+
+  // Suggest a tier based on avg daily calls in the 30d period
+  const suggestTier = (u: UserUsageSummary): UserTier => {
+    const avgDaily = u.totalCalls / 30;
+    if (avgDaily > 50) return 'unlimited';
+    if (avgDaily > 10) return 'pro';
+    return 'free';
+  };
+
   const handleSaveLimits = async (userId: string) => {
     setSavingLimits(true);
     try {
@@ -399,6 +423,15 @@ export default function AdminPage() {
                               <p className="text-xs text-white font-medium truncate">
                                 {u.user?.name || u.user?.email || u.userId.slice(0, 8)}
                               </p>
+                              {u.user?.tier && (
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                  u.user.tier === 'unlimited' ? 'bg-amber-500/15 text-amber-400'
+                                  : u.user.tier === 'pro' ? 'bg-blue-500/15 text-blue-400'
+                                  : 'bg-slate-500/15 text-slate-400'
+                                }`}>
+                                  {u.user.tier}
+                                </span>
+                              )}
                             </div>
                             <div className="col-span-1 text-right text-xs text-slate-300 tabular-nums">
                               {u.totalCalls}
@@ -473,6 +506,49 @@ export default function AdminPage() {
                                       </p>
                                     </div>
                                   )}
+
+                                  {/* Tier selector */}
+                                  <div>
+                                    <h4 className="text-[10px] text-muted uppercase tracking-widest font-bold mb-2">User Tier</h4>
+                                    <div className="flex items-center gap-2">
+                                      {(['free', 'pro', 'unlimited'] as UserTier[]).map((t) => {
+                                        const cfg = TIER_CONFIGS[t];
+                                        const isActive = (u.user?.tier || 'free') === t;
+                                        return (
+                                          <button
+                                            key={t}
+                                            onClick={() => handleSetTier(u.userId, t)}
+                                            disabled={savingTier}
+                                            className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border ${
+                                              isActive
+                                                ? t === 'unlimited' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                                                : t === 'pro' ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                                                : 'bg-slate-500/15 text-slate-300 border-slate-500/30'
+                                              : 'bg-card text-muted border-border-dark hover:text-slate-300'
+                                            } disabled:opacity-50`}
+                                          >
+                                            <div>{cfg.label}</div>
+                                            <div className="text-[8px] font-normal normal-case tracking-normal mt-0.5 opacity-70">
+                                              {cfg.maxMessagesPerDay ? `${cfg.maxMessagesPerDay}/day` : 'No limit'} · {cfg.models}
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    {/* Suggested tier based on usage */}
+                                    {usagePeriod === '30d' && u.totalCalls > 0 && (
+                                      <p className="text-[10px] text-slate-500 mt-1.5">
+                                        Avg {(u.totalCalls / 30).toFixed(1)} calls/day →{' '}
+                                        <span className={`font-semibold ${
+                                          suggestTier(u) === 'unlimited' ? 'text-amber-400'
+                                          : suggestTier(u) === 'pro' ? 'text-blue-400'
+                                          : 'text-slate-400'
+                                        }`}>
+                                          Suggested: {TIER_CONFIGS[suggestTier(u)].label}
+                                        </span>
+                                      </p>
+                                    )}
+                                  </div>
 
                                   {/* Rate limits editor */}
                                   <div>

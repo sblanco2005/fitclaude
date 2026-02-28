@@ -58,6 +58,7 @@ class User(Base):
         "trainingFrequency", nullable=True
     )
     is_onboarded: Mapped[bool] = mapped_column("isOnboarded", default=False)
+    tier: Mapped[str] = mapped_column(String, default="free")  # free, pro, unlimited
 
     # Relations
     workouts: Mapped[List["Workout"]] = relationship(back_populates="user")  # noqa: F821

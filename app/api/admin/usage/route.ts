@@ -43,7 +43,7 @@ export const GET = withAdmin(async (request: NextRequest) => {
   const userIds = usageByUser.map((u) => u.userId);
   const users = await prisma.user.findMany({
     where: { id: { in: userIds } },
-    select: { id: true, name: true, email: true, image: true },
+    select: { id: true, name: true, email: true, image: true, tier: true },
   });
   const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
 

@@ -1,6 +1,7 @@
 """Token usage tracking and rate limiting service."""
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -9,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.token_usage import TokenUsage, UserUsageLimit
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 cuid_generator = Cuid()
@@ -35,6 +37,58 @@ DEFAULT_PRICING: dict[str, float] = {
     "cache_write": 3.75,
     "cache_read": 0.30,
 }
+
+
+# ── Tier Configuration ──
+
+
+@dataclass
+class TierConfig:
+    max_messages_per_day: int | None  # None = unlimited
+    allowed_models: list[str]  # model IDs the tier can access
+    default_model: str  # model used by default
+
+
+TIER_CONFIGS: dict[str, TierConfig] = {
+    "free": TierConfig(
+        max_messages_per_day=20,
+        allowed_models=["claude-haiku-4-5-20251001"],
+        default_model="claude-haiku-4-5-20251001",
+    ),
+    "pro": TierConfig(
+        max_messages_per_day=100,
+        allowed_models=["claude-haiku-4-5-20251001", "claude-sonnet-4-20250514"],
+        default_model="claude-haiku-4-5-20251001",  # Haiku default, Sonnet for complex
+    ),
+    "unlimited": TierConfig(
+        max_messages_per_day=None,
+        allowed_models=["claude-haiku-4-5-20251001", "claude-sonnet-4-20250514"],
+        default_model="claude-sonnet-4-20250514",
+    ),
+}
+
+
+def get_tier_config(tier: str) -> TierConfig:
+    """Return the config for a given tier, defaulting to 'free'."""
+    return TIER_CONFIGS.get(tier, TIER_CONFIGS["free"])
+
+
+async def get_model_for_tier(
+    db: AsyncSession,
+    user_id: str,
+) -> str:
+    """Determine which model to use based on user tier.
+
+    Free  → always Haiku
+    Pro   → Haiku by default (Sonnet available for complex requests)
+    Unlimited → Sonnet
+    """
+    result = await db.execute(
+        select(User.tier).where(User.id == user_id)
+    )
+    tier = result.scalar_one_or_none() or "free"
+    config = get_tier_config(tier)
+    return config.default_model
 
 
 def calculate_cost(
@@ -106,24 +160,38 @@ async def check_rate_limit(
 ) -> tuple[bool, str | None]:
     """Check if a user has exceeded their rate limits.
 
+    Uses a two-layer approach:
+    1. Tier-based defaults (Free=20/day, Pro=100/day, Unlimited=no limit)
+    2. Admin-set UserUsageLimit overrides (take precedence when set)
+
     Returns (allowed, reason). If not allowed, reason explains why.
     """
+    # Load user tier
+    user_result = await db.execute(
+        select(User.tier).where(User.id == user_id)
+    )
+    tier = user_result.scalar_one_or_none() or "free"
+    tier_config = get_tier_config(tier)
+
+    # Load admin-set limits (if any)
     result = await db.execute(
         select(UserUsageLimit).where(UserUsageLimit.user_id == user_id)
     )
     limits = result.scalar_one_or_none()
 
-    if not limits:
-        return True, None  # No limits configured
-
-    if limits.is_throttled:
+    # Admin throttle is always respected
+    if limits and limits.is_throttled:
         return False, "Your account has been temporarily limited by an administrator."
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # Daily limit
-    if limits.max_calls_per_day is not None:
-        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Daily limit: admin override > tier default
+    effective_daily = (
+        limits.max_calls_per_day if (limits and limits.max_calls_per_day is not None)
+        else tier_config.max_messages_per_day
+    )
+    if effective_daily is not None:
         count_result = await db.execute(
             select(func.count(TokenUsage.id)).where(
                 TokenUsage.user_id == user_id,
@@ -131,14 +199,15 @@ async def check_rate_limit(
             )
         )
         daily_count = count_result.scalar() or 0
-        if daily_count >= limits.max_calls_per_day:
+        if daily_count >= effective_daily:
+            tier_label = tier.capitalize()
             return (
                 False,
-                f"Daily limit reached ({limits.max_calls_per_day} calls/day). Resets at midnight UTC.",
+                f"Daily message limit reached ({effective_daily}/day on {tier_label} tier). Resets at midnight UTC.",
             )
 
-    # Weekly limit
-    if limits.max_calls_per_week is not None:
+    # Weekly limit (admin-only, no tier default)
+    if limits and limits.max_calls_per_week is not None:
         week_start = now - timedelta(days=now.weekday())
         week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
         count_result = await db.execute(
@@ -154,8 +223,8 @@ async def check_rate_limit(
                 f"Weekly limit reached ({limits.max_calls_per_week} calls/week). Resets Monday.",
             )
 
-    # Monthly limit
-    if limits.max_calls_per_month is not None:
+    # Monthly limit (admin-only, no tier default)
+    if limits and limits.max_calls_per_month is not None:
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         count_result = await db.execute(
             select(func.count(TokenUsage.id)).where(
@@ -170,8 +239,8 @@ async def check_rate_limit(
                 f"Monthly limit reached ({limits.max_calls_per_month} calls/month). Resets on the 1st.",
             )
 
-    # Monthly cost limit
-    if limits.max_cost_per_month is not None:
+    # Monthly cost limit (admin-only)
+    if limits and limits.max_cost_per_month is not None:
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         cost_result = await db.execute(
             select(func.sum(TokenUsage.estimated_cost_usd)).where(

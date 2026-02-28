@@ -44,7 +44,7 @@ export const GET = withAdmin(async (request: NextRequest, _user, params) => {
   // User info and limits
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, image: true },
+    select: { id: true, name: true, email: true, image: true, tier: true },
   });
 
   const limits = await prisma.userUsageLimit.findUnique({

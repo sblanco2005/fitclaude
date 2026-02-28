@@ -21,7 +21,7 @@ from app.services.youtube_service import import_exercises_from_youtube
 from app.agent.tools import TOOL_DEFINITIONS
 from app.agent.minimax_fallback import handle_chat_minimax
 from app.config import settings
-from app.services.usage_service import check_rate_limit, log_token_usage
+from app.services.usage_service import check_rate_limit, get_model_for_tier, log_token_usage
 from app.models import (
     Activity,
     ConversationHistory,
@@ -897,11 +897,13 @@ async def handle_chat(
             "model_used": None,
         }
 
+    # Select model based on user tier
+    active_model = await get_model_for_tier(db, user_id)
     request_id = str(uuid.uuid4())[:8]
 
     try:
         response = await client.messages.create(
-            model=settings.agent_model,
+            model=active_model,
             max_tokens=2048,
             system=system_full,
             messages=messages,
@@ -909,7 +911,7 @@ async def handle_chat(
         )
 
         # Log initial API call usage
-        await log_token_usage(db, user_id, "chat", settings.agent_model, response.usage, request_id=request_id)
+        await log_token_usage(db, user_id, "chat", active_model, response.usage, request_id=request_id)
 
         # Tool-use loop
         workout_id = None
@@ -942,13 +944,13 @@ async def handle_chat(
             messages.append({"role": "user", "content": tool_results})
 
             response = await client.messages.create(
-                model=settings.agent_model,
+                model=active_model,
                 max_tokens=2048,
                 system=system_full,
                 messages=messages,
                 tools=TOOL_DEFINITIONS,
             )
-            await log_token_usage(db, user_id, "chat", settings.agent_model, response.usage, request_id=request_id)
+            await log_token_usage(db, user_id, "chat", active_model, response.usage, request_id=request_id)
 
         # Extract final text
         assistant_text = "".join(
@@ -974,13 +976,13 @@ async def handle_chat(
                 ),
             })
             response = await client.messages.create(
-                model=settings.agent_model,
+                model=active_model,
                 max_tokens=2048,
                 system=system_full,
                 messages=messages,
                 tools=TOOL_DEFINITIONS,
             )
-            await log_token_usage(db, user_id, "chat_retry", settings.agent_model, response.usage, request_id=request_id)
+            await log_token_usage(db, user_id, "chat_retry", active_model, response.usage, request_id=request_id)
             # Process tool calls from the retry
             while response.stop_reason == "tool_use":
                 tool_results = []
@@ -999,13 +1001,13 @@ async def handle_chat(
                 messages.append({"role": "assistant", "content": response.content})
                 messages.append({"role": "user", "content": tool_results})
                 response = await client.messages.create(
-                    model=settings.agent_model,
+                    model=active_model,
                     max_tokens=2048,
                     system=system_full,
                     messages=messages,
                     tools=TOOL_DEFINITIONS,
                 )
-                await log_token_usage(db, user_id, "chat_retry", settings.agent_model, response.usage, request_id=request_id)
+                await log_token_usage(db, user_id, "chat_retry", active_model, response.usage, request_id=request_id)
             # Use the retry response text
             assistant_text = "".join(
                 block.text for block in response.content if hasattr(block, "text")
@@ -1053,7 +1055,7 @@ async def handle_chat(
             "response": assistant_text,
             "workout_id": workout_id,
             "nutrition_log_id": nutrition_log_id,
-            "model_used": settings.agent_model,
+            "model_used": active_model,
         }
 
     except (APIStatusError, APIConnectionError) as e:
@@ -1063,7 +1065,7 @@ async def handle_chat(
 
         status = getattr(e, 'status_code', None)
         body = getattr(e, 'body', None)
-        logger.error(f"[Coach] Anthropic error (status={status}, model={settings.agent_model}): {e}")
+        logger.error(f"[Coach] Anthropic error (status={status}, model={active_model}): {e}")
         if body:
             logger.error(f"[Coach] Error body: {body}")
 

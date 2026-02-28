@@ -333,9 +333,11 @@ export interface UserUsageLimitData {
   updatedAt: string;
 }
 
+export type UserTier = 'free' | 'pro' | 'unlimited';
+
 export interface UserUsageSummary {
   userId: string;
-  user: { id: string; name: string | null; email: string | null; image: string | null } | null;
+  user: { id: string; name: string | null; email: string | null; image: string | null; tier: UserTier } | null;
   limits: UserUsageLimitData | null;
   totalCalls: number;
   totalInputTokens: number;
@@ -366,9 +368,16 @@ export interface DailyUsageBreakdown {
 }
 
 export interface UserUsageDetail {
-  user: { id: string; name: string | null; email: string | null; image: string | null } | null;
+  user: { id: string; name: string | null; email: string | null; image: string | null; tier: UserTier } | null;
   limits: UserUsageLimitData | null;
   dailyBreakdown: DailyUsageBreakdown[];
   byEndpoint: Record<string, { calls: number; costUsd: number }>;
   totalRecords: number;
 }
+
+// Tier configuration (mirrors backend TIER_CONFIGS)
+export const TIER_CONFIGS: Record<UserTier, { maxMessagesPerDay: number | null; models: string; label: string; color: string }> = {
+  free: { maxMessagesPerDay: 20, models: 'Haiku', label: 'Free', color: 'slate' },
+  pro: { maxMessagesPerDay: 100, models: 'Haiku + Sonnet', label: 'Pro', color: 'blue' },
+  unlimited: { maxMessagesPerDay: null, models: 'Full access', label: 'Unlimited', color: 'amber' },
+};

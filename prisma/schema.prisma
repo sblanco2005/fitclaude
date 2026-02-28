@@ -38,6 +38,7 @@ model User {
   timezone           String    @default("UTC") // IANA timezone e.g. "America/New_York"
   isOnboarded        Boolean   @default(false)
   isAdmin            Boolean   @default(false)
+  tier               String    @default("free") // free, pro, unlimited
 
   // NextAuth relations
   accounts      Account[]
