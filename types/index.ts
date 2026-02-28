@@ -202,6 +202,64 @@ export interface UserFood {
   updatedAt: string;
 }
 
+// Analytics
+export interface AnalyticsData {
+  period: string;
+  totalWorkouts: number;
+  totalVolume: number;
+  avgVolumePerSession: number;
+  volumeBySession: VolumeDataPoint[];
+  volumeByWeek: WeeklyVolume[];
+  progressiveOverload: ProgressiveOverloadSeries[];
+  personalRecords: PersonalRecord[];
+  plateaus: PlateauAlert[];
+  repRangeAnalysis: RepRangeData[];
+}
+
+export interface VolumeDataPoint {
+  date: string;
+  volume: number;
+  name: string;
+}
+
+export interface WeeklyVolume {
+  week: string;
+  weekStart: string;
+  volume: number;
+}
+
+export interface ProgressiveOverloadSeries {
+  exerciseName: string;
+  data: { date: string; maxWeight: number }[];
+}
+
+export interface PersonalRecord {
+  exerciseName: string;
+  muscleGroup: string;
+  prWeight: number;
+  prReps: number;
+  prDate: string;
+}
+
+export interface PlateauAlert {
+  exerciseName: string;
+  stuckAtWeight: number;
+  sessionCount: number;
+  lastDate: string;
+}
+
+export interface RepRangeData {
+  range: string;
+  totalSets: number;
+  avgWeight: number;
+  percentage: number;
+}
+
+export interface WeeklyInsights {
+  insights: string;
+  generatedAt: string;
+}
+
 // Chat
 export interface ChatMessage {
   id: string;

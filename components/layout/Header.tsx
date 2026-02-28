@@ -54,9 +54,22 @@ export function Header() {
           {menuOpen && (
             <div className="absolute right-0 top-11 w-40 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-50">
               <button
-                onClick={() => signOut({ callbackUrl: '/auth/signin' })}
-                className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-slate-700/60 transition-colors"
+                onClick={() => { setMenuOpen(false); router.push('/settings'); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/60 transition-colors flex items-center gap-2"
               >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Profile
+              </button>
+              <div className="border-t border-slate-700" />
+              <button
+                onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-slate-700/60 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
                 Sign out
               </button>
             </div>
