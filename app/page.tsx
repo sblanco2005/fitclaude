@@ -67,7 +67,6 @@ export default function DashboardPage() {
   const mealCount = nutrition?.logs?.length || 0;
   const hasNutrition = totals && totals.calories > 0;
   const hasWorkouts = todayWorkouts.length > 0;
-  const hasSummary = hasNutrition || hasWorkouts;
 
   return (
     <div className="p-3 pb-1 space-y-3 max-w-lg mx-auto">
@@ -91,71 +90,73 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Today's Summary */}
-      <Card>
-        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">
-          Today&apos;s Summary
-        </h3>
-
-        {!hasSummary ? (
-          <p className="text-muted text-sm">
-            Nothing logged yet today. Use the chat to generate a workout or log meals.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {/* Workouts section */}
-            {hasWorkouts && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-slate-400 uppercase">Workouts</span>
-                  <span className="text-xs text-muted">({todayWorkouts.length})</span>
-                </div>
-                <div className="space-y-2">
-                  {todayWorkouts.map((w) => (
-                    <Link key={w.id} href={`/workouts?id=${w.id}`} className="block">
-                      <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
-                        <div>
-                          <span className="text-sm text-white">{w.name || w.workoutType.replace('_', ' ')}</span>
-                          <span className="text-xs text-muted ml-2">{w.exercises?.length || 0} exercises</span>
-                        </div>
-                        <span className="text-[10px] font-medium text-primary bg-primary/15 px-2 py-0.5 rounded-full">Done</span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Nutrition section */}
-            {hasNutrition && totals && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-slate-400 uppercase">Nutrition</span>
-                  <span className="text-xs text-muted">({mealCount} meal{mealCount !== 1 ? 's' : ''})</span>
-                </div>
-                <div className="grid grid-cols-4 gap-2 text-center">
-                  <div>
-                    <div className="text-sm font-semibold text-primary">{Math.round(totals.calories)}</div>
-                    <div className="text-[10px] text-muted">kcal</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-blue-400">{Math.round(totals.proteinG)}g</div>
-                    <div className="text-[10px] text-muted">protein</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-amber-400">{Math.round(totals.carbsG)}g</div>
-                    <div className="text-[10px] text-muted">carbs</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-red-400">{Math.round(totals.fatG)}g</div>
-                    <div className="text-[10px] text-muted">fat</div>
-                  </div>
-                </div>
-              </div>
-            )}
+      {/* Today's Summary — two blocks */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Nutrition block */}
+        <Card className="p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-base">🍽️</span>
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Nutrition</h3>
           </div>
-        )}
-      </Card>
+          {hasNutrition && totals ? (
+            <div className="space-y-1.5">
+              <div className="text-center">
+                <div className="text-lg font-bold text-primary">{Math.round(totals.calories)}</div>
+                <div className="text-[10px] text-muted">kcal</div>
+              </div>
+              <div className="grid grid-cols-3 gap-1 text-center">
+                <div>
+                  <div className="text-xs font-semibold text-blue-400">{Math.round(totals.proteinG)}g</div>
+                  <div className="text-[9px] text-muted">protein</div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-amber-400">{Math.round(totals.carbsG)}g</div>
+                  <div className="text-[9px] text-muted">carbs</div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-red-400">{Math.round(totals.fatG)}g</div>
+                  <div className="text-[9px] text-muted">fat</div>
+                </div>
+              </div>
+              <div className="text-[10px] text-muted text-center pt-0.5">
+                {mealCount} meal{mealCount !== 1 ? 's' : ''} logged
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted text-xs text-center py-3">No meals logged</p>
+          )}
+        </Card>
+
+        {/* Last Workout block */}
+        <Card className="p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-base">🏋️</span>
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Workout</h3>
+          </div>
+          {hasWorkouts ? (
+            <div className="space-y-1.5">
+              {todayWorkouts.slice(0, 2).map((w) => (
+                <Link key={w.id} href={`/workouts?id=${w.id}`} className="block">
+                  <div className="py-1.5 px-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
+                    <div className="text-xs font-medium text-white truncate">
+                      {w.name || w.workoutType.replace('_', ' ')}
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="text-[10px] text-muted">{w.exercises?.length || 0} exercises</span>
+                      <span className="text-[9px] font-medium text-primary bg-primary/15 px-1.5 py-0.5 rounded-full">Done</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              {todayWorkouts.length > 2 && (
+                <div className="text-[10px] text-muted text-center">+{todayWorkouts.length - 2} more</div>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted text-xs text-center py-3">No workout today</p>
+          )}
+        </Card>
+      </div>
 
       {/* Exercise Library */}
       <Link href="/exercises" className="block">
