@@ -1410,8 +1410,8 @@ function ActiveWorkout({
 }) {
   const latest = workouts[0];
   const muscles = uniqueMuscles(latest);
-  const INACTIVITY_LIMIT = 15 * 60; // 15 minutes with no set logged
-  const HARD_CAP = 2 * 60 * 60; // 2 hours max
+  const INACTIVITY_LIMIT = 20 * 60; // 20 minutes with no set logged
+  const HARD_CAP = 1 * 60 * 60; // 1 hour max
 
   const [isRunning, setIsRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -1823,7 +1823,7 @@ function FinishedWorkoutCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'routines' | 'activities' | 'history' | 'hit-it';
+type Tab = 'routines' | 'history' | 'hit-it';
 
 const CATEGORIES = ['all', 'lifting', 'hiit', 'cardio', 'mobility', 'calisthenics', 'sport', 'external'] as const;
 type Category = typeof CATEGORIES[number];
@@ -2164,7 +2164,6 @@ export default function WorkoutsPage() {
         {([
           { key: 'routines' as Tab, label: 'Routines' },
           ...(hitItQueue.length > 0 ? [{ key: 'hit-it' as Tab, label: `Hit It (${hitItQueue.length})` }] : []),
-          { key: 'activities' as Tab, label: 'Activities' },
           { key: 'history' as Tab, label: 'History' },
         ]).map(({ key, label }) => (
           <button
@@ -2322,73 +2321,64 @@ export default function WorkoutsPage() {
         </div>
       )}
 
-      {/* History Tab — all completed workout sessions */}
+      {/* History Tab — completed workouts + activities merged by date */}
       {tab === 'history' && (() => {
         const completedWorkouts = workouts
           .filter((w) => w.completed || sessionHasLogs(w))
+          .map((w) => ({ type: 'workout' as const, date: w.date, data: w }));
+        const activityItems = activities.map((a) => ({ type: 'activity' as const, date: a.date, data: a }));
+        const merged = [...completedWorkouts, ...activityItems]
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         return (
           <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide">
-            {completedWorkouts.length === 0 ? (
+            {merged.length === 0 ? (
               <div className="flex items-center justify-center min-h-[40vh]">
                 <div className="text-center px-6">
                   <p className="text-2xl font-black text-slate-600 tracking-wide uppercase">
                     No History
                   </p>
                   <p className="text-sm text-muted mt-2 font-medium">
-                    Complete a workout to see it here
+                    Complete a workout or log an activity to see it here
                   </p>
                 </div>
               </div>
             ) : (
               <div className="space-y-2 mt-1">
-                {completedWorkouts.map((w) => (
-                  <SessionLogCard
-                    key={w.id}
-                    workout={w}
-                    onDeleteLogs={handleDeleteLogs}
-                    onEditLog={handleEditLog}
-                    onDeleteSession={handleDeleteSession}
-                    canDeleteSession={true}
-                  />
-                ))}
+                {merged.map((item) =>
+                  item.type === 'workout' ? (
+                    <SessionLogCard
+                      key={item.data.id}
+                      workout={item.data}
+                      onDeleteLogs={handleDeleteLogs}
+                      onEditLog={handleEditLog}
+                      onDeleteSession={handleDeleteSession}
+                      canDeleteSession={true}
+                    />
+                  ) : (
+                    <div key={item.data.id} className="px-4 py-3 rounded-xl glass">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            Activity
+                          </span>
+                          <p className="font-bold text-white text-sm capitalize">{item.data.name}</p>
+                        </div>
+                        {item.data.durationMinutes && (
+                          <span className="text-xs text-muted tabular-nums">{item.data.durationMinutes} min</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{formatDate(item.data.date)}</p>
+                      {item.data.notes && (
+                        <p className="text-xs text-slate-400 mt-1">{item.data.notes}</p>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
             )}
           </div>
         );
       })()}
-
-      {/* Activities Tab */}
-      {tab === 'activities' && (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide">
-          {activities.length === 0 ? (
-            <div className="flex items-center justify-center min-h-[40vh]">
-              <Card className="text-center">
-                <p className="text-muted text-sm font-medium">
-                  No activities logged yet. Tell Coach about a class or activity you did!
-                </p>
-              </Card>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {activities.map((a) => (
-                <div key={a.id} className="px-4 py-3 rounded-xl glass">
-                  <div className="flex items-center justify-between">
-                    <p className="font-bold text-white text-sm capitalize">{a.name}</p>
-                    {a.durationMinutes && (
-                      <span className="text-xs text-muted tabular-nums">{a.durationMinutes} min</span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{formatDate(a.date)}</p>
-                  {a.notes && (
-                    <p className="text-xs text-slate-400 mt-1">{a.notes}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Swap Exercise Modal for Hit It tab */}
       <SwapExerciseModal
