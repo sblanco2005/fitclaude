@@ -4,8 +4,8 @@ import { prisma } from '@/lib/prisma';
 
 /**
  * PATCH /api/workouts/[id]/exercises/[exerciseId]
- * Swap a workout exercise with a different one from the library.
- * Body: { newExerciseId: string }
+ * - Swap exercise: { newExerciseId: string }
+ * - Update sets/reps: { sets?: number, reps?: string, restSeconds?: number }
  */
 export const PATCH = withAuth(async (request: NextRequest, user, params) => {
   const workoutId = params?.id;
@@ -16,18 +16,7 @@ export const PATCH = withAuth(async (request: NextRequest, user, params) => {
   if (!owns) return AuthErrors.notFound('Workout');
 
   const body = await request.json();
-  const { newExerciseId } = body;
-
-  if (!newExerciseId) {
-    return NextResponse.json({ error: 'newExerciseId is required' }, { status: 400 });
-  }
-
-  // Verify the new exercise exists
-  const newExercise = await prisma.exercise.findUnique({
-    where: { id: newExerciseId },
-    select: { id: true, name: true, muscleGroup: true },
-  });
-  if (!newExercise) return AuthErrors.notFound('Exercise');
+  const { newExerciseId, sets, reps, restSeconds } = body;
 
   // Verify the workout exercise belongs to this workout
   const workoutExercise = await prisma.workoutExercise.findFirst({
@@ -35,15 +24,50 @@ export const PATCH = withAuth(async (request: NextRequest, user, params) => {
   });
   if (!workoutExercise) return AuthErrors.notFound('WorkoutExercise');
 
-  // Update the workout exercise to point to the new exercise
+  // If swapping exercise
+  if (newExerciseId) {
+    const newExercise = await prisma.exercise.findUnique({
+      where: { id: newExerciseId },
+      select: { id: true, name: true, muscleGroup: true },
+    });
+    if (!newExercise) return AuthErrors.notFound('Exercise');
+
+    const updated = await prisma.workoutExercise.update({
+      where: { id: workoutExerciseId },
+      data: {
+        exerciseId: newExerciseId,
+        variationId: null,
+        wasSpicy: false,
+        notes: null,
+      },
+      include: {
+        exercise: {
+          include: {
+            videos: {
+              where: { status: 'approved' },
+              orderBy: { isPrimary: 'desc' },
+            },
+          },
+        },
+        variation: true,
+      },
+    });
+    return NextResponse.json(updated);
+  }
+
+  // Otherwise update sets/reps/rest
+  const updateData: Record<string, unknown> = {};
+  if (typeof sets === 'number' && sets > 0) updateData.sets = sets;
+  if (typeof reps === 'string' && reps.trim()) updateData.reps = reps.trim();
+  if (typeof restSeconds === 'number' && restSeconds >= 0) updateData.restSeconds = restSeconds;
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+  }
+
   const updated = await prisma.workoutExercise.update({
     where: { id: workoutExerciseId },
-    data: {
-      exerciseId: newExerciseId,
-      variationId: null,
-      wasSpicy: false,
-      notes: null,
-    },
+    data: updateData,
     include: {
       exercise: {
         include: {

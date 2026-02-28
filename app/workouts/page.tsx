@@ -543,15 +543,43 @@ function RoutineExerciseRow({
   tip,
   lastLog,
   onSwap,
+  onUpdate,
 }: {
   ex: WorkoutExercise;
   globalIndex: number;
   tip: string | null;
   lastLog: SetLog[] | null;
   onSwap: () => void;
+  onUpdate: (updates: { sets?: number; reps?: string; restSeconds?: number }) => void;
 }) {
   const [showVideo, setShowVideo] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editSets, setEditSets] = useState(ex.sets);
+  const [editReps, setEditReps] = useState(ex.reps ?? '');
+  const [editRest, setEditRest] = useState(ex.restSeconds ?? 0);
   const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
+  const setsInputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = () => {
+    setEditSets(ex.sets);
+    setEditReps(ex.reps ?? '');
+    setEditRest(ex.restSeconds ?? 0);
+    setEditing(true);
+    setTimeout(() => setsInputRef.current?.focus(), 50);
+  };
+
+  const saveEdit = () => {
+    const updates: { sets?: number; reps?: string; restSeconds?: number } = {};
+    if (editSets !== ex.sets) updates.sets = editSets;
+    if (editReps !== (ex.reps ?? '')) updates.reps = editReps;
+    if (editRest !== (ex.restSeconds ?? 0)) updates.restSeconds = editRest;
+    if (Object.keys(updates).length > 0) {
+      onUpdate(updates);
+    }
+    setEditing(false);
+  };
+
+  const cancelEdit = () => setEditing(false);
 
   return (
     <div className="py-2 border-b border-slate-800/40 last:border-0">
@@ -600,14 +628,57 @@ function RoutineExerciseRow({
           </div>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-sm text-primary font-bold tabular-nums">
-            {ex.sets} x {ex.reps ?? '?'}
-          </p>
-          {ex.weightKg != null && (
-            <p className="text-[10px] text-muted">{ex.weightKg} kg</p>
-          )}
-          {ex.restSeconds != null && (
-            <p className="text-[10px] text-slate-600">{ex.restSeconds}s rest</p>
+          {editing ? (
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-1">
+                <input
+                  ref={setsInputRef}
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={editSets}
+                  onChange={(e) => setEditSets(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-8 bg-slate-800 text-white text-xs text-center rounded px-1 py-0.5 border border-slate-700 focus:border-emerald-500 outline-none"
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                />
+                <span className="text-xs text-muted">x</span>
+                <input
+                  type="text"
+                  value={editReps}
+                  onChange={(e) => setEditReps(e.target.value)}
+                  placeholder="8-12"
+                  className="w-12 bg-slate-800 text-white text-xs text-center rounded px-1 py-0.5 border border-slate-700 focus:border-emerald-500 outline-none"
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  value={editRest}
+                  onChange={(e) => setEditRest(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-10 bg-slate-800 text-white text-xs text-center rounded px-1 py-0.5 border border-slate-700 focus:border-emerald-500 outline-none"
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                />
+                <span className="text-[10px] text-muted">s rest</span>
+              </div>
+              <div className="flex gap-1.5 mt-0.5">
+                <button onClick={saveEdit} className="text-[10px] text-emerald-400 font-medium hover:text-emerald-300">Save</button>
+                <button onClick={cancelEdit} className="text-[10px] text-slate-500 hover:text-slate-400">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={startEdit} className="text-right group" title="Tap to edit sets & reps">
+              <p className="text-sm text-primary font-bold tabular-nums group-hover:text-emerald-300 transition-colors">
+                {ex.sets} x {ex.reps ?? '?'}
+              </p>
+              {ex.weightKg != null && (
+                <p className="text-[10px] text-muted">{ex.weightKg} kg</p>
+              )}
+              {ex.restSeconds != null && (
+                <p className="text-[10px] text-slate-600">{ex.restSeconds}s rest</p>
+              )}
+            </button>
           )}
         </div>
       </div>
@@ -763,6 +834,7 @@ function RoutineDetail({
   onDeleteSession,
   onSwapExercise,
   onAddExercise,
+  onUpdateExercise,
 }: {
   workouts: Workout[];
   onBack: () => void;
@@ -775,6 +847,7 @@ function RoutineDetail({
   onDeleteSession: (workoutId: string) => void;
   onSwapExercise: (workoutId: string, workoutExerciseId: string, newExerciseId: string) => Promise<void>;
   onAddExercise: (workoutId: string, exerciseId: string) => Promise<void>;
+  onUpdateExercise: (workoutId: string, workoutExerciseId: string, updates: { sets?: number; reps?: string; restSeconds?: number }) => Promise<void>;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -992,6 +1065,7 @@ function RoutineDetail({
                   tip={getCoachingTip(ex)}
                   lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                   onSwap={() => setSwappingExercise(ex)}
+                  onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                 />
               ))}
             </div>
@@ -1012,6 +1086,7 @@ function RoutineDetail({
                       tip={getCoachingTip(ex)}
                       lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                       onSwap={() => setSwappingExercise(ex)}
+                      onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                     />
                   ))}
                 </div>
@@ -1848,6 +1923,21 @@ export default function WorkoutsPage() {
     }
   };
 
+  const handleUpdateExercise = async (
+    workoutId: string,
+    workoutExerciseId: string,
+    updates: { sets?: number; reps?: string; restSeconds?: number }
+  ) => {
+    const res = await fetch(`/api/workouts/${workoutId}/exercises/${workoutExerciseId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) {
+      fetchWorkouts();
+    }
+  };
+
   const handleAddExercise = async (workoutId: string, exerciseId: string) => {
     const res = await fetch(`/api/workouts/${workoutId}/exercises`, {
       method: 'POST',
@@ -1911,6 +2001,7 @@ export default function WorkoutsPage() {
           onDeleteSession={handleDeleteSession}
           onSwapExercise={handleSwapExercise}
           onAddExercise={handleAddExercise}
+          onUpdateExercise={handleUpdateExercise}
         />
       </div>
     );
