@@ -657,10 +657,10 @@ function RoutineExerciseRow({
                   min={0}
                   value={editRest}
                   onChange={(e) => setEditRest(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-10 bg-slate-800 text-white text-xs text-center rounded px-1 py-0.5 border border-slate-700 focus:border-emerald-500 outline-none"
+                  className="w-12 bg-slate-800 text-white text-sm text-center rounded px-1.5 py-1 border border-slate-700 focus:border-emerald-500 outline-none"
                   onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
                 />
-                <span className="text-[10px] text-muted">s rest</span>
+                <span className="text-xs text-muted">s rest</span>
               </div>
               <div className="flex gap-1.5 mt-0.5">
                 <button onClick={saveEdit} className="text-[10px] text-emerald-400 font-medium hover:text-emerald-300">Save</button>
