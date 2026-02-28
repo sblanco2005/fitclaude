@@ -1288,7 +1288,7 @@ function ExerciseLogRow({
                 className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
                   plateMode
                     ? 'text-amber-400'
-                    : 'text-slate-600 hover:text-slate-400'
+                    : 'text-amber-500/70 hover:text-amber-400'
                 }`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="shrink-0">
@@ -1426,6 +1426,7 @@ function ActiveWorkout({
   const [restTotal, setRestTotal] = useState(0);
   const restIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restRemainingRef = useRef<number | null>(null);
+  const restExerciseRef = useRef<string | null>(null); // which exercise started the rest timer
   const audioCtxRef = useRef<AudioContext | null>(null);
   const hasRestPeriods = latest.exercises.some((ex) => ex.restSeconds && ex.restSeconds > 0);
 
@@ -1451,6 +1452,7 @@ function ActiveWorkout({
       restIntervalRef.current = null;
     }
     restRemainingRef.current = null;
+    restExerciseRef.current = null;
     setRestRemaining(null);
   }, []);
 
@@ -1496,7 +1498,13 @@ function ActiveWorkout({
       next.set(exerciseId, logs);
       // Start rest timer only when a new set was added (not removed)
       if (logs.length > prevLogs.length && restSeconds && restSeconds > 0) {
-        startRest(restSeconds);
+        // Don't reset an active timer from a different exercise
+        const timerRunning = restRemainingRef.current !== null && restRemainingRef.current > 0;
+        const sameExercise = restExerciseRef.current === exerciseId;
+        if (!timerRunning || sameExercise) {
+          restExerciseRef.current = exerciseId;
+          startRest(restSeconds);
+        }
       }
       return next;
     });
