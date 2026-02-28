@@ -1664,6 +1664,22 @@ function ActiveWorkout({
 
       {/* Exercise list */}
       <div className="mt-3 space-y-0.5">
+        {/* Sticky rest timer — stays visible when scrolling through exercises */}
+        {isRunning && hasRestPeriods && restRemaining !== null && (
+          <div className="sticky top-0 z-20 flex items-center justify-center py-2 -mx-4 px-4 bg-background/90 backdrop-blur-md border-b border-slate-800/50">
+            <span className="text-xs text-muted uppercase tracking-wider font-bold mr-2">Rest</span>
+            <span className={`text-lg font-black tabular-nums ${
+              restRemaining <= 5 ? 'text-red-400 animate-pulse' : 'text-amber-400'
+            }`}>
+              {formatTimer(restRemaining)}
+            </span>
+            <button onClick={cancelRest} className="ml-3 p-2 text-slate-600 active:text-white">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
         {latest.exercises.map((ex, i) => (
           <ExerciseLogRow
             key={ex.id}
