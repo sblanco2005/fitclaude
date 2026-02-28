@@ -74,7 +74,8 @@ async def _load_conversation_history(
         .limit(limit)
     )
     rows = list(reversed(result.scalars().all()))
-    return [{"role": r.role, "content": r.content} for r in rows]
+    # Filter out messages with empty content — can happen when user sends image-only
+    return [{"role": r.role, "content": r.content} for r in rows if r.content]
 
 
 async def _execute_tool(
@@ -847,6 +848,7 @@ async def handle_chat(
 
     # Build user content — text only, or text + image for vision
     if image_base64 and image_media_type:
+        text = user_message or "Analyze this image and log the nutrition info."
         user_content = [
             {
                 "type": "image",
@@ -856,7 +858,7 @@ async def handle_chat(
                     "data": image_base64,
                 },
             },
-            {"type": "text", "text": user_message},
+            {"type": "text", "text": text},
         ]
     else:
         user_content = user_message
