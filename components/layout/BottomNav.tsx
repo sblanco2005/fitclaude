@@ -65,7 +65,7 @@ export function BottomNav() {
               }`}
             >
               {item.icon}
-              <span className="text-[11px] font-medium">{item.label}</span>
+              <span className="text-[11px] font-medium truncate max-w-full">{item.label}</span>
             </Link>
           );
         })}

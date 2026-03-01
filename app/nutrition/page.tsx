@@ -24,9 +24,9 @@ function ProgressBar({ current, target, label, color }: {
 
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-sm">
-        <span className="text-slate-300">{label}</span>
-        <span className="text-muted">{Math.round(current)} / {target}</span>
+      <div className="flex justify-between text-sm gap-2">
+        <span className="text-slate-300 whitespace-nowrap">{label}</span>
+        <span className="text-muted shrink-0">{Math.round(current)} / {target}</span>
       </div>
       <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
         <div
@@ -133,7 +133,7 @@ function MealRow({
               key={type}
               type="button"
               onClick={() => setMealType(mealType === type ? '' : type)}
-              className={`flex-1 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors ${
+              className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors ${
                 mealType === type
                   ? 'bg-primary/20 text-primary border border-primary/30'
                   : 'bg-slate-800 text-slate-500 border border-transparent hover:text-slate-300'
@@ -145,7 +145,7 @@ function MealRow({
         </div>
 
         {/* Macros grid */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div>
             <label className="text-[9px] text-muted uppercase tracking-widest font-bold">Cal</label>
             <input
@@ -214,7 +214,7 @@ function MealRow({
               disabled={saving}
               className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
             >
-              Delete?
+              Confirm Delete
             </button>
           )}
         </div>
@@ -247,7 +247,10 @@ function MealRow({
           {log.mealType && (
             <span className="text-xs text-muted capitalize">{log.mealType}</span>
           )}
-          <span className="text-[10px] text-slate-600">hold to edit</span>
+          <span className="text-[10px] text-slate-600 flex items-center gap-0.5">
+            <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="4" cy="12" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="20" cy="12" r="2.5"/></svg>
+            hold to edit
+          </span>
         </div>
       </div>
       <div className="text-right text-xs text-muted whitespace-nowrap shrink-0 ml-3">
@@ -740,8 +743,10 @@ export default function NutritionPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-muted">Loading nutrition...</div>
+      <div className="p-4 space-y-4 max-w-lg mx-auto">
+        <div className="h-6 w-24 bg-slate-800 rounded animate-pulse" />
+        <div className="h-32 bg-slate-800/60 rounded-xl animate-pulse" />
+        <div className="h-40 bg-slate-800/60 rounded-xl animate-pulse" />
       </div>
     );
   }

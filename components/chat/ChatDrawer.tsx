@@ -381,9 +381,9 @@ export function ChatDrawer() {
                 </div>
                 <div className="flex-1 pt-2">
                   <div className="flex gap-1.5">
-                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '0.6s' }} />
+                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '100ms', animationDuration: '0.6s' }} />
+                    <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '200ms', animationDuration: '0.6s' }} />
                   </div>
                 </div>
               </div>
@@ -400,7 +400,7 @@ export function ChatDrawer() {
               <img src={imagePreview} alt="Preview" className="h-16 rounded-xl border border-slate-700" />
               <button
                 onClick={clearImage}
-                className="absolute -top-2 -right-2 w-5 h-5 bg-slate-600 hover:bg-danger rounded-full flex items-center justify-center text-white transition-colors"
+                className="absolute -top-3 -right-3 w-8 h-8 bg-slate-600 hover:bg-danger active:bg-danger rounded-full flex items-center justify-center text-white transition-colors active:scale-[0.95]"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -439,7 +439,7 @@ export function ChatDrawer() {
             <button
               onClick={handleSend}
               disabled={chatLoading || (!input.trim() && !imageData)}
-              className="w-8 h-8 rounded-full bg-primary hover:bg-primary-dark disabled:bg-slate-700 disabled:text-slate-500 flex items-center justify-center text-white transition-colors shrink-0 mb-0.5"
+              className="w-8 h-8 rounded-full bg-primary hover:bg-primary-dark disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors shrink-0 mb-0.5"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
