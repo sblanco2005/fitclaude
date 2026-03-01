@@ -136,12 +136,10 @@ function RoutineCard({
   name,
   workouts,
   onClick,
-  onSpin,
 }: {
   name: string;
   workouts: Workout[];
   onClick: () => void;
-  onSpin: () => void;
 }) {
   const latest = workouts[0];
   const typeColor = TYPE_COLORS[latest.workoutType] ?? 'default';
@@ -180,30 +178,15 @@ function RoutineCard({
         </div>
       </div>
 
-      {/* Row 2: swap (left) + stats + muscles */}
+      {/* Row 2: stats + muscles */}
       <div className="flex items-center gap-2 mt-1 ml-0.5">
-        {/* Swap — bottom-left, far from Hit It */}
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => { e.stopPropagation(); onSpin(); }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onSpin(); } }}
-          className="flex items-center gap-1 text-[10px] font-medium text-amber-400/50 hover:text-amber-400 transition-colors cursor-pointer"
-          title="Regenerate routine"
-        >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-          </svg>
-          Swap
-        </span>
-        <span className="text-slate-700">·</span>
         <span className="text-[11px] text-slate-500">{workouts.length}x done</span>
         {isLifting && muscles.length > 0 && (
           <>
-            <span className="text-slate-700">·</span>
+            <span className="text-slate-700">&middot;</span>
             <span className="text-[10px] text-slate-500/80 uppercase tracking-wider truncate">
-              {muscles.slice(0, 3).join(' · ')}
-              {muscles.length > 3 && ` +${muscles.length - 3}`}
+              {muscles.slice(0, 2).join(' · ')}
+              {muscles.length > 2 && ` +${muscles.length - 2}`}
             </span>
           </>
         )}
@@ -835,6 +818,7 @@ function RoutineDetail({
   onSwapExercise,
   onAddExercise,
   onUpdateExercise,
+  onSpin,
 }: {
   workouts: Workout[];
   onBack: () => void;
@@ -848,6 +832,7 @@ function RoutineDetail({
   onSwapExercise: (workoutId: string, workoutExerciseId: string, newExerciseId: string) => Promise<void>;
   onAddExercise: (workoutId: string, exerciseId: string) => Promise<void>;
   onUpdateExercise: (workoutId: string, workoutExerciseId: string, updates: { sets?: number; reps?: string; restSeconds?: number }) => Promise<void>;
+  onSpin: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -978,6 +963,12 @@ function RoutineDetail({
                         className="w-full text-left px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                       >
                         Add Exercise
+                      </button>
+                      <button
+                        onClick={() => { setMenuOpen(false); onSpin(); }}
+                        className="w-full text-left px-4 py-2 text-xs font-medium text-amber-400 hover:bg-slate-700 hover:text-amber-300 transition-colors"
+                      >
+                        Swap / Regenerate
                       </button>
                       <button
                         onClick={startRename}
@@ -1416,6 +1407,7 @@ function ActiveWorkout({
   const [isRunning, setIsRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<null | 'success' | 'error'>(null);
   const [autoStopped, setAutoStopped] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -1574,6 +1566,7 @@ function ActiveWorkout({
   const handleFinish = async () => {
     stop();
     setSaving(true);
+    setSaveStatus(null);
 
     // Save logs to API
     const exercisePayload = Array.from(exerciseLogs.entries())
@@ -1582,7 +1575,7 @@ function ActiveWorkout({
 
     if (exercisePayload.length > 0) {
       try {
-        await fetch(`/api/workouts/${latest.id}/log`, {
+        const res = await fetch(`/api/workouts/${latest.id}/log`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1590,13 +1583,27 @@ function ActiveWorkout({
             durationMinutes: Math.ceil(elapsed / 60),
           }),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        setSaving(false);
+        setSaveStatus('success');
+        navigator.vibrate?.(200);
+        setTimeout(() => onFinish(routineName, elapsed, exerciseLogs), 2000);
+        return;
       } catch {
-        // Still mark as finished even if save fails
+        setSaving(false);
+        setSaveStatus('error');
+        return;
       }
     }
 
     setSaving(false);
     onFinish(routineName, elapsed, exerciseLogs);
+  };
+
+  const retryFinish = () => {
+    setSaveStatus(null);
+    handleFinish();
   };
 
   const loggedCount = Array.from(exerciseLogs.values()).filter((l) => l.length > 0).length;
@@ -1734,6 +1741,26 @@ function ActiveWorkout({
           </div>
         )}
       </div>
+
+      {/* Save feedback banners */}
+      {saveStatus === 'success' && (
+        <div className="mt-3 px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-center">
+          <p className="text-xs font-bold text-emerald-400">
+            Workout saved &mdash; {Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged
+          </p>
+        </div>
+      )}
+      {saveStatus === 'error' && (
+        <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/30 flex items-center justify-between">
+          <p className="text-xs font-bold text-red-400">Save failed</p>
+          <button
+            onClick={retryFinish}
+            className="px-3 py-1 rounded-md bg-red-500/20 text-red-300 text-xs font-bold hover:bg-red-500/30 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
     </Card>
   );
 }
@@ -1874,6 +1901,8 @@ export default function WorkoutsPage() {
   const [categoryFilter, setCategoryFilter] = useState<Category>('all');
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
   const [routineSearch, setRoutineSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
   const [finishedWorkouts, setFinishedWorkouts] = useState<
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
   >([]);
@@ -1982,6 +2011,8 @@ export default function WorkoutsPage() {
     }
     return ms;
   }, [routineGroups]);
+
+  const activeFilterCount = (categoryFilter !== 'all' ? 1 : 0) + (muscleFilter ? 1 : 0);
 
   const selectedGroup = selectedRoutine
     ? routineGroups.find(([k]) => k === selectedRoutine)?.[1] ?? null
@@ -2144,8 +2175,10 @@ export default function WorkoutsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-muted text-sm font-medium tracking-wide">Loading workouts...</div>
+      <div className="flex flex-col h-full max-w-lg mx-auto px-4 pt-6 space-y-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="animate-pulse rounded-xl bg-slate-800/60 h-16 w-full" />
+        ))}
       </div>
     );
   }
@@ -2167,6 +2200,7 @@ export default function WorkoutsPage() {
           onSwapExercise={handleSwapExercise}
           onAddExercise={handleAddExercise}
           onUpdateExercise={handleUpdateExercise}
+          onSpin={() => requestSpin(selectedRoutine!)}
         />
       </div>
     );
@@ -2203,71 +2237,110 @@ export default function WorkoutsPage() {
       {/* Routines Tab — full-width list */}
       {tab === 'routines' && (
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          {/* Category filter pills */}
-          {activeCategories.size > 1 && (
-            <div className="flex gap-1.5 px-4 pb-3 overflow-x-auto scrollbar-hide">
-              {CATEGORIES.filter((c) => c === 'all' || activeCategories.has(c)).map((cat) => (
+          {/* Compact toolbar: search + filter toggle */}
+          <div className="flex items-center gap-2 px-4 pb-2">
+            {searchExpanded ? (
+              <div className="flex-1 relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  autoFocus
+                  value={routineSearch}
+                  onChange={(e) => setRoutineSearch(e.target.value)}
+                  placeholder="Search routines..."
+                  className="w-full pl-9 pr-8 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/30 transition-colors"
+                />
                 <button
-                  key={cat}
-                  onClick={() => { setCategoryFilter(cat); setMuscleFilter(null); }}
-                  className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
-                    categoryFilter === cat
-                      ? cat === 'all'
-                        ? 'bg-primary/20 text-primary border-primary/30'
-                        : CATEGORY_COLORS[cat] || 'bg-slate-700 text-white border-slate-600'
-                      : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Muscle group filter pills */}
-          {activeMuscles.size > 1 && (
-            <div className="flex gap-1.5 px-4 pb-2 overflow-x-auto scrollbar-hide">
-              {MUSCLE_PILL_ORDER.filter((m) => activeMuscles.has(m)).map((muscle) => (
-                <button
-                  key={muscle}
-                  onClick={() => setMuscleFilter(muscleFilter === muscle ? null : muscle)}
-                  className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
-                    muscleFilter === muscle
-                      ? (MUSCLE_COLORS[muscle] || 'bg-slate-500/20 text-slate-300') + ' border-transparent'
-                      : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
-                  }`}
-                >
-                  {muscle}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Search bar */}
-          <div className="px-4 pb-3">
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                value={routineSearch}
-                onChange={(e) => setRoutineSearch(e.target.value)}
-                placeholder="Search routines, muscles, exercises…"
-                className="w-full pl-9 pr-8 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/30 transition-colors"
-              />
-              {routineSearch && (
-                <button
-                  onClick={() => setRoutineSearch('')}
+                  onClick={() => { setSearchExpanded(false); setRoutineSearch(''); }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => setSearchExpanded(true)}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  title="Search routines"
+                >
+                  <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </button>
+                {(activeCategories.size > 1 || activeMuscles.size > 1) && (
+                  <button
+                    onClick={() => setFilterOpen((v) => !v)}
+                    className={`relative p-2 rounded-lg transition-colors ${
+                      filterOpen ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                    title="Filter routines"
+                  >
+                    <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    {activeFilterCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Filter panel */}
+          {filterOpen && !searchExpanded && (
+            <div className="px-4 pb-3 space-y-2">
+              {activeCategories.size > 1 && (
+                <div>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Category</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CATEGORIES.filter((c) => c === 'all' || activeCategories.has(c)).map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => { setCategoryFilter(cat); setMuscleFilter(null); }}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
+                          categoryFilter === cat
+                            ? cat === 'all'
+                              ? 'bg-primary/20 text-primary border-primary/30'
+                              : CATEGORY_COLORS[cat] || 'bg-slate-700 text-white border-slate-600'
+                            : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {activeMuscles.size > 1 && (
+                <div>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Muscle</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MUSCLE_PILL_ORDER.filter((m) => activeMuscles.has(m)).map((muscle) => (
+                      <button
+                        key={muscle}
+                        onClick={() => setMuscleFilter(muscleFilter === muscle ? null : muscle)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
+                          muscleFilter === muscle
+                            ? (MUSCLE_COLORS[muscle] || 'bg-slate-500/20 text-slate-300') + ' border-transparent'
+                            : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
+                        }`}
+                      >
+                        {muscle}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-          </div>
+          )}
 
           <div className="px-4 pb-4 space-y-2">
           {filteredRoutineGroups.length === 0 ? (
@@ -2282,6 +2355,14 @@ export default function WorkoutsPage() {
                         ? `No ${muscleFilter} routines${categoryFilter !== 'all' ? ` in ${categoryFilter}` : ''}.`
                         : `No ${categoryFilter} routines yet.`}
                 </p>
+                {routineGroups.length === 0 && (
+                  <button
+                    onClick={() => { setChatTopic('workout'); setChatOpen(true); }}
+                    className="mt-3 px-4 py-2 rounded-lg bg-primary text-white text-xs font-bold tracking-wide uppercase hover:bg-primary-dark transition-colors"
+                  >
+                    Generate a Routine
+                  </button>
+                )}
               </Card>
             </div>
           ) : (
@@ -2291,7 +2372,6 @@ export default function WorkoutsPage() {
                 name={key}
                 workouts={group}
                 onClick={() => setSelectedRoutine(key)}
-                onSpin={() => requestSpin(key)}
               />
             ))
           )}
@@ -2311,6 +2391,12 @@ export default function WorkoutsPage() {
                 <p className="text-sm text-muted mt-2 font-medium">
                   Queue a routine to start training
                 </p>
+                <button
+                  onClick={() => setTab('routines')}
+                  className="mt-4 px-4 py-2 rounded-lg bg-slate-700 text-white text-xs font-bold tracking-wide uppercase hover:bg-slate-600 transition-colors"
+                >
+                  Browse Routines
+                </button>
               </div>
             </div>
           ) : (
@@ -2356,6 +2442,12 @@ export default function WorkoutsPage() {
                   <p className="text-sm text-muted mt-2 font-medium">
                     Complete a workout or log an activity to see it here
                   </p>
+                  <button
+                    onClick={() => setTab('routines')}
+                    className="mt-4 px-4 py-2 rounded-lg bg-slate-700 text-white text-xs font-bold tracking-wide uppercase hover:bg-slate-600 transition-colors"
+                  >
+                    Start a Workout
+                  </button>
                 </div>
               </div>
             ) : (
