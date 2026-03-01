@@ -231,7 +231,7 @@ export function ChatDrawer() {
       <div className="shrink-0 px-3 py-2 bg-background border-t border-primary/20">
         {hiddenFileInput}
         <div
-          className="flex items-center gap-2 bg-slate-800/70 border border-primary/30 rounded-2xl px-3 py-2.5 cursor-text shadow-[0_0_12px_rgba(16,185,129,0.08)]"
+          className="flex items-center gap-2 bg-slate-800/70 border border-primary/30 rounded-2xl px-3 py-2.5 cursor-text shadow-[0_0_12px_rgba(16,185,129,0.08)] active:scale-[0.98] active:bg-slate-800/90 transition-all"
           onClick={() => setChatOpen(true)}
         >
           {/* Coach avatar */}
@@ -248,7 +248,7 @@ export function ChatDrawer() {
               e.stopPropagation();
               fileInputRef.current?.click();
             }}
-            className="w-7 h-7 rounded-full hover:bg-slate-700/60 flex items-center justify-center text-slate-500 hover:text-white transition-colors shrink-0"
+            className="w-9 h-9 rounded-full hover:bg-slate-700/60 active:bg-slate-700/80 flex items-center justify-center text-slate-500 hover:text-white transition-colors shrink-0"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

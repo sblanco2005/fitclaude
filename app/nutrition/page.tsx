@@ -62,7 +62,7 @@ function MealRow({
   const [fatG, setFatG] = useState(String(log.fatG ?? ''));
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const lastTapRef = useRef(0);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startEdit = () => {
     setRawInput(log.rawInput);
@@ -222,18 +222,24 @@ function MealRow({
     );
   }
 
-  const handleTap = () => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 350) {
+  const handleTouchStart = () => {
+    longPressTimer.current = setTimeout(() => {
       startEdit();
-    }
-    lastTapRef.current = now;
+      navigator.vibrate?.(10);
+    }, 400);
+  };
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
   };
 
   return (
     <div
-      onClick={handleTap}
-      className="flex items-start justify-between py-2 border-b border-slate-800 last:border-0 group cursor-pointer active:bg-slate-800/30 transition-colors"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onDoubleClick={startEdit}
+      className="flex items-start justify-between py-2 min-h-[52px] border-b border-slate-800 last:border-0 group cursor-pointer active:bg-slate-800/30 transition-colors"
     >
       <div className="min-w-0 flex-1">
         <p className="text-sm text-white">{cleanRawInput(log.rawInput)}</p>
@@ -241,7 +247,7 @@ function MealRow({
           {log.mealType && (
             <span className="text-xs text-muted capitalize">{log.mealType}</span>
           )}
-          <span className="text-[10px] text-slate-600">double-tap to edit</span>
+          <span className="text-[10px] text-slate-600">hold to edit</span>
         </div>
       </div>
       <div className="text-right text-xs text-muted whitespace-nowrap shrink-0 ml-3">

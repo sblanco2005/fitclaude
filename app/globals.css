@@ -45,7 +45,7 @@ body {
 }
 
 @utility glass-hover {
-  &:hover {
+  &:hover, &:active {
     background: rgba(51, 65, 85, 0.7);
     border-color: rgba(148, 163, 184, 0.2);
   }
