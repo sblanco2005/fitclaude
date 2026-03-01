@@ -1479,25 +1479,31 @@ function ActiveWorkout({
   // Map of exerciseId -> SetLog[]
   const [exerciseLogs, setExerciseLogs] = useState<Map<string, SetLog[]>>(new Map());
 
-  const updateLogs = useCallback((exerciseId: string, logs: SetLog[], restSeconds?: number) => {
+  const updateLogs = useCallback((exerciseId: string, logs: SetLog[], restSeconds?: number, totalSets?: number) => {
     lastActivityRef.current = Date.now();
     setExerciseLogs((prev) => {
       const next = new Map(prev);
       const prevLogs = prev.get(exerciseId) ?? [];
       next.set(exerciseId, logs);
-      // Start rest timer only when a new set was added (not removed)
-      if (logs.length > prevLogs.length && restSeconds && restSeconds > 0) {
-        // Don't reset an active timer from a different exercise
-        const timerRunning = restRemainingRef.current !== null && restRemainingRef.current > 0;
-        const sameExercise = restExerciseRef.current === exerciseId;
-        if (!timerRunning || sameExercise) {
-          restExerciseRef.current = exerciseId;
-          startRest(restSeconds);
-        }
+
+      const isNewSet = logs.length > prevLogs.length;
+      const isDifferentExercise = restExerciseRef.current !== null && restExerciseRef.current !== exerciseId;
+
+      // If user starts logging a different exercise, cancel any running rest timer
+      if (isNewSet && isDifferentExercise) {
+        cancelRest();
       }
+
+      // Start rest timer only when ALL prescribed sets for this exercise are done
+      const prescribed = totalSets || 3;
+      if (isNewSet && logs.length >= prescribed && restSeconds && restSeconds > 0) {
+        restExerciseRef.current = exerciseId;
+        startRest(restSeconds);
+      }
+
       return next;
     });
-  }, [startRest]);
+  }, [startRest, cancelRest]);
 
   const stopRef = useRef<() => void>(() => {});
 
@@ -1691,7 +1697,7 @@ function ActiveWorkout({
             index={i}
             isRunning={isRunning}
             logs={exerciseLogs.get(ex.id) ?? []}
-            onUpdateLogs={(logs, restSecs) => updateLogs(ex.id, logs, restSecs)}
+            onUpdateLogs={(logs, restSecs) => updateLogs(ex.id, logs, restSecs, ex.sets)}
             lastLogs={getLastLogForExercise(allWorkouts, getExerciseName(ex), latest.id)}
             onSwap={onSwapExercise ? () => onSwapExercise(latest.id, ex.id) : undefined}
           />
