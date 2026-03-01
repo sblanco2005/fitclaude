@@ -214,7 +214,7 @@ function MealRow({
               disabled={saving}
               className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
             >
-              Delete?
+              Confirm Delete
             </button>
           )}
         </div>
@@ -247,7 +247,10 @@ function MealRow({
           {log.mealType && (
             <span className="text-xs text-muted capitalize">{log.mealType}</span>
           )}
-          <span className="text-[10px] text-slate-600">hold to edit</span>
+          <span className="text-[10px] text-slate-600 flex items-center gap-0.5">
+            <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="4" cy="12" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="20" cy="12" r="2.5"/></svg>
+            hold to edit
+          </span>
         </div>
       </div>
       <div className="text-right text-xs text-muted whitespace-nowrap shrink-0 ml-3">

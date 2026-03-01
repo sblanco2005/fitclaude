@@ -100,6 +100,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Today's Summary — two blocks */}
+      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Today</h3>
       <div className="grid grid-cols-2 gap-3">
         {/* Nutrition block */}
         <Card className="p-3">
@@ -152,7 +153,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
                       <span className="text-[10px] text-muted">{w.exercises?.length || 0} exercises</span>
-                      <span className="text-[9px] font-medium text-primary bg-primary/15 px-1.5 py-0.5 rounded-full">Done</span>
+                      <span className="text-[9px] font-medium text-white bg-primary/30 px-1.5 py-0.5 rounded-full">Done</span>
                     </div>
                   </div>
                 </Link>
@@ -162,7 +163,7 @@ export default function DashboardPage() {
                   <div className="text-xs font-medium text-white truncate capitalize">{a.name}</div>
                   <div className="flex items-center justify-between mt-0.5">
                     <span className="text-[10px] text-muted">{a.durationMinutes ? `${a.durationMinutes} min` : 'Activity'}</span>
-                    <span className="text-[9px] font-medium text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded-full">Activity</span>
+                    <span className="text-[9px] font-medium text-white bg-amber-500/30 px-1.5 py-0.5 rounded-full">Activity</span>
                   </div>
                 </div>
               ))}
@@ -184,8 +185,8 @@ export default function DashboardPage() {
               <h3 className="font-semibold text-white">Exercise Library</h3>
               <p className="text-sm text-muted">Browse exercises and spicy variations</p>
             </div>
-            <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
             </svg>
           </div>
         </Card>
