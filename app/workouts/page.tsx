@@ -1481,29 +1481,34 @@ function ActiveWorkout({
 
   const updateLogs = useCallback((exerciseId: string, logs: SetLog[], restSeconds?: number, totalSets?: number) => {
     lastActivityRef.current = Date.now();
-    setExerciseLogs((prev) => {
-      const next = new Map(prev);
-      const prevLogs = prev.get(exerciseId) ?? [];
-      next.set(exerciseId, logs);
 
-      const isNewSet = logs.length > prevLogs.length;
+    // Read previous logs before updating state
+    const prevLogs = exerciseLogs.get(exerciseId) ?? [];
+    const isNewSet = logs.length > prevLogs.length;
+
+    // Handle rest timer logic outside of state updater (side effects)
+    if (isNewSet) {
       const isDifferentExercise = restExerciseRef.current !== null && restExerciseRef.current !== exerciseId;
 
       // If user starts logging a different exercise, cancel any running rest timer
-      if (isNewSet && isDifferentExercise) {
+      if (isDifferentExercise) {
         cancelRest();
       }
 
       // Start rest timer only when ALL prescribed sets for this exercise are done
       const prescribed = totalSets || 3;
-      if (isNewSet && logs.length >= prescribed && restSeconds && restSeconds > 0) {
+      if (logs.length >= prescribed && restSeconds && restSeconds > 0) {
         restExerciseRef.current = exerciseId;
         startRest(restSeconds);
       }
+    }
 
+    setExerciseLogs((prev) => {
+      const next = new Map(prev);
+      next.set(exerciseId, logs);
       return next;
     });
-  }, [startRest, cancelRest]);
+  }, [exerciseLogs, startRest, cancelRest]);
 
   const stopRef = useRef<() => void>(() => {});
 
