@@ -33,6 +33,7 @@ from app.models import (
     Workout,
     WorkoutExercise,
 )
+from app.models.exercise_video import ExerciseVideo
 # Note: ConversationHistory is still imported for _load_conversation_history reads,
 # but conversation saving is handled by the Next.js API route (Prisma).
 
@@ -536,6 +537,21 @@ async def _tool_generate_workout(
                             f"but user only has {user_equipment}"
                         )
                         continue  # Skip this exercise
+
+                # Auto-search YouTube if matched exercise has no videos yet
+                existing_vids = await db.execute(
+                    select(ExerciseVideo.id).where(
+                        ExerciseVideo.exercise_id == found_exercise.id,
+                        ExerciseVideo.status.in_(["approved", "pending"]),
+                    )
+                )
+                if not existing_vids.first():
+                    try:
+                        vid_added = await _link_best_video(db, found_exercise)
+                        if vid_added:
+                            logger.info(f"[Coach] Auto-linked tutorial video for existing exercise '{found_exercise.name}'")
+                    except Exception as e:
+                        logger.warning(f"[Coach] Video auto-link failed for '{found_exercise.name}': {e}")
             else:
                 # Auto-add to exercise library so Video Linker can find tutorials later
                 muscle_group = ex.get("muscle_group", "full_body")
