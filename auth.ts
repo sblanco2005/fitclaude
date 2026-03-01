@@ -41,9 +41,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = user.id;
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { isOnboarded: true },
+          select: { isOnboarded: true, isAdmin: true },
         });
         session.user.isOnboarded = dbUser?.isOnboarded ?? false;
+        session.user.isAdmin = dbUser?.isAdmin ?? false;
       }
       return session;
     },
