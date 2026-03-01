@@ -50,8 +50,8 @@ export const POST = withAuth(async (request: NextRequest, user, params) => {
       exercise: {
         include: {
           videos: {
-            where: { status: 'approved' },
-            orderBy: { isPrimary: 'desc' },
+            where: { status: { in: ['approved', 'pending'] } },
+            orderBy: [{ status: 'asc' }, { isPrimary: 'desc' }],
           },
         },
       },

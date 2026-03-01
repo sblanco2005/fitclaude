@@ -540,7 +540,9 @@ function RoutineExerciseRow({
   const [editSets, setEditSets] = useState(ex.sets);
   const [editReps, setEditReps] = useState(ex.reps ?? '');
   const [editRest, setEditRest] = useState(ex.restSeconds ?? 0);
-  const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
+  const firstVideo = ex.exercise?.videos?.[0] ?? null;
+  const videoId = firstVideo?.youtubeVideoId ?? null;
+  const videoPending = firstVideo?.status === 'pending';
   const setsInputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = () => {
@@ -580,13 +582,20 @@ function RoutineExerciseRow({
               <div className="flex items-center gap-0.5 shrink-0">
                 {videoId && (
                   <button
-                    onClick={() => setShowVideo((v) => !v)}
-                    className={`shrink-0 p-1.5 rounded transition-colors ${showVideo ? 'text-red-400' : 'text-red-400/40 hover:text-red-400'}`}
-                    title="Watch tutorial"
+                    onClick={() => !videoPending && setShowVideo((v) => !v)}
+                    className={`shrink-0 p-1.5 rounded transition-colors relative ${
+                      videoPending
+                        ? 'text-amber-400/50 cursor-default'
+                        : showVideo ? 'text-red-400' : 'text-red-400/40 hover:text-red-400'
+                    }`}
+                    title={videoPending ? 'Video pending approval' : 'Watch tutorial'}
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                     </svg>
+                    {videoPending && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" />
+                    )}
                   </button>
                 )}
                 <button
@@ -667,7 +676,7 @@ function RoutineExerciseRow({
           )}
         </div>
       </div>
-      {showVideo && videoId && (
+      {showVideo && videoId && !videoPending && (
         <div className="ml-7 mt-2">
           <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
             <iframe
@@ -1162,7 +1171,9 @@ function ExerciseLogRow({
   const [barWeight, setBarWeight] = useState(45);
   const hasLogs = logs.length > 0;
 
-  const videoId = ex.exercise?.videos?.[0]?.youtubeVideoId ?? null;
+  const firstVid = ex.exercise?.videos?.[0] ?? null;
+  const videoId = firstVid?.youtubeVideoId ?? null;
+  const vidPending = firstVid?.status === 'pending';
   const numSets = ex.sets || 3;
   const isBarbell = (ex.exercise?.equipmentRequired?.toLowerCase().includes('barbell') ?? false)
     || getExerciseName(ex).toLowerCase().includes('barbell');
@@ -1236,9 +1247,12 @@ function ExerciseLogRow({
             {getExerciseName(ex)}
           </span>
           {videoId && !expanded && (
-            <svg className="w-3 h-3 text-red-400/60 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-            </svg>
+            <span className="relative shrink-0">
+              <svg className={`w-3 h-3 ${vidPending ? 'text-amber-400/50' : 'text-red-400/60'} shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+              {vidPending && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -1354,6 +1368,14 @@ function ExerciseLogRow({
       {/* YouTube tutorial video — toggle */}
       {expanded && videoId && (
         <div className="ml-7 mt-2">
+          {vidPending ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-medium text-amber-400/60">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+              Video pending approval
+            </span>
+          ) : (
           <button
             onClick={() => setShowVideo((v) => !v)}
             className={`flex items-center gap-1.5 text-[10px] font-medium transition-colors ${showVideo ? 'text-red-400' : 'text-slate-500 hover:text-red-400'}`}
@@ -1363,6 +1385,7 @@ function ExerciseLogRow({
             </svg>
             {showVideo ? 'Hide video' : 'Watch form'}
           </button>
+          )}
           {showVideo && (
             <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900 mt-1.5">
               <iframe
