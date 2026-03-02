@@ -7,6 +7,7 @@ import { useFitClaude } from '@/context/FitClaudeContext';
 import { Modal } from '@/components/ui/Modal';
 import type { Workout, WorkoutExercise, Exercise, Activity } from '@/types';
 import SetRow, { type WeightUnit, lbToKg } from '@/components/workout/SetRow';
+import FocusedExerciseView from '@/components/workout/FocusedExerciseView';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -1747,6 +1748,158 @@ function ActiveWorkout({
   const loggedCount = Array.from(exerciseLogs.values()).filter((l) => l.length > 0).length;
   const totalExercises = latest.exercises.length;
 
+  const isActive = isRunning || isPaused;
+
+  // ─── Active workout: Focused exercise-by-exercise view ───
+  if (isActive || elapsed > 0) {
+    return (
+      <div className="flex flex-col h-full -mx-4 -mt-4">
+        {/* Routine name header (compact) */}
+        <div className="flex items-center justify-between px-4 py-2 bg-[#111118]">
+          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
+            {routineName.replace(/_/g, ' ')}
+          </h4>
+          {isPaused && (
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/70">
+              Paused
+            </span>
+          )}
+        </div>
+
+        {/* Focused exercise view */}
+        <div className="flex-1 min-h-0">
+          <FocusedExerciseView
+            exercises={latest.exercises}
+            exerciseLogs={exerciseLogs}
+            onUpdateLogs={updateLogs}
+            allWorkouts={allWorkouts}
+            latestWorkoutId={latest.id}
+            onSwapExercise={onSwapExercise ? (exId) => onSwapExercise(latest.id, exId) : undefined}
+            weightUnit={weightUnit}
+            restRemaining={restRemaining}
+            restTotal={restTotal}
+            onCancelRest={cancelRest}
+            isRunning={isRunning}
+            isPaused={isPaused}
+            elapsed={elapsed}
+          />
+        </div>
+
+        {/* Action buttons */}
+        <div className="px-4 py-3 bg-[#111118] border-t border-slate-800/50 space-y-2 pb-[env(safe-area-inset-bottom)]">
+          {/* Running — Pause button */}
+          {isRunning && (
+            <button
+              onClick={pause}
+              className="w-full py-2.5 rounded-lg bg-amber-500/90 text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-amber-600 active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="5" y="4" width="5" height="16" rx="1" />
+                <rect x="14" y="4" width="5" height="16" rx="1" />
+              </svg>
+              Pause
+            </button>
+          )}
+
+          {/* Paused — Resume + Save + Discard */}
+          {isPaused && !saving && !saveStatus && (
+            <>
+              {autoStopped && (
+                <p className="text-[10px] text-amber-400 font-bold text-center uppercase tracking-wider">
+                  Auto-paused after inactivity
+                </p>
+              )}
+              <button
+                onClick={resume}
+                className="w-full py-2.5 rounded-lg bg-primary text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary-dark active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Resume
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmAction('save')}
+                  className="flex-1 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-emerald-500/30 active:scale-[0.98]"
+                >
+                  Save Workout
+                </button>
+                <button
+                  onClick={() => setConfirmAction('discard')}
+                  className="flex-1 py-2 rounded-lg bg-red-500/15 text-red-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-red-500/25 active:scale-[0.98]"
+                >
+                  Discard
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Saving spinner */}
+          {saving && (
+            <div className="w-full py-2.5 rounded-lg bg-slate-800 text-slate-400 font-bold text-sm tracking-wide uppercase text-center">
+              Saving...
+            </div>
+          )}
+
+          {/* Confirmation prompt */}
+          {confirmAction && (
+            <div className={`px-3 py-3 rounded-lg border ${
+              confirmAction === 'save'
+                ? 'bg-emerald-500/10 border-emerald-500/30'
+                : 'bg-red-500/10 border-red-500/30'
+            }`}>
+              <p className="text-xs font-bold text-center mb-2.5 text-slate-300">
+                {confirmAction === 'save'
+                  ? `Save workout? (${Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged)`
+                  : 'Discard this workout? All logged sets will be lost.'}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={confirmAction === 'save' ? handleSave : handleDiscard}
+                  className={`flex-1 py-2 rounded-lg font-bold text-xs tracking-wide uppercase transition-all active:scale-[0.98] ${
+                    confirmAction === 'save'
+                      ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                      : 'bg-red-500 text-white hover:bg-red-600'
+                  }`}
+                >
+                  {confirmAction === 'save' ? 'Yes, Save' : 'Yes, Discard'}
+                </button>
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-400 font-bold text-xs tracking-wide uppercase transition-all hover:text-white active:scale-[0.98]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Save feedback banners */}
+          {saveStatus === 'success' && (
+            <div className="px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-center">
+              <p className="text-xs font-bold text-emerald-400">
+                Workout saved &mdash; {Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged
+              </p>
+            </div>
+          )}
+          {saveStatus === 'error' && (
+            <div className="px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/30 flex items-center justify-between">
+              <p className="text-xs font-bold text-red-400">Save failed</p>
+              <button
+                onClick={retrySave}
+                className="px-3 py-1 rounded-md bg-red-500/20 text-red-300 text-xs font-bold hover:bg-red-500/30 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Pre-start: Card view with routine info + Start button ───
   return (
     <Card className="border border-border-dark">
       <div className="flex items-start justify-between gap-2">
@@ -1760,84 +1913,34 @@ function ActiveWorkout({
             </div>
           )}
         </div>
-        {!isRunning && elapsed === 0 && (
-          <button
-            onClick={() => onRemove(routineName)}
-            className="text-xs text-slate-500 hover:text-red-400 transition-colors p-1"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        )}
+        <button
+          onClick={() => onRemove(routineName)}
+          className="text-xs text-slate-500 hover:text-red-400 transition-colors p-1"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
 
-      {/* Timer + progress */}
-      <div className="mt-4 flex items-center justify-center gap-3">
-        <span className={`text-3xl font-black tabular-nums tracking-tight ${isRunning ? 'text-primary' : isPaused ? 'text-amber-400' : 'text-slate-400'}`}>
+      {/* Timer (pre-start) */}
+      <div className="mt-4 flex items-center justify-center">
+        <span className="text-3xl font-black tabular-nums tracking-tight text-slate-400">
           {formatTimer(elapsed)}
         </span>
-        {isPaused && (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/70">
-            Paused
-          </span>
-        )}
-        {/* Rest countdown timer */}
-        {isRunning && hasRestPeriods && restRemaining !== null && (
-          <div className="flex items-center gap-1">
-            <span className="text-slate-600">|</span>
-            <span className={`text-xl font-bold tabular-nums tracking-tight transition-all ${
-              restRemaining <= 5
-                ? 'text-red-400 animate-pulse'
-                : 'text-amber-400'
-            }`}>
-              {formatTimer(restRemaining)}
-            </span>
-          </div>
-        )}
-        {/* Show 0:00 placeholder when routine has rest but timer isn't active */}
-        {isRunning && hasRestPeriods && restRemaining === null && (
-          <div className="flex items-center gap-1">
-            <span className="text-slate-600">|</span>
-            <span className="text-xl font-bold tabular-nums tracking-tight text-slate-600">
-              00:00
-            </span>
-          </div>
-        )}
-        {(isRunning || isPaused) && totalExercises > 0 && (
-          <span className="text-[10px] text-muted font-bold tabular-nums">
-            {loggedCount}/{totalExercises}
-          </span>
-        )}
       </div>
 
-      {/* Exercise list */}
+      {/* Exercise preview list */}
       <div className="mt-3 space-y-0.5">
-        {/* Sticky rest timer — stays visible when scrolling through exercises */}
-        {isRunning && hasRestPeriods && restRemaining !== null && (
-          <div className="sticky top-0 z-20 flex items-center justify-center py-2 -mx-4 px-4 bg-background/90 backdrop-blur-md border-b border-slate-800/50">
-            <span className="text-xs text-muted uppercase tracking-wider font-bold mr-2">Rest</span>
-            <span className={`text-lg font-black tabular-nums ${
-              restRemaining <= 5 ? 'text-red-400 animate-pulse' : 'text-amber-400'
-            }`}>
-              {formatTimer(restRemaining)}
-            </span>
-            <button onClick={cancelRest} className="ml-3 p-2 text-slate-600 active:text-white">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
         {latest.exercises.map((ex, i) => (
           <ExerciseLogRow
             key={ex.id}
             ex={ex}
             index={i}
-            isRunning={isRunning || isPaused}
-            logs={exerciseLogs.get(ex.id) ?? []}
-            onUpdateLogs={(logs, restSecs) => updateLogs(ex.id, logs, restSecs, ex.sets)}
+            isRunning={false}
+            logs={[]}
+            onUpdateLogs={() => {}}
             lastLogs={getLastLogForExercise(allWorkouts, getExerciseName(ex), latest.id)}
             onSwap={onSwapExercise ? () => onSwapExercise(latest.id, ex.id) : undefined}
             defaultUnit={weightUnit}
@@ -1845,130 +1948,14 @@ function ActiveWorkout({
         ))}
       </div>
 
-      {/* Hint when running */}
-      {(isRunning || isPaused) && loggedCount === 0 && (
-        <p className="text-[10px] text-slate-600 text-center mt-3 font-medium">
-          Tap an exercise to log your sets
-        </p>
-      )}
-
-      {/* Action buttons */}
-      <div className="mt-5 space-y-2">
-        {/* Initial state — Start */}
-        {!isRunning && !isPaused && elapsed === 0 && !saveStatus && (
+      {/* Start button */}
+      {!saveStatus && (
+        <div className="mt-5">
           <button
             onClick={start}
             className="w-full py-2.5 rounded-lg bg-primary text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary-dark active:scale-[0.98]"
           >
             Start Workout
-          </button>
-        )}
-
-        {/* Running — Pause button */}
-        {isRunning && (
-          <button
-            onClick={pause}
-            className="w-full py-2.5 rounded-lg bg-amber-500/90 text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-amber-600 active:scale-[0.98] flex items-center justify-center gap-2"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="5" y="4" width="5" height="16" rx="1" />
-              <rect x="14" y="4" width="5" height="16" rx="1" />
-            </svg>
-            Pause
-          </button>
-        )}
-
-        {/* Paused — Resume + Save + Discard */}
-        {isPaused && !saving && !saveStatus && (
-          <>
-            {autoStopped && (
-              <p className="text-[10px] text-amber-400 font-bold text-center uppercase tracking-wider">
-                Auto-paused after inactivity
-              </p>
-            )}
-            <button
-              onClick={resume}
-              className="w-full py-2.5 rounded-lg bg-primary text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary-dark active:scale-[0.98] flex items-center justify-center gap-2"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Resume
-            </button>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setConfirmAction('save')}
-                className="flex-1 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-emerald-500/30 active:scale-[0.98]"
-              >
-                Save Workout
-              </button>
-              <button
-                onClick={() => setConfirmAction('discard')}
-                className="flex-1 py-2 rounded-lg bg-red-500/15 text-red-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-red-500/25 active:scale-[0.98]"
-              >
-                Discard
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Saving spinner */}
-        {saving && (
-          <div className="w-full py-2.5 rounded-lg bg-slate-800 text-slate-400 font-bold text-sm tracking-wide uppercase text-center">
-            Saving...
-          </div>
-        )}
-
-        {/* Confirmation prompt */}
-        {confirmAction && (
-          <div className={`px-3 py-3 rounded-lg border ${
-            confirmAction === 'save'
-              ? 'bg-emerald-500/10 border-emerald-500/30'
-              : 'bg-red-500/10 border-red-500/30'
-          }`}>
-            <p className="text-xs font-bold text-center mb-2.5 text-slate-300">
-              {confirmAction === 'save'
-                ? `Save workout? (${Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged)`
-                : 'Discard this workout? All logged sets will be lost.'}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={confirmAction === 'save' ? handleSave : handleDiscard}
-                className={`flex-1 py-2 rounded-lg font-bold text-xs tracking-wide uppercase transition-all active:scale-[0.98] ${
-                  confirmAction === 'save'
-                    ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                    : 'bg-red-500 text-white hover:bg-red-600'
-                }`}
-              >
-                {confirmAction === 'save' ? 'Yes, Save' : 'Yes, Discard'}
-              </button>
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-400 font-bold text-xs tracking-wide uppercase transition-all hover:text-white active:scale-[0.98]"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Save feedback banners */}
-      {saveStatus === 'success' && (
-        <div className="mt-3 px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-center">
-          <p className="text-xs font-bold text-emerald-400">
-            Workout saved &mdash; {Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged
-          </p>
-        </div>
-      )}
-      {saveStatus === 'error' && (
-        <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/30 flex items-center justify-between">
-          <p className="text-xs font-bold text-red-400">Save failed</p>
-          <button
-            onClick={retrySave}
-            className="px-3 py-1 rounded-md bg-red-500/20 text-red-300 text-xs font-bold hover:bg-red-500/30 transition-colors"
-          >
-            Retry
           </button>
         </div>
       )}

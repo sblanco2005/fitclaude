@@ -10,6 +10,7 @@ interface NumericStepperProps {
   max?: number;
   label?: string;
   inputWidth?: string;
+  size?: 'sm' | 'lg';
 }
 
 export default function NumericStepper({
@@ -20,6 +21,7 @@ export default function NumericStepper({
   max = 999,
   label,
   inputWidth = 'w-12',
+  size = 'sm',
 }: NumericStepperProps) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,6 +83,10 @@ export default function NumericStepper({
   // Display: when focused show draft (empty until user types), otherwise show value
   const displayValue = focused ? draft : (value || '');
 
+  const lg = size === 'lg';
+  const btnCls = `${lg ? 'w-10 h-10' : 'w-8 h-8'} flex items-center justify-center rounded-md bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white active:bg-slate-600 transition-colors select-none touch-none`;
+  const iconSize = lg ? 14 : 12;
+
   return (
     <div className="flex items-center gap-0.5">
       <button
@@ -88,9 +94,9 @@ export default function NumericStepper({
         onPointerDown={() => startRepeat(-step)}
         onPointerUp={stopRepeat}
         onPointerLeave={stopRepeat}
-        className="w-8 h-8 flex items-center justify-center rounded-md bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white active:bg-slate-600 transition-colors select-none touch-none"
+        className={btnCls}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
       </button>
@@ -103,7 +109,7 @@ export default function NumericStepper({
         onChange={handleInputChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        className={`${inputWidth} h-8 text-center bg-slate-900 border border-slate-700 rounded-md text-[16px] text-white tabular-nums font-bold focus:outline-none focus:ring-1 focus:ring-primary`}
+        className={`${inputWidth} ${lg ? 'h-10 text-base' : 'h-8 text-[16px]'} text-center bg-slate-900 border border-slate-700 rounded-md text-white tabular-nums font-bold focus:outline-none focus:ring-1 focus:ring-primary`}
       />
 
       <button
@@ -111,16 +117,16 @@ export default function NumericStepper({
         onPointerDown={() => startRepeat(step)}
         onPointerUp={stopRepeat}
         onPointerLeave={stopRepeat}
-        className="w-8 h-8 flex items-center justify-center rounded-md bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white active:bg-slate-600 transition-colors select-none touch-none"
+        className={btnCls}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
       </button>
 
       {label && (
-        <span className="text-[10px] text-slate-500 font-medium ml-0.5">{label}</span>
+        <span className={`${lg ? 'text-xs' : 'text-[10px]'} text-slate-500 font-medium ml-0.5`}>{label}</span>
       )}
     </div>
   );
