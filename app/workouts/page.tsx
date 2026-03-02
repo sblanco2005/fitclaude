@@ -1684,6 +1684,8 @@ function ActiveWorkout({
       .filter(([, logs]) => logs.length > 0)
       .map(([exerciseId, setLogs]) => ({ exerciseId, setLogs }));
 
+    console.log(`[save] workoutId=${latest.id}, exercises=${exercisePayload.length}`, exercisePayload);
+
     if (exercisePayload.length > 0) {
       try {
         const res = await fetch(`/api/workouts/${latest.id}/log`, {
@@ -1694,20 +1696,27 @@ function ActiveWorkout({
             durationMinutes: Math.ceil(elapsed / 60),
           }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          console.error(`[save] API error ${res.status}:`, errText);
+          throw new Error(`HTTP ${res.status}`);
+        }
 
+        console.log('[save] Success');
         setSaving(false);
         setSaveStatus('success');
         navigator.vibrate?.(200);
         setTimeout(() => onFinish(routineName, elapsed, exerciseLogs), 2000);
         return;
-      } catch {
+      } catch (err) {
+        console.error('[save] Failed:', err);
         setSaving(false);
         setSaveStatus('error');
         return;
       }
     }
 
+    console.log('[save] No exercises to save, finishing immediately');
     setSaving(false);
     onFinish(routineName, elapsed, exerciseLogs);
   };

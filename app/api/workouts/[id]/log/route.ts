@@ -14,30 +14,45 @@ export const POST = withAuth(async (request, user, params) => {
   const body = await request.json();
   const exerciseLogs: { exerciseId: string; setLogs: unknown[] }[] = body.exercises ?? [];
 
-  // Update each exercise's setLogs
-  for (const entry of exerciseLogs) {
-    await prisma.workoutExercise.update({
-      where: { id: entry.exerciseId },
-      data: { setLogs: JSON.stringify(entry.setLogs) },
-    });
-  }
+  console.log(`[log] Saving workout ${id}: ${exerciseLogs.length} exercises`);
 
-  // Mark workout completed and optionally set duration
-  const updates: Record<string, unknown> = { completed: true };
-  if (body.durationMinutes) {
-    updates.durationMinutes = body.durationMinutes;
-  }
+  // Use a transaction so all updates succeed or all fail
+  const workout = await prisma.$transaction(async (tx) => {
+    // Update each exercise's setLogs
+    for (const entry of exerciseLogs) {
+      // Verify the exercise belongs to this workout before updating
+      const we = await tx.workoutExercise.findFirst({
+        where: { id: entry.exerciseId, workoutId: id },
+        select: { id: true },
+      });
+      if (!we) {
+        console.warn(`[log] WorkoutExercise ${entry.exerciseId} not found in workout ${id}, skipping`);
+        continue;
+      }
+      await tx.workoutExercise.update({
+        where: { id: entry.exerciseId },
+        data: { setLogs: JSON.stringify(entry.setLogs) },
+      });
+    }
 
-  const workout = await prisma.workout.update({
-    where: { id },
-    data: updates,
-    include: {
-      exercises: {
-        orderBy: { order: 'asc' },
+    // Mark workout completed and optionally set duration
+    const updates: Record<string, unknown> = { completed: true };
+    if (body.durationMinutes) {
+      updates.durationMinutes = body.durationMinutes;
+    }
+
+    return tx.workout.update({
+      where: { id },
+      data: updates,
+      include: {
+        exercises: {
+          orderBy: { order: 'asc' },
+        },
       },
-    },
+    });
   });
 
+  console.log(`[log] Workout ${id} saved successfully, completed=${workout.completed}`);
   return NextResponse.json(workout);
 });
 
