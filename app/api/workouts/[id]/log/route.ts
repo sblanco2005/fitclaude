@@ -14,7 +14,9 @@ export const POST = withAuth(async (request, user, params) => {
   const body = await request.json();
   const exerciseLogs: { exerciseId: string; setLogs: unknown[] }[] = body.exercises ?? [];
 
-  console.log(`[log] Saving workout ${id}: ${exerciseLogs.length} exercises`);
+  console.log(`[log] Saving workout ${id}: ${exerciseLogs.length} exercises, durationMinutes=${body.durationMinutes}`);
+  console.log(`[log] Exercise IDs:`, exerciseLogs.map(e => e.exerciseId));
+  console.log(`[log] Full body:`, JSON.stringify(body).substring(0, 500));
 
   // Use a transaction so all updates succeed or all fail
   const workout = await prisma.$transaction(async (tx) => {
@@ -29,9 +31,11 @@ export const POST = withAuth(async (request, user, params) => {
         console.warn(`[log] WorkoutExercise ${entry.exerciseId} not found in workout ${id}, skipping`);
         continue;
       }
+      const serialized = JSON.stringify(entry.setLogs);
+      console.log(`[log] Updating exercise ${entry.exerciseId}: ${serialized.substring(0, 100)}`);
       await tx.workoutExercise.update({
         where: { id: entry.exerciseId },
-        data: { setLogs: JSON.stringify(entry.setLogs) },
+        data: { setLogs: serialized },
       });
     }
 

@@ -1554,6 +1554,8 @@ function ActiveWorkout({
 
   // Map of exerciseId -> SetLog[]
   const [exerciseLogs, setExerciseLogs] = useState<Map<string, SetLog[]>>(new Map());
+  const exerciseLogsRef = useRef(exerciseLogs);
+  exerciseLogsRef.current = exerciseLogs;
 
   const updateLogs = useCallback((exerciseId: string, logs: SetLog[], restSeconds?: number, totalSets?: number) => {
     lastActivityRef.current = Date.now();
@@ -1679,34 +1681,45 @@ function ActiveWorkout({
     setSaving(true);
     setSaveStatus(null);
 
+    // Use ref to avoid stale closure issues
+    const currentLogs = exerciseLogsRef.current;
+
     // Save logs to API
-    const exercisePayload = Array.from(exerciseLogs.entries())
+    const exercisePayload = Array.from(currentLogs.entries())
       .filter(([, logs]) => logs.length > 0)
       .map(([exerciseId, setLogs]) => ({ exerciseId, setLogs }));
 
-    console.log(`[save] workoutId=${latest.id}, exercises=${exercisePayload.length}`, exercisePayload);
+    const totalSets = exercisePayload.reduce((s, e) => s + e.setLogs.length, 0);
+    console.log(`[save] workoutId=${latest.id}, routine="${routineName}", exercises=${exercisePayload.length}, totalSets=${totalSets}`);
+    console.log('[save] exerciseIds:', exercisePayload.map(e => e.exerciseId));
+    console.log('[save] Map size:', currentLogs.size, 'entries:', Array.from(currentLogs.keys()));
 
     if (exercisePayload.length > 0) {
+      const requestBody = {
+        exercises: exercisePayload,
+        durationMinutes: Math.ceil(elapsed / 60),
+      };
+      console.log('[save] POST body:', JSON.stringify(requestBody).substring(0, 500));
+
       try {
         const res = await fetch(`/api/workouts/${latest.id}/log`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            exercises: exercisePayload,
-            durationMinutes: Math.ceil(elapsed / 60),
-          }),
+          body: JSON.stringify(requestBody),
         });
+
+        const responseText = await res.text();
+        console.log(`[save] Response status=${res.status}, body=${responseText.substring(0, 300)}`);
+
         if (!res.ok) {
-          const errText = await res.text().catch(() => '');
-          console.error(`[save] API error ${res.status}:`, errText);
+          console.error(`[save] API error ${res.status}:`, responseText);
           throw new Error(`HTTP ${res.status}`);
         }
 
-        console.log('[save] Success');
         setSaving(false);
         setSaveStatus('success');
         navigator.vibrate?.(200);
-        setTimeout(() => onFinish(routineName, elapsed, exerciseLogs), 2000);
+        setTimeout(() => onFinish(routineName, elapsed, currentLogs), 2000);
         return;
       } catch (err) {
         console.error('[save] Failed:', err);
@@ -1716,9 +1729,9 @@ function ActiveWorkout({
       }
     }
 
-    console.log('[save] No exercises to save, finishing immediately');
+    console.warn('[save] No exercises to save — exerciseLogs Map was empty, finishing immediately');
     setSaving(false);
-    onFinish(routineName, elapsed, exerciseLogs);
+    onFinish(routineName, elapsed, currentLogs);
   };
 
   const handleDiscard = () => {
