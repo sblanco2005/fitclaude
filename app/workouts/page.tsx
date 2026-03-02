@@ -1475,10 +1475,13 @@ function ActiveWorkout({
   const HARD_CAP = 1 * 60 * 60; // 1 hour max
 
   const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<null | 'success' | 'error'>(null);
   const [autoStopped, setAutoStopped] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<null | 'save' | 'discard'>(null);
+  const pausedAtRef = useRef<number>(0); // elapsed seconds when paused
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
@@ -1604,8 +1607,10 @@ function ActiveWorkout({
     const now = Date.now();
     startTimeRef.current = now;
     lastActivityRef.current = now;
+    pausedAtRef.current = 0;
     setAutoStopped(false);
     setIsRunning(true);
+    setIsPaused(false);
     intervalRef.current = setInterval(tick, 1000);
     // Initialize AudioContext on user gesture
     if (!audioCtxRef.current) {
@@ -1613,21 +1618,46 @@ function ActiveWorkout({
     }
   }, [isRunning, tick]);
 
+  const pause = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    cancelRest();
+    if (startTimeRef.current != null) {
+      pausedAtRef.current = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      setElapsed(pausedAtRef.current);
+    }
+    setIsRunning(false);
+    setIsPaused(true);
+  }, [cancelRest]);
+
+  const resume = useCallback(() => {
+    const now = Date.now();
+    // Adjust startTime so elapsed continues from where we paused
+    startTimeRef.current = now - pausedAtRef.current * 1000;
+    lastActivityRef.current = now;
+    setIsRunning(true);
+    setIsPaused(false);
+    setConfirmAction(null);
+    intervalRef.current = setInterval(tick, 1000);
+  }, [tick]);
+
   const stop = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
     cancelRest();
-    // Compute final elapsed from real clock
     if (startTimeRef.current != null) {
       setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
     }
     setIsRunning(false);
+    setIsPaused(false);
   }, [cancelRest]);
 
   // Keep stopRef in sync so tick can call it without stale closure
-  stopRef.current = stop;
+  stopRef.current = pause;
 
   // Recalculate elapsed when screen wakes up (visibilitychange)
   useEffect(() => {
@@ -1644,8 +1674,8 @@ function ActiveWorkout({
     };
   }, [tick]);
 
-  const handleFinish = async () => {
-    stop();
+  const handleSave = async () => {
+    setConfirmAction(null);
     setSaving(true);
     setSaveStatus(null);
 
@@ -1682,9 +1712,14 @@ function ActiveWorkout({
     onFinish(routineName, elapsed, exerciseLogs);
   };
 
-  const retryFinish = () => {
+  const handleDiscard = () => {
+    setConfirmAction(null);
+    onRemove(routineName);
+  };
+
+  const retrySave = () => {
     setSaveStatus(null);
-    handleFinish();
+    handleSave();
   };
 
   const loggedCount = Array.from(exerciseLogs.values()).filter((l) => l.length > 0).length;
@@ -1718,9 +1753,14 @@ function ActiveWorkout({
 
       {/* Timer + progress */}
       <div className="mt-4 flex items-center justify-center gap-3">
-        <span className={`text-3xl font-black tabular-nums tracking-tight ${isRunning ? 'text-primary' : 'text-slate-400'}`}>
+        <span className={`text-3xl font-black tabular-nums tracking-tight ${isRunning ? 'text-primary' : isPaused ? 'text-amber-400' : 'text-slate-400'}`}>
           {formatTimer(elapsed)}
         </span>
+        {isPaused && (
+          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/70">
+            Paused
+          </span>
+        )}
         {/* Rest countdown timer */}
         {isRunning && hasRestPeriods && restRemaining !== null && (
           <div className="flex items-center gap-1">
@@ -1743,7 +1783,7 @@ function ActiveWorkout({
             </span>
           </div>
         )}
-        {isRunning && totalExercises > 0 && (
+        {(isRunning || isPaused) && totalExercises > 0 && (
           <span className="text-[10px] text-muted font-bold tabular-nums">
             {loggedCount}/{totalExercises}
           </span>
@@ -1773,7 +1813,7 @@ function ActiveWorkout({
             key={ex.id}
             ex={ex}
             index={i}
-            isRunning={isRunning}
+            isRunning={isRunning || isPaused}
             logs={exerciseLogs.get(ex.id) ?? []}
             onUpdateLogs={(logs, restSecs) => updateLogs(ex.id, logs, restSecs, ex.sets)}
             lastLogs={getLastLogForExercise(allWorkouts, getExerciseName(ex), latest.id)}
@@ -1784,42 +1824,109 @@ function ActiveWorkout({
       </div>
 
       {/* Hint when running */}
-      {isRunning && loggedCount === 0 && (
+      {(isRunning || isPaused) && loggedCount === 0 && (
         <p className="text-[10px] text-slate-600 text-center mt-3 font-medium">
           Tap an exercise to log your sets
         </p>
       )}
 
-      <div className="mt-5 flex gap-2">
-        {!isRunning && elapsed === 0 && (
+      {/* Action buttons */}
+      <div className="mt-5 space-y-2">
+        {/* Initial state — Start */}
+        {!isRunning && !isPaused && elapsed === 0 && !saveStatus && (
           <button
             onClick={start}
-            className="flex-1 py-2.5 rounded-lg bg-primary text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary-dark active:scale-[0.98]"
+            className="w-full py-2.5 rounded-lg bg-primary text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary-dark active:scale-[0.98]"
           >
             Start Workout
           </button>
         )}
+
+        {/* Running — Pause button */}
         {isRunning && (
           <button
-            onClick={handleFinish}
-            disabled={saving}
-            className="flex-1 py-2.5 rounded-lg bg-red-500/90 text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-red-600 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
+            onClick={pause}
+            className="w-full py-2.5 rounded-lg bg-amber-500/90 text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-amber-600 active:scale-[0.98] flex items-center justify-center gap-2"
           >
-            {saving ? (
-              'Saving...'
-            ) : (
-              <>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="4" y="4" width="16" height="16" rx="2" />
-                </svg>
-                Stop
-              </>
-            )}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="5" y="4" width="5" height="16" rx="1" />
+              <rect x="14" y="4" width="5" height="16" rx="1" />
+            </svg>
+            Pause
           </button>
         )}
-        {!isRunning && elapsed > 0 && (
-          <div className={`flex-1 py-2.5 rounded-lg font-bold text-sm tracking-wide uppercase text-center ${autoStopped ? 'bg-amber-500/20 text-amber-400' : 'bg-primary/20 text-primary'}`}>
-            {autoStopped ? `Auto-stopped — ${formatTimer(elapsed)}` : `Completed — ${formatTimer(elapsed)}`}
+
+        {/* Paused — Resume + Save + Discard */}
+        {isPaused && !saving && !saveStatus && (
+          <>
+            {autoStopped && (
+              <p className="text-[10px] text-amber-400 font-bold text-center uppercase tracking-wider">
+                Auto-paused after inactivity
+              </p>
+            )}
+            <button
+              onClick={resume}
+              className="w-full py-2.5 rounded-lg bg-primary text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary-dark active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Resume
+            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmAction('save')}
+                className="flex-1 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-emerald-500/30 active:scale-[0.98]"
+              >
+                Save Workout
+              </button>
+              <button
+                onClick={() => setConfirmAction('discard')}
+                className="flex-1 py-2 rounded-lg bg-red-500/15 text-red-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-red-500/25 active:scale-[0.98]"
+              >
+                Discard
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Saving spinner */}
+        {saving && (
+          <div className="w-full py-2.5 rounded-lg bg-slate-800 text-slate-400 font-bold text-sm tracking-wide uppercase text-center">
+            Saving...
+          </div>
+        )}
+
+        {/* Confirmation prompt */}
+        {confirmAction && (
+          <div className={`px-3 py-3 rounded-lg border ${
+            confirmAction === 'save'
+              ? 'bg-emerald-500/10 border-emerald-500/30'
+              : 'bg-red-500/10 border-red-500/30'
+          }`}>
+            <p className="text-xs font-bold text-center mb-2.5 text-slate-300">
+              {confirmAction === 'save'
+                ? `Save workout? (${Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged)`
+                : 'Discard this workout? All logged sets will be lost.'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={confirmAction === 'save' ? handleSave : handleDiscard}
+                className={`flex-1 py-2 rounded-lg font-bold text-xs tracking-wide uppercase transition-all active:scale-[0.98] ${
+                  confirmAction === 'save'
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                    : 'bg-red-500 text-white hover:bg-red-600'
+                }`}
+              >
+                {confirmAction === 'save' ? 'Yes, Save' : 'Yes, Discard'}
+              </button>
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-400 font-bold text-xs tracking-wide uppercase transition-all hover:text-white active:scale-[0.98]"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1836,7 +1943,7 @@ function ActiveWorkout({
         <div className="mt-3 px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/30 flex items-center justify-between">
           <p className="text-xs font-bold text-red-400">Save failed</p>
           <button
-            onClick={retryFinish}
+            onClick={retrySave}
             className="px-3 py-1 rounded-md bg-red-500/20 text-red-300 text-xs font-bold hover:bg-red-500/30 transition-colors"
           >
             Retry
