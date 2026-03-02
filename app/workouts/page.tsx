@@ -2107,9 +2107,23 @@ export default function WorkoutsPage() {
   const weightUnit = (profile?.weightUnit === 'kg' ? 'kg' : 'lb') as 'lb' | 'kg';
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>('routines');
+  const [tab, setTab] = useState<Tab>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('fitclaude:activeTab');
+      if (saved === 'hit-it' || saved === 'routines' || saved === 'history') return saved;
+    }
+    return 'routines';
+  });
   const [selectedRoutine, setSelectedRoutine] = useState<string | null>(null);
-  const [hitItQueue, setHitItQueue] = useState<string[]>([]);
+  const [hitItQueue, setHitItQueue] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(localStorage.getItem('fitclaude:hitItQueue') || '[]');
+        return Array.isArray(saved) ? saved : [];
+      } catch { return []; }
+    }
+    return [];
+  });
   const [spinTarget, setSpinTarget] = useState<{ name: string; muscles: string[]; exerciseCount: number; category: string; confirm: typeof SPIN_CONFIRMS[number] } | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<Category>('all');
@@ -2122,6 +2136,23 @@ export default function WorkoutsPage() {
   >([]);
   const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
+
+  // Persist Hit It queue and active tab to localStorage
+  useEffect(() => {
+    localStorage.setItem('fitclaude:hitItQueue', JSON.stringify(hitItQueue));
+    // If queue is empty, clear the saved tab so next visit starts on routines
+    if (hitItQueue.length === 0 && tab !== 'hit-it') {
+      localStorage.removeItem('fitclaude:activeTab');
+    }
+  }, [hitItQueue, tab]);
+
+  useEffect(() => {
+    if (tab === 'hit-it' && hitItQueue.length > 0) {
+      localStorage.setItem('fitclaude:activeTab', 'hit-it');
+    } else {
+      localStorage.removeItem('fitclaude:activeTab');
+    }
+  }, [tab, hitItQueue]);
 
   // Override Header back button when routine detail is open
   useEffect(() => {

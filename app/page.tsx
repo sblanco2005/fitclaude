@@ -18,6 +18,17 @@ export default function DashboardPage() {
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.isOnboarded === false) {
       router.replace('/onboarding');
+      return;
+    }
+    // If there's an active workout in Hit It, go straight to the workouts page
+    if (status === 'authenticated') {
+      try {
+        const queue = JSON.parse(localStorage.getItem('fitclaude:hitItQueue') || '[]');
+        if (Array.isArray(queue) && queue.length > 0) {
+          router.replace('/workouts');
+          return;
+        }
+      } catch { /* ignore */ }
     }
   }, [status, session, router]);
 
