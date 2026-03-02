@@ -6,10 +6,10 @@ import NumericStepper from './NumericStepper';
 const LB_PER_KG = 2.20462;
 const KG_PER_LB = 1 / LB_PER_KG;
 
-function lbToKg(lb: number): number { return Math.round(lb * KG_PER_LB * 10) / 10; }
-function kgToLb(kg: number): number { return Math.round(kg * LB_PER_KG); }
+export function lbToKg(lb: number): number { return Math.round(lb * KG_PER_LB * 10) / 10; }
+export function kgToLb(kg: number): number { return Math.round(kg * LB_PER_KG); }
 
-type WeightUnit = 'lb' | 'kg';
+export type WeightUnit = 'lb' | 'kg';
 
 interface SetRowProps {
   setNumber: number;
@@ -21,7 +21,7 @@ interface SetRowProps {
   weightStep?: number;
   plateMode?: boolean;
   barWeight?: number;   // always in lbs
-  defaultUnit?: WeightUnit;
+  unit?: WeightUnit;    // controlled from parent (exercise-level)
 }
 
 export default function SetRow({
@@ -34,10 +34,9 @@ export default function SetRow({
   weightStep = 5,
   plateMode = false,
   barWeight = 45,
-  defaultUnit = 'lb',
+  unit = 'lb',
 }: SetRowProps) {
   const [editing, setEditing] = useState(false);
-  const [unit, setUnit] = useState<WeightUnit>(defaultUnit);
 
   // Internal weight is always in the DISPLAY unit
   // initialWeight comes in as lbs — convert to display unit
@@ -68,10 +67,10 @@ export default function SetRow({
     setPerSide(calc > 0 ? Math.round(calc * 10) / 10 : 0);
   }
 
-  // When unit toggles, convert current weight value
-  const toggleUnit = () => {
-    const newUnit: WeightUnit = unit === 'lb' ? 'kg' : 'lb';
-    if (newUnit === 'kg') {
+  // When unit changes from parent, convert current weight value
+  const [lastUnit, setLastUnit] = useState(unit);
+  if (unit !== lastUnit) {
+    if (unit === 'kg') {
       setWeight(lbToKg(weight));
       const barKg = lbToKg(barWeight);
       const calc = (lbToKg(weight) - barKg) / 2;
@@ -81,8 +80,8 @@ export default function SetRow({
       const calc = (kgToLb(weight) - barWeight) / 2;
       setPerSide(calc > 0 ? calc : 0);
     }
-    setUnit(newUnit);
-  };
+    setLastUnit(unit);
+  }
 
   const handlePerSideChange = (v: number) => {
     setPerSide(v);
@@ -117,17 +116,6 @@ export default function SetRow({
   const otherUnit = unit === 'lb' ? 'kg' : 'lb';
   const converted = unit === 'lb' ? lbToKg(weight) : kgToLb(weight);
   const convertedLabel = `${Math.round(converted * 10) / 10}${otherUnit}`;
-
-  const unitToggle = (
-    <button
-      type="button"
-      onClick={toggleUnit}
-      className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700 active:scale-[0.95] transition-all shrink-0"
-      title={`Switch to ${otherUnit}`}
-    >
-      {unit}
-    </button>
-  );
 
   // Logged state — compact chip, tappable to edit
   if (isLogged && !editing) {
@@ -201,18 +189,15 @@ export default function SetRow({
             </span>
           </div>
         ) : (
-          <div className="flex items-center gap-1">
-            <NumericStepper
-              value={weight}
-              onChange={setWeight}
-              step={unit === 'kg' ? 2.5 : weightStep}
-              min={0}
-              max={999}
-              label={unit}
-              inputWidth="w-14"
-            />
-            {unitToggle}
-          </div>
+          <NumericStepper
+            value={weight}
+            onChange={setWeight}
+            step={unit === 'kg' ? 2.5 : weightStep}
+            min={0}
+            max={999}
+            label={unit}
+            inputWidth="w-14"
+          />
         )}
 
         <NumericStepper

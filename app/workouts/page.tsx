@@ -6,12 +6,10 @@ import { Badge } from '@/components/ui/Badge';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { Modal } from '@/components/ui/Modal';
 import type { Workout, WorkoutExercise, Exercise, Activity } from '@/types';
-import SetRow from '@/components/workout/SetRow';
+import SetRow, { type WeightUnit, lbToKg } from '@/components/workout/SetRow';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-const LB_PER_KG = 2.20462;
-function lbToKg(lb: number): number { return Math.round(lb / LB_PER_KG * 10) / 10; }
 function formatWeight(lbs: number, unit: 'lb' | 'kg'): string {
   if (unit === 'kg') return `${lbToKg(lbs)}kg`;
   return `${lbs}lb`;
@@ -377,7 +375,7 @@ function SessionLogCard({
                         isLogged={false}
                         onLog={(w, r) => handleEditSetLog(l.set, w, r)}
                         onUnlog={() => setEditLogs((prev) => prev.filter((x) => x.set !== l.set))}
-                        defaultUnit={weightUnit}
+                        unit={weightUnit}
                       />
                     ))}
                     <div className="flex gap-1.5 mt-2">
@@ -1197,6 +1195,7 @@ function ExerciseLogRow({
   const [showVideo, setShowVideo] = useState(false);
   const [plateMode, setPlateMode] = useState(false);
   const [barWeight, setBarWeight] = useState(45);
+  const [unit, setUnit] = useState<WeightUnit>(defaultUnit);
   const hasLogs = logs.length > 0;
 
   const firstVid = ex.exercise?.videos?.[0] ?? null;
@@ -1309,44 +1308,64 @@ function ExerciseLogRow({
       {/* Per-set logging UI */}
       {expanded && isRunning && (
         <div className="mt-1.5 ml-3 space-y-0.5">
-          {/* Per-Side toggle — exercise level, for barbell exercises */}
-          {isBarbell && (
-            <div className="flex items-center gap-2 mb-1 pb-1 border-b border-slate-800/40 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setPlateMode(!plateMode)}
-                className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors p-1 rounded ${
-                  plateMode
-                    ? 'text-amber-400'
-                    : 'text-amber-500/70 hover:text-amber-400'
-                }`}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="shrink-0">
-                  <line x1="2" y1="12" x2="22" y2="12" strokeLinecap="round" />
-                  <rect x="4" y="8" width="3" height="8" rx="0.5" fill="currentColor" stroke="none" />
-                  <rect x="17" y="8" width="3" height="8" rx="0.5" fill="currentColor" stroke="none" />
-                </svg>
-                Per Side
-              </button>
-              {plateMode && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-slate-600">bar:</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={barWeight}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value) || 0;
-                      setBarWeight(Math.max(0, Math.min(100, v)));
-                    }}
-                    onFocus={(e) => e.target.select()}
-                    className="w-8 h-5 text-center bg-slate-900 border border-slate-700 rounded text-[10px] text-slate-400 tabular-nums font-medium focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:text-white"
-                  />
-                  <span className="text-[10px] text-slate-600">lb</span>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Exercise-level toolbar: unit toggle + per-side */}
+          <div className="flex items-center gap-2 mb-1 pb-1 border-b border-slate-800/40 flex-wrap">
+            {/* Unit toggle */}
+            <button
+              type="button"
+              onClick={() => setUnit(unit === 'lb' ? 'kg' : 'lb')}
+              className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors p-1 rounded ${
+                unit === 'kg'
+                  ? 'text-blue-400'
+                  : 'text-slate-500 hover:text-blue-400'
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+              {unit === 'lb' ? 'lb' : 'kg'}
+            </button>
+
+            {/* Per-Side toggle — for barbell exercises */}
+            {isBarbell && (
+              <>
+                <span className="text-slate-800">|</span>
+                <button
+                  type="button"
+                  onClick={() => setPlateMode(!plateMode)}
+                  className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors p-1 rounded ${
+                    plateMode
+                      ? 'text-amber-400'
+                      : 'text-amber-500/70 hover:text-amber-400'
+                  }`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="shrink-0">
+                    <line x1="2" y1="12" x2="22" y2="12" strokeLinecap="round" />
+                    <rect x="4" y="8" width="3" height="8" rx="0.5" fill="currentColor" stroke="none" />
+                    <rect x="17" y="8" width="3" height="8" rx="0.5" fill="currentColor" stroke="none" />
+                  </svg>
+                  Per Side
+                </button>
+                {plateMode && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-600">bar:</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={barWeight}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value) || 0;
+                        setBarWeight(Math.max(0, Math.min(100, v)));
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      className="w-8 h-5 text-center bg-slate-900 border border-slate-700 rounded text-[10px] text-slate-400 tabular-nums font-medium focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:text-white"
+                    />
+                    <span className="text-[10px] text-slate-600">{unit}</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {Array.from({ length: numSets }, (_, i) => i + 1).map((setNum) => {
             const existingLog = logs.find((l) => l.set === setNum);
@@ -1362,7 +1381,7 @@ function ExerciseLogRow({
                 onUnlog={() => handleUnlogSet(setNum)}
                 plateMode={plateMode}
                 barWeight={barWeight}
-                defaultUnit={defaultUnit}
+                unit={unit}
               />
             );
           })}
@@ -1373,7 +1392,7 @@ function ExerciseLogRow({
               onClick={handleFillRemaining}
               className="w-full py-1.5 mt-1 rounded-lg text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/15 active:scale-[0.98] transition-colors truncate"
             >
-              Fill ({formatWeight(logs[logs.length - 1].weight, defaultUnit)} &times; {logs[logs.length - 1].reps})
+              Fill ({formatWeight(logs[logs.length - 1].weight, unit)} &times; {logs[logs.length - 1].reps})
             </button>
           )}
 
