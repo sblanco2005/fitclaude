@@ -3,16 +3,25 @@
 import { useState } from 'react';
 import NumericStepper from './NumericStepper';
 
+const LB_PER_KG = 2.20462;
+const KG_PER_LB = 1 / LB_PER_KG;
+
+function lbToKg(lb: number): number { return Math.round(lb * KG_PER_LB * 10) / 10; }
+function kgToLb(kg: number): number { return Math.round(kg * LB_PER_KG); }
+
+type WeightUnit = 'lb' | 'kg';
+
 interface SetRowProps {
   setNumber: number;
-  weight: number;
+  weight: number;       // always in lbs (storage unit)
   reps: number;
   isLogged: boolean;
-  onLog: (weight: number, reps: number) => void;
+  onLog: (weight: number, reps: number) => void; // weight in lbs
   onUnlog: () => void;
   weightStep?: number;
   plateMode?: boolean;
-  barWeight?: number;
+  barWeight?: number;   // always in lbs
+  defaultUnit?: WeightUnit;
 }
 
 export default function SetRow({
@@ -25,41 +34,68 @@ export default function SetRow({
   weightStep = 5,
   plateMode = false,
   barWeight = 45,
+  defaultUnit = 'lb',
 }: SetRowProps) {
   const [editing, setEditing] = useState(false);
-  const [weight, setWeight] = useState(initialWeight);
+  const [unit, setUnit] = useState<WeightUnit>(defaultUnit);
+
+  // Internal weight is always in the DISPLAY unit
+  // initialWeight comes in as lbs — convert to display unit
+  const toDisplay = (lbs: number) => unit === 'kg' ? lbToKg(lbs) : lbs;
+  const toLbs = (val: number) => unit === 'kg' ? kgToLb(val) : val;
+
+  const [weight, setWeight] = useState(() => toDisplay(initialWeight));
   const [reps, setReps] = useState(initialReps);
 
   const [perSide, setPerSide] = useState(() => {
-    const calc = (initialWeight - barWeight) / 2;
-    return calc > 0 ? calc : 0;
+    const totalDisplay = toDisplay(initialWeight);
+    const barDisplay = toDisplay(barWeight);
+    const calc = (totalDisplay - barDisplay) / 2;
+    return calc > 0 ? Math.round(calc * 10) / 10 : 0;
   });
 
   // Sync when parent changes defaults (e.g. carry-forward from previous set)
-  // Only update if not currently editing and not already logged
   const [lastInitWeight, setLastInitWeight] = useState(initialWeight);
   const [lastInitReps, setLastInitReps] = useState(initialReps);
   if (!isLogged && !editing && (initialWeight !== lastInitWeight || initialReps !== lastInitReps)) {
-    setWeight(initialWeight);
+    const disp = toDisplay(initialWeight);
+    setWeight(disp);
     setReps(initialReps);
     setLastInitWeight(initialWeight);
     setLastInitReps(initialReps);
-    // Also sync perSide
-    const calc = (initialWeight - barWeight) / 2;
-    setPerSide(calc > 0 ? calc : 0);
+    const barDisplay = toDisplay(barWeight);
+    const calc = (disp - barDisplay) / 2;
+    setPerSide(calc > 0 ? Math.round(calc * 10) / 10 : 0);
   }
+
+  // When unit toggles, convert current weight value
+  const toggleUnit = () => {
+    const newUnit: WeightUnit = unit === 'lb' ? 'kg' : 'lb';
+    if (newUnit === 'kg') {
+      setWeight(lbToKg(weight));
+      const barKg = lbToKg(barWeight);
+      const calc = (lbToKg(weight) - barKg) / 2;
+      setPerSide(calc > 0 ? Math.round(calc * 10) / 10 : 0);
+    } else {
+      setWeight(kgToLb(weight));
+      const calc = (kgToLb(weight) - barWeight) / 2;
+      setPerSide(calc > 0 ? calc : 0);
+    }
+    setUnit(newUnit);
+  };
 
   const handlePerSideChange = (v: number) => {
     setPerSide(v);
-    setWeight(v * 2 + barWeight);
+    const barDisplay = toDisplay(barWeight);
+    setWeight(Math.round((v * 2 + barDisplay) * 10) / 10);
   };
 
   const handleConfirm = () => {
-    // Blur active input to dismiss keyboard & reset iOS zoom
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-    onLog(weight, reps);
+    // Always send lbs to parent
+    onLog(toLbs(weight), reps);
     setEditing(false);
   };
 
@@ -67,15 +103,31 @@ export default function SetRow({
     setEditing(true);
   };
 
-  // When plateMode changes externally, recalc perSide from current weight
+  // When plateMode changes externally, recalc perSide
   const [lastPlateMode, setLastPlateMode] = useState(plateMode);
   if (plateMode !== lastPlateMode) {
     setLastPlateMode(plateMode);
     if (plateMode) {
-      const calc = (weight - barWeight) / 2;
-      setPerSide(calc > 0 ? calc : 0);
+      const barDisplay = toDisplay(barWeight);
+      const calc = (weight - barDisplay) / 2;
+      setPerSide(calc > 0 ? Math.round(calc * 10) / 10 : 0);
     }
   }
+
+  const otherUnit = unit === 'lb' ? 'kg' : 'lb';
+  const converted = unit === 'lb' ? lbToKg(weight) : kgToLb(weight);
+  const convertedLabel = `${Math.round(converted * 10) / 10}${otherUnit}`;
+
+  const unitToggle = (
+    <button
+      type="button"
+      onClick={toggleUnit}
+      className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-700 active:scale-[0.95] transition-all shrink-0"
+      title={`Switch to ${otherUnit}`}
+    >
+      {unit}
+    </button>
+  );
 
   // Logged state — compact chip, tappable to edit
   if (isLogged && !editing) {
@@ -92,8 +144,13 @@ export default function SetRow({
             S{setNumber}
           </span>
           <span className="text-[11px] tabular-nums font-medium text-slate-300">
-            {weight}lb × {reps}
+            {toDisplay(initialWeight)}{unit} × {initialReps}
           </span>
+          {unit !== 'lb' && (
+            <span className="text-[9px] tabular-nums text-slate-500">
+              ({initialWeight}lb)
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
@@ -128,7 +185,6 @@ export default function SetRow({
         </span>
 
         {plateMode ? (
-          /* Plate calc mode: per-side input + total readout */
           <div className="flex items-center gap-1">
             <NumericStepper
               value={perSide}
@@ -141,20 +197,22 @@ export default function SetRow({
             />
             <span className="text-[10px] text-slate-500 font-medium">=</span>
             <span className="text-[11px] tabular-nums font-bold text-white">
-              {weight}lb
+              {weight}{unit}
             </span>
           </div>
         ) : (
-          /* Standard total weight input */
-          <NumericStepper
-            value={weight}
-            onChange={setWeight}
-            step={weightStep}
-            min={0}
-            max={999}
-            label="lb"
-            inputWidth="w-14"
-          />
+          <div className="flex items-center gap-1">
+            <NumericStepper
+              value={weight}
+              onChange={setWeight}
+              step={unit === 'kg' ? 2.5 : weightStep}
+              min={0}
+              max={999}
+              label={unit}
+              inputWidth="w-14"
+            />
+            {unitToggle}
+          </div>
         )}
 
         <NumericStepper
@@ -189,6 +247,13 @@ export default function SetRow({
           </button>
         )}
       </div>
+
+      {/* Conversion preview */}
+      {weight > 0 && (
+        <p className="text-[9px] text-slate-500 ml-6 mt-0.5 tabular-nums">
+          = {convertedLabel}
+        </p>
+      )}
     </div>
   );
 }

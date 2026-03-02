@@ -18,6 +18,7 @@ export interface UserProfile {
   fatPercent: number | null;
   sex: string | null;
   trainingFrequency: number | null;
+  weightUnit: string; // "lb" or "kg"
   isOnboarded: boolean;
   isAdmin: boolean;
 }

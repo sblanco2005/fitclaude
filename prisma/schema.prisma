@@ -36,6 +36,7 @@ model User {
   sex                String?   // male, female, other, prefer_not_to_say
   trainingFrequency  Int?      // days per week, 1–7
   timezone           String    @default("UTC") // IANA timezone e.g. "America/New_York"
+  weightUnit         String    @default("lb")  // "lb" or "kg" — user's preferred unit for logging
   isOnboarded        Boolean   @default(false)
   isAdmin            Boolean   @default(false)
   tier               String    @default("free") // free, pro, unlimited

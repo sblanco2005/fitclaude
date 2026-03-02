@@ -10,6 +10,13 @@ import SetRow from '@/components/workout/SetRow';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
+const LB_PER_KG = 2.20462;
+function lbToKg(lb: number): number { return Math.round(lb / LB_PER_KG * 10) / 10; }
+function formatWeight(lbs: number, unit: 'lb' | 'kg'): string {
+  if (unit === 'kg') return `${lbToKg(lbs)}kg`;
+  return `${lbs}lb`;
+}
+
 const TYPE_COLORS: Record<string, 'info' | 'success' | 'warning' | 'danger' | 'default'> = {
   push: 'info',
   pull: 'success',
@@ -221,12 +228,14 @@ function SessionLogCard({
   onEditLog,
   onDeleteSession,
   canDeleteSession = true,
+  weightUnit = 'lb',
 }: {
   workout: Workout;
   onDeleteLogs: (workoutId: string) => void;
   onEditLog: (workoutId: string, exerciseId: string, logs: SetLog[]) => void;
   onDeleteSession: (workoutId: string) => void;
   canDeleteSession?: boolean;
+  weightUnit?: 'lb' | 'kg';
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editingExId, setEditingExId] = useState<string | null>(null);
@@ -368,6 +377,7 @@ function SessionLogCard({
                         isLogged={false}
                         onLog={(w, r) => handleEditSetLog(l.set, w, r)}
                         onUnlog={() => setEditLogs((prev) => prev.filter((x) => x.set !== l.set))}
+                        defaultUnit={weightUnit}
                       />
                     ))}
                     <div className="flex gap-1.5 mt-2">
@@ -398,7 +408,7 @@ function SessionLogCard({
                         key={l.set}
                         className="text-[10px] tabular-nums bg-primary/10 text-primary/80 px-1.5 py-0.5 rounded font-medium"
                       >
-                        S{l.set} {l.weight}lb × {l.reps}
+                        S{l.set} {formatWeight(l.weight, weightUnit)} × {l.reps}
                       </span>
                     ))}
                   </div>
@@ -414,10 +424,15 @@ function SessionLogCard({
                 <div>
                   <p className="text-[10px] text-muted uppercase tracking-widest">Volume</p>
                   <p className="text-sm font-black text-white tabular-nums">
-                    {loggedExercises.reduce((acc, ex) => {
-                      const logs = parseStoredSetLogs(ex.setLogs);
-                      return acc + logs.reduce((s, l) => s + l.weight * l.reps, 0);
-                    }, 0).toLocaleString()} lb
+                    {(() => {
+                      const volLb = loggedExercises.reduce((acc, ex) => {
+                        const logs = parseStoredSetLogs(ex.setLogs);
+                        return acc + logs.reduce((s, l) => s + l.weight * l.reps, 0);
+                      }, 0);
+                      return weightUnit === 'kg'
+                        ? `${Math.round(volLb / 2.20462).toLocaleString()} kg`
+                        : `${volLb.toLocaleString()} lb`;
+                    })()}
                   </p>
                 </div>
                 <div>
@@ -527,6 +542,7 @@ function RoutineExerciseRow({
   lastLog,
   onSwap,
   onUpdate,
+  weightUnit = 'lb',
 }: {
   ex: WorkoutExercise;
   globalIndex: number;
@@ -534,6 +550,7 @@ function RoutineExerciseRow({
   lastLog: SetLog[] | null;
   onSwap: () => void;
   onUpdate: (updates: { sets?: number; reps?: string; restSeconds?: number }) => void;
+  weightUnit?: 'lb' | 'kg';
 }) {
   const [showVideo, setShowVideo] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -616,7 +633,7 @@ function RoutineExerciseRow({
             )}
             {lastLog && (
               <p className="text-[10px] text-slate-500 font-bold mt-0.5 tabular-nums">
-                Last: {lastLog.map((l) => `${l.weight}×${l.reps}`).join('  ')}
+                Last: {lastLog.map((l) => `${formatWeight(l.weight, weightUnit)}×${l.reps}`).join('  ')}
               </p>
             )}
           </div>
@@ -835,6 +852,7 @@ function RoutineDetail({
   onAddExercise,
   onUpdateExercise,
   onSpin,
+  weightUnit = 'lb',
 }: {
   workouts: Workout[];
   onBack: () => void;
@@ -849,6 +867,7 @@ function RoutineDetail({
   onAddExercise: (workoutId: string, exerciseId: string) => Promise<void>;
   onUpdateExercise: (workoutId: string, workoutExerciseId: string, updates: { sets?: number; reps?: string; restSeconds?: number }) => Promise<void>;
   onSpin: () => void;
+  weightUnit?: 'lb' | 'kg';
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -1068,6 +1087,7 @@ function RoutineDetail({
                   lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                   onSwap={() => setSwappingExercise(ex)}
                   onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
+                  weightUnit={weightUnit}
                 />
               ))}
             </div>
@@ -1089,6 +1109,7 @@ function RoutineDetail({
                       lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                       onSwap={() => setSwappingExercise(ex)}
                       onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
+                      weightUnit={weightUnit}
                     />
                   ))}
                 </div>
@@ -1147,8 +1168,8 @@ interface SetLog {
 }
 
 
-function formatSetLog(log: SetLog): string {
-  return `${log.weight}lb × ${log.reps}`;
+function formatSetLog(log: SetLog, unit: 'lb' | 'kg' = 'lb'): string {
+  return `${formatWeight(log.weight, unit)} × ${log.reps}`;
 }
 
 // ─── ExerciseLogRow ─────────────────────────────────────────────────────────
@@ -1161,6 +1182,7 @@ function ExerciseLogRow({
   onUpdateLogs,
   lastLogs,
   onSwap,
+  defaultUnit = 'lb',
 }: {
   ex: WorkoutExercise;
   index: number;
@@ -1169,6 +1191,7 @@ function ExerciseLogRow({
   onUpdateLogs: (logs: SetLog[], restSeconds?: number) => void;
   lastLogs?: SetLog[] | null;
   onSwap?: () => void;
+  defaultUnit?: 'lb' | 'kg';
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
@@ -1277,7 +1300,7 @@ function ExerciseLogRow({
         <div className="flex flex-wrap gap-1 ml-7 mt-0.5 mb-1">
           {logs.map((l) => (
             <span key={l.set} className="text-[10px] tabular-nums bg-primary/15 text-primary px-1.5 py-0.5 rounded font-medium">
-              S{l.set} {formatSetLog(l)}
+              S{l.set} {formatSetLog(l, defaultUnit)}
             </span>
           ))}
         </div>
@@ -1339,6 +1362,7 @@ function ExerciseLogRow({
                 onUnlog={() => handleUnlogSet(setNum)}
                 plateMode={plateMode}
                 barWeight={barWeight}
+                defaultUnit={defaultUnit}
               />
             );
           })}
@@ -1349,7 +1373,7 @@ function ExerciseLogRow({
               onClick={handleFillRemaining}
               className="w-full py-1.5 mt-1 rounded-lg text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/15 active:scale-[0.98] transition-colors truncate"
             >
-              Fill ({logs[logs.length - 1].weight}lb &times; {logs[logs.length - 1].reps})
+              Fill ({formatWeight(logs[logs.length - 1].weight, defaultUnit)} &times; {logs[logs.length - 1].reps})
             </button>
           )}
 
@@ -1416,6 +1440,7 @@ function ActiveWorkout({
   onFinish,
   onRemove,
   onSwapExercise,
+  weightUnit = 'lb',
 }: {
   routineName: string;
   workouts: Workout[];
@@ -1423,6 +1448,7 @@ function ActiveWorkout({
   onFinish: (routineName: string, elapsed: number, exerciseLogs: Map<string, SetLog[]>) => void;
   onRemove: (routineName: string) => void;
   onSwapExercise?: (workoutId: string, workoutExerciseId: string) => void;
+  weightUnit?: 'lb' | 'kg';
 }) {
   const latest = workouts[0];
   const muscles = uniqueMuscles(latest);
@@ -1733,6 +1759,7 @@ function ActiveWorkout({
             onUpdateLogs={(logs, restSecs) => updateLogs(ex.id, logs, restSecs, ex.sets)}
             lastLogs={getLastLogForExercise(allWorkouts, getExerciseName(ex), latest.id)}
             onSwap={onSwapExercise ? () => onSwapExercise(latest.id, ex.id) : undefined}
+            defaultUnit={weightUnit}
           />
         ))}
       </div>
@@ -1806,9 +1833,11 @@ function ActiveWorkout({
 function FinishedWorkoutCard({
   fw,
   onDelete,
+  weightUnit = 'lb',
 }: {
   fw: { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout };
   onDelete: () => void;
+  weightUnit?: 'lb' | 'kg';
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -1866,7 +1895,7 @@ function FinishedWorkoutCard({
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                   {logs.map((log, j) => (
                     <span key={j} className="text-[11px] text-slate-400 tabular-nums">
-                      {log.weight}lb &times; {log.reps}
+                      {formatWeight(log.weight, weightUnit)} &times; {log.reps}
                     </span>
                   ))}
                 </div>
@@ -1926,7 +1955,8 @@ const SPIN_CONFIRMS = [
 ];
 
 export default function WorkoutsPage() {
-  const { chatOpen, dataVersion, sendMessage, setChatOpen, setChatTopic, setCustomBack } = useFitClaude();
+  const { chatOpen, dataVersion, sendMessage, setChatOpen, setChatTopic, setCustomBack, profile } = useFitClaude();
+  const weightUnit = (profile?.weightUnit === 'kg' ? 'kg' : 'lb') as 'lb' | 'kg';
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('routines');
@@ -2237,6 +2267,7 @@ export default function WorkoutsPage() {
           onAddExercise={handleAddExercise}
           onUpdateExercise={handleUpdateExercise}
           onSpin={() => requestSpin(selectedRoutine!)}
+          weightUnit={weightUnit}
         />
       </div>
     );
@@ -2451,6 +2482,7 @@ export default function WorkoutsPage() {
                     onSwapExercise={(workoutId, workoutExerciseId) =>
                       setHitItSwapping({ workoutId, workoutExerciseId, exerciseName: '' })
                     }
+                    weightUnit={weightUnit}
                   />
                 );
               })}
@@ -2497,6 +2529,7 @@ export default function WorkoutsPage() {
                       onEditLog={handleEditLog}
                       onDeleteSession={handleDeleteSession}
                       canDeleteSession={true}
+                      weightUnit={weightUnit}
                     />
                   ) : (
                     <div key={item.data.id} className="px-4 py-3 rounded-xl glass">

@@ -134,6 +134,36 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      {/* Weight Unit */}
+      <Card>
+        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Weight Unit</h3>
+        <div className="flex gap-2">
+          <button
+            onClick={() => updateField('weightUnit', 'lb')}
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              (profile.weightUnit || 'lb') === 'lb'
+                ? 'bg-primary text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            Pounds (lb)
+          </button>
+          <button
+            onClick={() => updateField('weightUnit', 'kg')}
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              profile.weightUnit === 'kg'
+                ? 'bg-primary text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            Kilograms (kg)
+          </button>
+        </div>
+        <p className="text-[10px] text-muted mt-2">
+          Sets your default logging unit. You can still toggle per-set while logging.
+        </p>
+      </Card>
+
       {/* Gym & Equipment */}
       <Card>
         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Gym & Equipment</h3>
