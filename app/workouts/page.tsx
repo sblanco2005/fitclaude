@@ -2232,11 +2232,37 @@ export default function WorkoutsPage() {
     ? routineGroups.find(([k]) => k === selectedRoutine)?.[1] ?? null
     : null;
 
-  const addToHitIt = (name: string) => {
+  const addToHitIt = async (name: string) => {
     const alreadyQueued = hitItQueue.includes(name);
+
     if (!alreadyQueued) {
+      // Find the latest workout for this routine and duplicate it for a fresh session
+      const group = routineGroups.find(([k]) => k === name)?.[1];
+      const latestWorkout = group?.[0];
+      if (latestWorkout) {
+        try {
+          const res = await fetch(`/api/workouts/${latestWorkout.id}/duplicate`, { method: 'POST' });
+          if (res.ok) {
+            // Refresh workouts so the new copy appears as workouts[0] in the group
+            await new Promise<void>((resolve) => {
+              fetch('/api/workouts?daysBack=90')
+                .then((r) => r.ok ? r.json() : [])
+                .then((data) => {
+                  setWorkouts(Array.isArray(data) ? data : []);
+                  resolve();
+                })
+                .catch(() => resolve());
+            });
+          } else {
+            console.error('[hitIt] Failed to duplicate workout:', await res.text().catch(() => ''));
+          }
+        } catch (err) {
+          console.error('[hitIt] Error duplicating workout:', err);
+        }
+      }
       setHitItQueue((prev) => [...prev, name]);
     }
+
     setSelectedRoutine(null);
     setTab('hit-it');
   };
