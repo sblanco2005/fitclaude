@@ -2581,9 +2581,8 @@ export default function WorkoutsPage() {
         </div>
       )}
 
-      {/* Hit It Tab — active workouts */}
-      {tab === 'hit-it' && (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide">
+      {/* Hit It Tab — always mounted to preserve workout state */}
+      <div className={`flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide ${tab === 'hit-it' ? '' : 'hidden'}`}>
           {hitItQueue.length === 0 ? (
             <div className="flex items-center justify-center min-h-[40vh]">
               <div className="text-center px-6">
@@ -2623,8 +2622,7 @@ export default function WorkoutsPage() {
               })}
             </div>
           )}
-        </div>
-      )}
+      </div>
 
       {/* History Tab — completed workouts + activities merged by date */}
       {tab === 'history' && (() => {
