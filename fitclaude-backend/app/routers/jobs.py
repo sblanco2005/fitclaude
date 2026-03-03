@@ -18,19 +18,35 @@ def _verify_api_key(x_job_api_key: str = Header(..., alias="X-Job-API-Key")):
 
 @router.post("/video-linking")
 async def trigger_video_linking(
+    limit: int = 95,
     _key: None = Depends(_verify_api_key),
     db: AsyncSession = Depends(get_db),
 ):
-    """Trigger the nightly video linking job."""
-    result = await run_video_linking_job(db)
+    """Trigger the nightly video linking job.
+
+    Args:
+        limit: Max exercises to search per run. Each search costs ~101
+               YouTube API quota units. Free daily quota is 10,000 units,
+               so the default of 95 stays safely within limits.
+               Set to 0 to process all (careful with quota!).
+    """
+    result = await run_video_linking_job(db, limit=limit)
     return result
 
 
 @router.post("/video-discovery")
 async def trigger_video_discovery(
+    limit: int = 95,
     _key: None = Depends(_verify_api_key),
     db: AsyncSession = Depends(get_db),
 ):
-    """Trigger the video discovery job — fetches reference videos with classification."""
-    result = await run_video_discovery_job(db)
+    """Trigger the video discovery job — fetches reference videos with classification.
+
+    Args:
+        limit: Max exercises to search per run. Each search costs ~101
+               YouTube API quota units. Free daily quota is 10,000 units,
+               so the default of 95 stays safely within limits.
+               Set to 0 to process all (careful with quota!).
+    """
+    result = await run_video_discovery_job(db, limit=limit)
     return result

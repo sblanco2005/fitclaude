@@ -116,9 +116,16 @@ async def _discover_videos_for_exercise(
     return added
 
 
-async def run_video_discovery_job(db: AsyncSession) -> dict:
-    """For each exercise, search YouTube for 3 videos, classify them as
-    tutorial or reference, and store them as pending for admin review."""
+async def run_video_discovery_job(db: AsyncSession, limit: int = 95) -> dict:
+    """For each exercise, search YouTube for videos, classify them as
+    tutorial or reference, and store them as pending for admin review.
+
+    Args:
+        limit: Max exercises to search in this batch. Each search costs ~101
+               YouTube API quota units (100 for search + 1 for details).
+               Free daily quota is 10,000 units, so safe limit is ~95 per run.
+               Set to 0 or negative to process all (careful with quota!).
+    """
 
     # 1. Get all exercises
     result = await db.execute(select(Exercise))
@@ -137,19 +144,25 @@ async def run_video_discovery_job(db: AsyncSession) -> dict:
         if ex.id not in has_video_ids
     ]
 
+    # 3. Apply batch limit
+    batch = uncovered[:limit] if limit > 0 else uncovered
+    remaining = max(0, len(uncovered) - len(batch))
+
     logger.info(
         f"[VideoDiscovery] {len(exercises)} exercises total, "
         f"{len(has_video_ids)} already have videos, "
-        f"{len(uncovered)} to search"
+        f"{len(uncovered)} uncovered — processing batch of {len(batch)}"
     )
 
-    # 3. Search YouTube for each exercise (3 results each)
+    # 4. Search YouTube for each exercise in this batch
     added = 0
     errors = 0
-    for exercise in uncovered:
+    quota_used = 0
+    for exercise in batch:
         try:
             count = await _discover_videos_for_exercise(db, exercise)
             added += count
+            quota_used += 101  # 100 for search + 1 for details
         except Exception as e:
             logger.error(f"[VideoDiscovery] Failed for '{exercise.name}': {e}")
             errors += 1
@@ -160,7 +173,10 @@ async def run_video_discovery_job(db: AsyncSession) -> dict:
     return {
         "added": added,
         "errors": errors,
+        "batch_size": len(batch),
         "total_exercises": len(exercises),
         "already_have_videos": len(has_video_ids),
-        "searched": len(uncovered),
+        "remaining_uncovered": remaining,
+        "estimated_quota_used": quota_used,
+        "estimated_days_to_complete": (remaining + len(batch) - 1) // max(len(batch), 1) if remaining > 0 else 0,
     }

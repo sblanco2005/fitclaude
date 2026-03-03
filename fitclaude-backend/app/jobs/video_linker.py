@@ -79,9 +79,16 @@ async def _link_best_video(
     return 1
 
 
-async def run_video_linking_job(db: AsyncSession) -> dict:
+async def run_video_linking_job(db: AsyncSession, limit: int = 95) -> dict:
     """For each exercise without an approved/pending primary video,
-    search YouTube and store the single best tutorial as a pending ExerciseVideo."""
+    search YouTube and store the single best tutorial as a pending ExerciseVideo.
+
+    Args:
+        limit: Max exercises to search in this batch. Each search costs ~101
+               YouTube API quota units (100 for search + 1 for details).
+               Free daily quota is 10,000 units, so safe limit is ~95 per run.
+               Set to 0 or negative to process all (careful with quota!).
+    """
 
     # 1. Get all exercises
     result = await db.execute(select(Exercise))
@@ -110,19 +117,25 @@ async def run_video_linking_job(db: AsyncSession) -> dict:
         and ex.id not in pending_ids
     ]
 
+    # 4. Apply batch limit
+    batch = uncovered[:limit] if limit > 0 else uncovered
+    remaining = max(0, len(uncovered) - len(batch))
+
     logger.info(
         f"[VideoLinker] {len(exercises)} exercises total, "
         f"{len(covered_ids)} covered, {len(pending_ids)} pending, "
-        f"{len(uncovered)} to search"
+        f"{len(uncovered)} uncovered — processing batch of {len(batch)}"
     )
 
-    # 4. Search YouTube for each uncovered exercise (1 best result)
+    # 5. Search YouTube for each exercise in this batch
     added = 0
     errors = 0
-    for exercise in uncovered:
+    quota_used = 0
+    for exercise in batch:
         try:
             count = await _link_best_video(db, exercise)
             added += count
+            quota_used += 101  # 100 for search + 1 for details
         except Exception as e:
             logger.error(f"[VideoLinker] Failed for '{exercise.name}': {e}")
             errors += 1
@@ -133,9 +146,13 @@ async def run_video_linking_job(db: AsyncSession) -> dict:
     return {
         "added": added,
         "errors": errors,
+        "batch_size": len(batch),
         "total_exercises": len(exercises),
         "already_covered": len(covered_ids),
         "already_pending": len(pending_ids),
+        "remaining_uncovered": remaining,
+        "estimated_quota_used": quota_used,
+        "estimated_days_to_complete": (remaining + len(batch) - 1) // max(len(batch), 1) if remaining > 0 else 0,
     }
 
 
