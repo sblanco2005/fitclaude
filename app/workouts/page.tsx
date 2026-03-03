@@ -734,11 +734,22 @@ function SwapExerciseModal({
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // AI photo identification state
+  const [identifying, setIdentifying] = useState(false);
+  const [aiMatches, setAiMatches] = useState<{id: string; name: string; muscleGroup: string; confidence: string}[] | null>(null);
+  const [aiLabel, setAiLabel] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
     setSearch('');
     setMuscleFilter(null);
+    setIdentifying(false);
+    setAiMatches(null);
+    setAiLabel(null);
+    setAiError(null);
     fetch('/api/exercises')
       .then((r) => r.ok ? r.json() : [])
       .then((data: Exercise[]) => {
@@ -749,6 +760,75 @@ function SwapExerciseModal({
     setTimeout(() => searchRef.current?.focus(), 100);
   }, [isOpen]);
 
+  // Resize image on client to keep payload small (~200KB)
+  const resizeImage = useCallback((file: File): Promise<{ base64: string; mediaType: string }> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const reader = new FileReader();
+      reader.onload = () => {
+        img.onload = () => {
+          let { width, height } = img;
+          const maxWidth = 1024;
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+          const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+          resolve({ base64, mediaType: 'image/jpeg' });
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const handleCameraCapture = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset file input so same file can be re-selected
+    e.target.value = '';
+
+    setIdentifying(true);
+    setAiError(null);
+    setAiMatches(null);
+    setAiLabel(null);
+
+    try {
+      const { base64, mediaType } = await resizeImage(file);
+
+      const res = await fetch('/api/exercises/identify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: base64, image_media_type: mediaType }),
+      });
+
+      if (!res.ok) throw new Error('Failed to identify');
+
+      const data = await res.json();
+
+      if (data.error) {
+        setAiError(data.error);
+      } else {
+        setAiLabel(data.raw_identification);
+        setAiMatches(data.matches);
+        // Auto-filter to the best match
+        if (data.matches.length > 0) {
+          const bestMatch = data.matches[0];
+          setSearch(bestMatch.name.split(' ').slice(0, 2).join(' '));
+          setMuscleFilter(bestMatch.muscleGroup);
+        }
+      }
+    } catch {
+      setAiError('Could not identify the machine. Try searching manually.');
+    } finally {
+      setIdentifying(false);
+    }
+  }, [resizeImage]);
+
   const muscleGroups = useMemo(() => {
     const groups = new Set<string>();
     exercises.forEach((e) => groups.add(e.muscleGroup));
@@ -756,7 +836,7 @@ function SwapExerciseModal({
   }, [exercises]);
 
   const filtered = useMemo(() => {
-    return exercises.filter((e) => {
+    let result = exercises.filter((e) => {
       if (e.name === currentExerciseName) return false;
       if (muscleFilter && e.muscleGroup !== muscleFilter) return false;
       if (search) {
@@ -765,19 +845,94 @@ function SwapExerciseModal({
       }
       return true;
     });
-  }, [exercises, search, muscleFilter, currentExerciseName]);
+
+    // Sort AI matches to the top
+    if (aiMatches && aiMatches.length > 0) {
+      const confidenceOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      result.sort((a, b) => {
+        const aMatch = aiMatches.find(m => m.id === a.id);
+        const bMatch = aiMatches.find(m => m.id === b.id);
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+        if (aMatch && bMatch) return (confidenceOrder[aMatch.confidence] ?? 3) - (confidenceOrder[bMatch.confidence] ?? 3);
+        return 0;
+      });
+    }
+
+    return result;
+  }, [exercises, search, muscleFilter, currentExerciseName, aiMatches]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="md">
       <div className="space-y-3">
-        {/* Search */}
-        <input
-          ref={searchRef}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search exercises..."
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary"
-        />
+        {/* Search + Camera */}
+        <div className="flex gap-2">
+          <input
+            ref={searchRef}
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setAiMatches(null); setAiLabel(null); }}
+            placeholder="Search exercises..."
+            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleCameraCapture}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={identifying}
+            className={`px-3 py-2 rounded-lg border transition-colors shrink-0 ${
+              identifying
+                ? 'bg-primary/20 border-primary/30 text-primary animate-pulse'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+            }`}
+            title="Take photo of machine"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
+
+        {/* AI identification result */}
+        {identifying && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+            <p className="text-xs text-primary font-medium">Identifying machine...</p>
+          </div>
+        )}
+        {aiLabel && !identifying && (
+          <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+            <div className="flex items-center gap-2 min-w-0">
+              <svg className="w-4 h-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-primary font-medium truncate">Found: {aiLabel}</p>
+            </div>
+            <button
+              onClick={() => { setAiLabel(null); setAiMatches(null); setSearch(''); setMuscleFilter(null); }}
+              className="text-primary/60 hover:text-primary text-xs font-bold shrink-0 ml-2"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+        {aiError && !identifying && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+            <p className="text-xs text-red-400 font-medium">{aiError}</p>
+            <button
+              onClick={() => setAiError(null)}
+              className="text-red-400/60 hover:text-red-400 text-xs font-bold shrink-0 ml-auto"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Muscle group chips */}
         <div className="flex flex-wrap gap-1.5">
@@ -811,23 +966,43 @@ function SwapExerciseModal({
           ) : filtered.length === 0 ? (
             <p className="text-sm text-muted text-center py-8">No matching exercises</p>
           ) : (
-            filtered.map((ex) => (
-              <button
-                key={ex.id}
-                onClick={() => onSelect(ex)}
-                className="w-full text-left flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition-colors group"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm text-white font-medium group-hover:text-primary transition-colors truncate">
-                    {ex.name}
-                  </p>
-                  <p className="text-[10px] text-slate-500">{ex.muscleGroup} · {ex.difficulty} · {ex.exerciseType}</p>
-                </div>
-                <svg className="w-4 h-4 text-slate-600 group-hover:text-primary shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                </svg>
-              </button>
-            ))
+            filtered.map((ex) => {
+              const aiMatch = aiMatches?.find(m => m.id === ex.id);
+              return (
+                <button
+                  key={ex.id}
+                  onClick={() => onSelect(ex)}
+                  className={`w-full text-left flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg transition-colors group ${
+                    aiMatch?.confidence === 'high'
+                      ? 'bg-primary/10 border border-primary/20 hover:bg-primary/15'
+                      : aiMatch
+                      ? 'bg-slate-800/50 hover:bg-slate-800'
+                      : 'hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm text-white font-medium group-hover:text-primary transition-colors truncate">
+                        {ex.name}
+                      </p>
+                      {aiMatch && (
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
+                          aiMatch.confidence === 'high' ? 'bg-primary/20 text-primary' :
+                          aiMatch.confidence === 'medium' ? 'bg-amber-400/20 text-amber-400' :
+                          'bg-slate-600/20 text-slate-400'
+                        }`}>
+                          {aiMatch.confidence === 'high' ? 'Best match' : aiMatch.confidence === 'medium' ? 'Similar' : 'Related'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500">{ex.muscleGroup} · {ex.difficulty} · {ex.exerciseType}</p>
+                  </div>
+                  <svg className="w-4 h-4 text-slate-600 group-hover:text-primary shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  </svg>
+                </button>
+              );
+            })
           )}
         </div>
       </div>

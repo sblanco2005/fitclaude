@@ -25,3 +25,24 @@ class ExerciseResponse(BaseModel):
     variations: List[ExerciseVariationResponse] = []
 
     model_config = {"from_attributes": True}
+
+
+# ─── Exercise identification (photo → exercise) ──────────────────────────────
+
+
+class IdentifyExerciseRequest(BaseModel):
+    image_base64: str
+    image_media_type: str
+
+
+class ExerciseMatch(BaseModel):
+    id: str
+    name: str
+    muscleGroup: str
+    confidence: str  # "high", "medium", "low"
+
+
+class IdentifyExerciseResponse(BaseModel):
+    matches: List[ExerciseMatch] = []
+    raw_identification: str = "unknown"
+    error: Optional[str] = None
