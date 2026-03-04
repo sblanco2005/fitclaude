@@ -1650,17 +1650,75 @@ function ActiveWorkout({
   const INACTIVITY_LIMIT = 20 * 60; // 20 minutes with no set logged
   const HARD_CAP = 1 * 60 * 60; // 1 hour max
 
-  const [isRunning, setIsRunning] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
+  // ─── Session persistence helpers ───
+  const sessionKey = `fitclaude:session:${routineName}`;
+
+  const saveSession = useCallback((fields: {
+    startTime: number | null;
+    pausedAt: number;
+    running: boolean;
+    paused: boolean;
+    lastActivity: number;
+    logs?: Map<string, SetLog[]>;
+  }) => {
+    try {
+      const logsObj: Record<string, SetLog[]> = {};
+      const logsMap = fields.logs ?? exerciseLogsRef.current;
+      logsMap.forEach((v, k) => { logsObj[k] = v; });
+      localStorage.setItem(sessionKey, JSON.stringify({
+        startTime: fields.startTime,
+        pausedAt: fields.pausedAt,
+        running: fields.running,
+        paused: fields.paused,
+        lastActivity: fields.lastActivity,
+        logs: logsObj,
+      }));
+    } catch { /* quota exceeded — non-critical */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey]);
+
+  const clearSession = useCallback(() => {
+    localStorage.removeItem(sessionKey);
+  }, [sessionKey]);
+
+  // Restore session from localStorage on mount
+  const restored = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(sessionKey);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (!s.startTime) return null;
+      // Don't restore sessions older than the hard cap (1 hour)
+      const age = (Date.now() - s.startTime) / 1000;
+      if (age > 3600) { localStorage.removeItem(sessionKey); return null; }
+      return s as {
+        startTime: number;
+        pausedAt: number;
+        running: boolean;
+        paused: boolean;
+        lastActivity: number;
+        logs: Record<string, SetLog[]>;
+      };
+    } catch { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [isRunning, setIsRunning] = useState(restored?.running ?? false);
+  const [isPaused, setIsPaused] = useState(restored?.paused ?? false);
+  const [elapsed, setElapsed] = useState(() => {
+    if (!restored) return 0;
+    if (restored.paused) return restored.pausedAt;
+    return Math.floor((Date.now() - restored.startTime) / 1000);
+  });
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<null | 'success' | 'error'>(null);
   const [autoStopped, setAutoStopped] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | 'save' | 'discard'>(null);
-  const pausedAtRef = useRef<number>(0); // elapsed seconds when paused
+  const pausedAtRef = useRef<number>(restored?.pausedAt ?? 0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef<number | null>(null);
-  const lastActivityRef = useRef<number>(Date.now());
+  const startTimeRef = useRef<number | null>(restored?.startTime ?? null);
+  const lastActivityRef = useRef<number>(restored?.lastActivity ?? Date.now());
 
   // Rest timer state
   const [restRemaining, setRestRemaining] = useState<number | null>(null);
@@ -1729,7 +1787,16 @@ function ActiveWorkout({
   }, [cancelRest, playBeep]);
 
   // Map of exerciseId -> SetLog[]
-  const [exerciseLogs, setExerciseLogs] = useState<Map<string, SetLog[]>>(new Map());
+  const [exerciseLogs, setExerciseLogs] = useState<Map<string, SetLog[]>>(() => {
+    if (restored?.logs) {
+      const m = new Map<string, SetLog[]>();
+      for (const [k, v] of Object.entries(restored.logs)) {
+        m.set(k, v as SetLog[]);
+      }
+      return m;
+    }
+    return new Map();
+  });
   const exerciseLogsRef = useRef(exerciseLogs);
   exerciseLogsRef.current = exerciseLogs;
 
@@ -1852,6 +1919,31 @@ function ActiveWorkout({
     };
   }, [tick]);
 
+  // Restart interval when restoring a running (not paused) session
+  useEffect(() => {
+    if (restored && restored.running && !restored.paused && startTimeRef.current != null) {
+      intervalRef.current = setInterval(tick, 1000);
+      if (!audioCtxRef.current) {
+        try { audioCtxRef.current = new AudioContext(); } catch { /* no audio */ }
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist session state whenever timer state or logs change
+  useEffect(() => {
+    if (startTimeRef.current != null) {
+      saveSession({
+        startTime: startTimeRef.current,
+        pausedAt: pausedAtRef.current,
+        running: isRunning,
+        paused: isPaused,
+        lastActivity: lastActivityRef.current,
+        logs: exerciseLogs,
+      });
+    }
+  }, [isRunning, isPaused, exerciseLogs, saveSession]);
+
   const handleSave = async () => {
     setConfirmAction(null);
     setSaving(true);
@@ -1892,6 +1984,7 @@ function ActiveWorkout({
           throw new Error(`HTTP ${res.status}`);
         }
 
+        clearSession();
         setSaving(false);
         setSaveStatus('success');
         navigator.vibrate?.(200);
@@ -1906,11 +1999,13 @@ function ActiveWorkout({
     }
 
     console.warn('[save] No exercises to save — exerciseLogs Map was empty, finishing immediately');
+    clearSession();
     setSaving(false);
     onFinish(routineName, elapsed, currentLogs);
   };
 
   const handleDiscard = () => {
+    clearSession();
     setConfirmAction(null);
     onRemove(routineName);
   };
@@ -2089,7 +2184,7 @@ function ActiveWorkout({
           )}
         </div>
         <button
-          onClick={() => onRemove(routineName)}
+          onClick={() => { clearSession(); onRemove(routineName); }}
           className="text-xs text-slate-500 hover:text-red-400 transition-colors p-1"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
