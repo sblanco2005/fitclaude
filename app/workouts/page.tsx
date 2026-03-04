@@ -2490,6 +2490,16 @@ export default function WorkoutsPage() {
     );
   }, [workouts]);
 
+  // Clean up stale Hit It queue entries (routine deleted/renamed while in queue)
+  useEffect(() => {
+    if (loading || hitItQueue.length === 0 || routineGroups.length === 0) return;
+    const validNames = new Set(routineGroups.map(([k]) => k));
+    const stale = hitItQueue.filter((name) => !validNames.has(name));
+    if (stale.length > 0) {
+      setHitItQueue((prev) => prev.filter((n) => validNames.has(n)));
+    }
+  }, [loading, hitItQueue, routineGroups]);
+
   // Filter routine groups by category + search
   const filteredRoutineGroups = useMemo(() => {
     let filtered = routineGroups;
