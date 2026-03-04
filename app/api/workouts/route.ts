@@ -37,6 +37,7 @@ export const GET = withAuth(async (request, user) => {
                 name: true,
                 muscleGroup: true,
                 equipmentRequired: true,
+                gifUrl: true,
                 videos: {
                   where: { status: { in: ['approved', 'pending'] } },
                   orderBy: [{ status: 'asc' }, { isPrimary: 'desc' }],

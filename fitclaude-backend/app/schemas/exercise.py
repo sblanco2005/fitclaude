@@ -22,6 +22,7 @@ class ExerciseResponse(BaseModel):
     difficulty: str
     exercise_type: str
     instructions: Optional[str] = None
+    gif_url: Optional[str] = None
     variations: List[ExerciseVariationResponse] = []
 
     model_config = {"from_attributes": True}

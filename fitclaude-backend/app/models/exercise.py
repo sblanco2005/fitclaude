@@ -22,6 +22,9 @@ class Exercise(Base):
     difficulty: Mapped[str] = mapped_column(String, default="intermediate")
     exercise_type: Mapped[str] = mapped_column("exerciseType", String)
     instructions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    gif_url: Mapped[Optional[str]] = mapped_column(
+        "gifUrl", String, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         "createdAt", DateTime, default=func.now()
     )

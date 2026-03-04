@@ -115,6 +115,7 @@ model Exercise {
   difficulty       String   @default("intermediate")
   exerciseType     String   // compound, isolation, cardio, stretch, plyometric
   instructions     String?  @db.Text
+  gifUrl           String?
   createdAt        DateTime @default(now())
 
   variations       ExerciseVariation[]

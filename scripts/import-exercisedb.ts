@@ -259,6 +259,7 @@ async function main() {
           difficulty: 'intermediate',
           exerciseType,
           instructions,
+          gifUrl: ex.gifUrl ?? null,
         },
       });
       inserted++;

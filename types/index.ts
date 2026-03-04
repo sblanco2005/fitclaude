@@ -33,6 +33,7 @@ export interface Exercise {
   difficulty: string;
   exerciseType: string;
   instructions: string | null;
+  gifUrl: string | null;
   variations: ExerciseVariation[];
   videos?: ExerciseVideoLink[];
 }
@@ -130,7 +131,7 @@ export interface WorkoutExercise {
   notes: string | null;
   setLogs: string | null; // JSON: [{"set":1,"weight":195,"reps":4},...]
   wasSpicy: boolean;
-  exercise?: { name: string; muscleGroup: string; equipmentRequired?: string | null; videos?: { youtubeVideoId: string; title: string; status?: string }[] } | null;
+  exercise?: { name: string; muscleGroup: string; equipmentRequired?: string | null; gifUrl?: string | null; videos?: { youtubeVideoId: string; title: string; status?: string }[] } | null;
   variation?: { name: string; spicyLevel: number } | null;
 }
 

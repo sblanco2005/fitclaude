@@ -249,6 +249,17 @@ export default function ExercisesPage() {
 
               {expandedId === exercise.id && (
                 <div className="mt-4 pt-4 border-t border-slate-700 space-y-3">
+                  {exercise.gifUrl && (
+                    <div className="rounded-lg overflow-hidden bg-slate-900">
+                      <img
+                        src={exercise.gifUrl}
+                        alt={`${exercise.name} form`}
+                        className="w-full max-w-[300px] mx-auto"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+
                   {exercise.instructions && (
                     <p className="text-sm text-slate-300">{exercise.instructions}</p>
                   )}
