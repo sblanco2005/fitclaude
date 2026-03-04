@@ -126,11 +126,41 @@ export default function FocusedExerciseView({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showExerciseList, setShowExerciseList] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  const [skippedExercises, setSkippedExercises] = useState<Set<string>>(new Set());
 
   // Per-exercise settings (reset when navigating)
   const [unit, setUnit] = useState<WeightUnit>(weightUnit);
   const [plateMode, setPlateMode] = useState(false);
   const [barWeight, setBarWeight] = useState(45);
+
+  // Draft values: track unlogged set edits so we can auto-save on navigate
+  // Key: "exerciseId:setNum" → { weight (lbs), reps }
+  const draftsRef = useRef<Map<string, { weight: number; reps: number }>>(new Map());
+
+  const handleDraftChange = useCallback((exerciseId: string, setNum: number, weightLbs: number, reps: number) => {
+    draftsRef.current.set(`${exerciseId}:${setNum}`, { weight: weightLbs, reps });
+  }, []);
+
+  // Auto-log any unlogged drafts for the current exercise before navigating away
+  const autoSaveCurrent = useCallback(() => {
+    const curEx = exercises[currentIndex];
+    if (!curEx) return;
+    const curLogs = exerciseLogs.get(curEx.id) ?? [];
+    const numSetsForEx = curEx.sets || 3;
+    let updated = [...curLogs];
+    let changed = false;
+    for (let s = 1; s <= numSetsForEx; s++) {
+      const key = `${curEx.id}:${s}`;
+      const draft = draftsRef.current.get(key);
+      if (draft && !curLogs.find((l) => l.set === s) && draft.weight > 0) {
+        updated = [...updated.filter((l) => l.set !== s), { set: s, weight: draft.weight, reps: draft.reps }];
+        changed = true;
+      }
+    }
+    if (changed) {
+      onUpdateLogs(curEx.id, updated.sort((a, b) => a.set - b.set));
+    }
+  }, [currentIndex, exercises, exerciseLogs, onUpdateLogs]);
 
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -168,19 +198,45 @@ export default function FocusedExerciseView({
     return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   };
 
-  // Navigation
+  // Navigation (auto-save drafts before moving)
   const goNext = () => {
     if (currentIndex < total - 1) {
+      autoSaveCurrent();
       setCurrentIndex(currentIndex + 1);
       setShowVideo(false);
     }
   };
   const goPrev = () => {
     if (currentIndex > 0) {
+      autoSaveCurrent();
       setCurrentIndex(currentIndex - 1);
       setShowVideo(false);
     }
   };
+  const goTo = (idx: number) => {
+    if (idx !== currentIndex && idx >= 0 && idx < total) {
+      autoSaveCurrent();
+      setCurrentIndex(idx);
+      setShowVideo(false);
+    }
+  };
+
+  // Skip exercise
+  const skipCurrent = () => {
+    setSkippedExercises((prev) => new Set(prev).add(ex.id));
+    if (currentIndex < total - 1) {
+      setCurrentIndex(currentIndex + 1);
+      setShowVideo(false);
+    }
+  };
+  const unskipCurrent = () => {
+    setSkippedExercises((prev) => {
+      const next = new Set(prev);
+      next.delete(ex.id);
+      return next;
+    });
+  };
+  const isSkipped = skippedExercises.has(ex.id);
 
   // Swipe handlers (on hero section only)
   const onPointerDown = (e: React.PointerEvent) => {
@@ -273,11 +329,14 @@ export default function FocusedExerciseView({
           const l = exerciseLogs.get(e.id) ?? [];
           const done = l.length >= (e.sets || 3);
           const isCurrent = i === currentIndex;
+          const isExSkipped = skippedExercises.has(e.id);
           return (
             <div
               key={e.id}
               className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                done
+                isExSkipped
+                  ? 'bg-slate-600'
+                  : done
                   ? 'bg-primary'
                   : isCurrent
                   ? 'bg-primary/40'
@@ -305,19 +364,23 @@ export default function FocusedExerciseView({
             </span>
           )}
 
-          {/* Exercise name + complete badge */}
+          {/* Exercise name + complete/skipped badge */}
           <div className="flex items-center gap-2 mt-2">
-            <h3 className="text-xl font-black text-white tracking-wide leading-tight">
+            <h3 className={`text-xl font-black tracking-wide leading-tight ${isSkipped ? 'text-slate-500 line-through' : 'text-white'}`}>
               {name}
             </h3>
-            {allSetsLogged && (
+            {isSkipped ? (
+              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded-full shrink-0">
+                Skipped
+              </span>
+            ) : allSetsLogged ? (
               <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
                 <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
                 Done
               </span>
-            )}
+            ) : null}
           </div>
 
           {/* Prescription */}
@@ -360,6 +423,22 @@ export default function FocusedExerciseView({
               className="mt-4 px-6 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider hover:text-white active:bg-slate-700 transition-colors"
             >
               Skip Rest
+            </button>
+          </div>
+        ) : isSkipped ? (
+          /* ─── Skipped exercise ─── */
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center">
+              <svg className="w-6 h-6 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            </div>
+            <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Exercise Skipped</p>
+            <button
+              onClick={unskipCurrent}
+              className="px-5 py-2 rounded-lg bg-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider hover:text-white active:bg-slate-700 transition-colors"
+            >
+              Undo Skip
             </button>
           </div>
         ) : showVideo && videoId ? (
@@ -456,6 +535,7 @@ export default function FocusedExerciseView({
                   isLogged={!!existingLog}
                   onLog={(w, r) => handleSetLog(setNum, w, r)}
                   onUnlog={() => handleUnlogSet(setNum)}
+                  onValueChange={(s, w, r) => handleDraftChange(ex.id, s, w, r)}
                   plateMode={plateMode}
                   barWeight={barWeight}
                   unit={unit}
@@ -531,6 +611,19 @@ export default function FocusedExerciseView({
 
         {/* Center buttons */}
         <div className="flex items-center gap-2">
+          {/* Skip */}
+          {!isSkipped && !allSetsLogged && (
+            <button
+              onClick={skipCurrent}
+              className="w-11 h-11 flex items-center justify-center rounded-xl bg-slate-800 text-slate-500 hover:text-slate-300 active:bg-slate-700 transition-colors"
+              title="Skip exercise"
+            >
+              <svg className="w-4.5 h-4.5" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+
           {/* Swap */}
           {onSwapExercise && (
             <button
@@ -582,10 +675,11 @@ export default function FocusedExerciseView({
           exercises={exercises}
           exerciseLogs={exerciseLogs}
           currentIndex={currentIndex}
-          onSelect={setCurrentIndex}
+          onSelect={goTo}
           onClose={() => setShowExerciseList(false)}
           getExerciseName={getExerciseName}
           getExerciseMuscle={getExerciseMuscle}
+          skippedExercises={skippedExercises}
         />
       )}
     </div>

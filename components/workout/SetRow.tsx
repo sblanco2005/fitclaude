@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import NumericStepper from './NumericStepper';
 
 const LB_PER_KG = 2.20462;
@@ -18,6 +18,7 @@ interface SetRowProps {
   isLogged: boolean;
   onLog: (weight: number, reps: number) => void; // weight in lbs
   onUnlog: () => void;
+  onValueChange?: (setNumber: number, weightLbs: number, reps: number) => void;
   weightStep?: number;
   plateMode?: boolean;
   barWeight?: number;   // always in lbs
@@ -31,6 +32,7 @@ export default function SetRow({
   isLogged,
   onLog,
   onUnlog,
+  onValueChange,
   weightStep = 5,
   plateMode = false,
   barWeight = 45,
@@ -82,6 +84,16 @@ export default function SetRow({
     }
     setLastUnit(unit);
   }
+
+  // Report current draft values to parent (for auto-save on navigate)
+  const onValueChangeRef = useRef(onValueChange);
+  onValueChangeRef.current = onValueChange;
+  useEffect(() => {
+    if (!isLogged && onValueChangeRef.current) {
+      onValueChangeRef.current(setNumber, toLbs(weight), reps);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weight, reps, isLogged, setNumber]);
 
   const handlePerSideChange = (v: number) => {
     setPerSide(v);

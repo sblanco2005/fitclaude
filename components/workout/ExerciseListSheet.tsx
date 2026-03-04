@@ -16,6 +16,7 @@ interface ExerciseListSheetProps {
   onClose: () => void;
   getExerciseName: (ex: WorkoutExercise) => string;
   getExerciseMuscle: (ex: WorkoutExercise) => string | null;
+  skippedExercises?: Set<string>;
 }
 
 export default function ExerciseListSheet({
@@ -26,6 +27,7 @@ export default function ExerciseListSheet({
   onClose,
   getExerciseName,
   getExerciseMuscle,
+  skippedExercises,
 }: ExerciseListSheetProps) {
   return (
     <div className="fixed inset-0 z-50" onClick={onClose}>
@@ -62,6 +64,7 @@ export default function ExerciseListSheet({
             const allDone = logs.length >= numSets;
             const isCurrent = i === currentIndex;
             const muscle = getExerciseMuscle(ex);
+            const isSkip = skippedExercises?.has(ex.id) ?? false;
 
             return (
               <button
@@ -75,7 +78,11 @@ export default function ExerciseListSheet({
               >
                 {/* Status icon */}
                 <div className="w-6 h-6 flex items-center justify-center shrink-0">
-                  {allDone ? (
+                  {isSkip ? (
+                    <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    </svg>
+                  ) : allDone ? (
                     <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
@@ -90,7 +97,9 @@ export default function ExerciseListSheet({
 
                 {/* Exercise info */}
                 <div className="flex-1 min-w-0 text-left">
-                  <div className={`text-xs font-semibold truncate ${allDone ? 'text-primary' : isCurrent ? 'text-white' : 'text-slate-400'}`}>
+                  <div className={`text-xs font-semibold truncate ${
+                    isSkip ? 'text-slate-600 line-through' : allDone ? 'text-primary' : isCurrent ? 'text-white' : 'text-slate-400'
+                  }`}>
                     {getExerciseName(ex)}
                   </div>
                   {muscle && (
@@ -100,10 +109,14 @@ export default function ExerciseListSheet({
                   )}
                 </div>
 
-                {/* Set progress */}
-                <span className={`text-[10px] tabular-nums font-bold shrink-0 ${allDone ? 'text-primary' : 'text-slate-600'}`}>
-                  {logs.length}/{numSets}
-                </span>
+                {/* Set progress or skipped label */}
+                {isSkip ? (
+                  <span className="text-[10px] font-bold text-slate-600 shrink-0">Skip</span>
+                ) : (
+                  <span className={`text-[10px] tabular-nums font-bold shrink-0 ${allDone ? 'text-primary' : 'text-slate-600'}`}>
+                    {logs.length}/{numSets}
+                  </span>
+                )}
               </button>
             );
           })}
