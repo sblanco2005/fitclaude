@@ -552,6 +552,7 @@ function RoutineExerciseRow({
   weightUnit?: 'lb' | 'kg';
 }) {
   const [showVideo, setShowVideo] = useState(false);
+  const [showGif, setShowGif] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editSets, setEditSets] = useState(ex.sets);
   const [editReps, setEditReps] = useState(ex.reps ?? '');
@@ -559,6 +560,7 @@ function RoutineExerciseRow({
   const firstVideo = ex.exercise?.videos?.[0] ?? null;
   const videoId = firstVideo?.youtubeVideoId ?? null;
   const videoPending = firstVideo?.status === 'pending';
+  const gifUrl = ex.exercise?.gifUrl ?? null;
   const setsInputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = () => {
@@ -598,7 +600,7 @@ function RoutineExerciseRow({
               <div className="flex items-center gap-0.5 shrink-0">
                 {videoId && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); setShowVideo((v) => !v); }}
+                    onClick={(e) => { e.stopPropagation(); setShowVideo((v) => !v); setShowGif(false); }}
                     className={`shrink-0 p-1.5 rounded transition-colors relative ${
                       videoPending
                         ? showVideo ? 'text-amber-400' : 'text-amber-400/50 hover:text-amber-400'
@@ -612,6 +614,20 @@ function RoutineExerciseRow({
                     {videoPending && (
                       <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" />
                     )}
+                  </button>
+                )}
+                {gifUrl && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowGif((v) => !v); setShowVideo(false); }}
+                    className={`shrink-0 p-1.5 rounded transition-colors ${
+                      showGif ? 'text-cyan-400' : 'text-cyan-400/40 hover:text-cyan-400'
+                    }`}
+                    title="View form demo"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <circle cx="12" cy="12" r="10" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01" />
+                    </svg>
                   </button>
                 )}
                 <button
@@ -706,6 +722,18 @@ function RoutineExerciseRow({
                 Pending
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {showGif && gifUrl && (
+        <div className="ml-7 mt-2">
+          <div className="rounded-lg overflow-hidden bg-slate-900">
+            <img
+              src={gifUrl}
+              alt={`${getExerciseName(ex)} form`}
+              className="w-full max-w-[280px]"
+              loading="lazy"
+            />
           </div>
         </div>
       )}
