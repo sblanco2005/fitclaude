@@ -29,7 +29,7 @@ async def search_youtube(query: str, max_results: int = 3) -> list[dict]:
                 "q": query,
                 "type": "video",
                 "maxResults": max_results,
-                "videoCategoryId": "17",  # Sports
+                "relevanceLanguage": "en",
                 "key": settings.youtube_api_key,
             },
         )

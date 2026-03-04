@@ -24,7 +24,7 @@ async def _link_best_video(
     # Fetch more results when we need to skip known videos
     max_results = 5 if skip_video_ids else 1
     results = await search_youtube(
-        f"how to {exercise.name} proper form technique",
+        f"{exercise.name} form",
         max_results=max_results,
     )
     if not results:

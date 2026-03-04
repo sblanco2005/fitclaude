@@ -66,7 +66,7 @@ async def _discover_videos_for_exercise(
     Skips any youtubeVideoId that already exists for this exercise (any status).
     Returns the number of videos added."""
     results = await search_youtube(
-        f"{exercise.name} exercise workout tutorial",
+        f"{exercise.name} exercise",
         max_results=1,
     )
     if not results:
