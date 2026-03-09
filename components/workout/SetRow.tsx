@@ -55,15 +55,22 @@ export default function SetRow({
     return calc > 0 ? Math.round(calc * 10) / 10 : 0;
   });
 
-  // Sync when parent changes defaults (e.g. carry-forward from previous set)
+  // Track whether the user has touched this row's values
+  const [userEdited, setUserEdited] = useState(false);
+  const origWeight = useRef(toDisplay(initialWeight));
+  const origReps = useRef(initialReps);
+
+  // Sync when parent changes defaults — but ONLY if the user hasn't edited this row
   const [lastInitWeight, setLastInitWeight] = useState(initialWeight);
   const [lastInitReps, setLastInitReps] = useState(initialReps);
-  if (!isLogged && !editing && (initialWeight !== lastInitWeight || initialReps !== lastInitReps)) {
+  if (!isLogged && !userEdited && (initialWeight !== lastInitWeight || initialReps !== lastInitReps)) {
     const disp = toDisplay(initialWeight);
     setWeight(disp);
     setReps(initialReps);
     setLastInitWeight(initialWeight);
     setLastInitReps(initialReps);
+    origWeight.current = disp;
+    origReps.current = initialReps;
     const barDisplay = toDisplay(barWeight);
     const calc = (disp - barDisplay) / 2;
     setPerSide(calc > 0 ? Math.round(calc * 10) / 10 : 0);
@@ -95,8 +102,13 @@ export default function SetRow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weight, reps, isLogged, setNumber]);
 
+  // Wrap setters to track user edits
+  const setWeightEdited = (v: number) => { setWeight(v); setUserEdited(true); };
+  const setRepsEdited = (v: number) => { setReps(v); setUserEdited(true); };
+
   const handlePerSideChange = (v: number) => {
     setPerSide(v);
+    setUserEdited(true);
     const barDisplay = toDisplay(barWeight);
     setWeight(Math.round((v * 2 + barDisplay) * 10) / 10);
   };
@@ -108,6 +120,7 @@ export default function SetRow({
     // Always send lbs to parent
     onLog(toLbs(weight), reps);
     setEditing(false);
+    setUserEdited(false);
   };
 
   const handleEdit = () => {
@@ -203,7 +216,7 @@ export default function SetRow({
         ) : (
           <NumericStepper
             value={weight}
-            onChange={setWeight}
+            onChange={setWeightEdited}
             step={unit === 'kg' ? 2.5 : weightStep}
             min={0}
             max={999}
@@ -214,7 +227,7 @@ export default function SetRow({
 
         <NumericStepper
           value={reps}
-          onChange={setReps}
+          onChange={setRepsEdited}
           step={1}
           min={0}
           max={99}
