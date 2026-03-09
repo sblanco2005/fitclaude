@@ -259,12 +259,12 @@ export default function FocusedExerciseView({
     swipeStartRef.current = null;
   };
 
-  // Set logging handlers (identical to ExerciseLogRow)
+  // Set logging handlers
+  // Defaults come from: (1) existing log for this set, (2) last session data only.
+  // No cross-set carry-forward — that caused values to overwrite when logging out of order.
   const getDefaults = (setNum: number) => {
     const existing = logs.find((l) => l.set === setNum);
     if (existing) return { weight: existing.weight, reps: existing.reps };
-    const lastLogged = logs.length > 0 ? logs[logs.length - 1] : null;
-    if (lastLogged) return { weight: lastLogged.weight, reps: lastLogged.reps };
     if (lastLogs) {
       const lastForSet = lastLogs.find((l) => l.set === setNum) ?? lastLogs[lastLogs.length - 1];
       if (lastForSet) return { weight: lastForSet.weight, reps: lastForSet.reps };

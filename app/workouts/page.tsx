@@ -1413,22 +1413,16 @@ function ExerciseLogRow({
   const prescribedReps = parseInt(ex.reps ?? '0') || 0;
 
   // Get default weight/reps for a given set number
+  // No cross-set carry-forward — only use existing log or last session data
   const getDefaults = (setNum: number) => {
-    // 1. If this set already has a log, use it
     const existing = logs.find((l) => l.set === setNum);
     if (existing) return { weight: existing.weight, reps: existing.reps };
 
-    // 2. Carry forward from the last logged set in this session
-    const lastLogged = logs.length > 0 ? logs[logs.length - 1] : null;
-    if (lastLogged) return { weight: lastLogged.weight, reps: lastLogged.reps };
-
-    // 3. Use last session's data for this set
     if (lastLogs) {
       const lastForSet = lastLogs.find((l) => l.set === setNum) ?? lastLogs[lastLogs.length - 1];
       if (lastForSet) return { weight: lastForSet.weight, reps: lastForSet.reps };
     }
 
-    // 4. Fallback
     return { weight: 0, reps: prescribedReps || 8 };
   };
 
