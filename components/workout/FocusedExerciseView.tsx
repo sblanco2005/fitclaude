@@ -131,7 +131,12 @@ export default function FocusedExerciseView({
 
   // Per-exercise settings (reset when navigating)
   const [unit, setUnit] = useState<WeightUnit>(weightUnit);
-  const [plateMode, setPlateMode] = useState(false);
+  const [plateMode, setPlateMode] = useState(() => {
+    const first = exercises[0];
+    if (!first) return false;
+    const n = getExerciseName(first).toLowerCase();
+    return n.includes('barbell') || (first.exercise?.equipmentRequired?.toLowerCase().includes('barbell') ?? false);
+  });
   const [barWeight, setBarWeight] = useState(45);
 
   // Draft values: track unlogged set edits so we can auto-save on navigate
@@ -200,6 +205,14 @@ export default function FocusedExerciseView({
     return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   };
 
+  // Check if exercise at given index is barbell (for auto-enabling plate mode)
+  const isBarbellAt = (idx: number) => {
+    const e = exercises[idx];
+    if (!e) return false;
+    const n = getExerciseName(e).toLowerCase();
+    return n.includes('barbell') || (e.exercise?.equipmentRequired?.toLowerCase().includes('barbell') ?? false);
+  };
+
   // Navigation (auto-save drafts before moving)
   const goNext = () => {
     if (currentIndex < total - 1) {
@@ -207,6 +220,7 @@ export default function FocusedExerciseView({
       setCurrentIndex(currentIndex + 1);
       setShowVideo(false);
       setShowGif(false);
+      setPlateMode(isBarbellAt(currentIndex + 1));
     }
   };
   const goPrev = () => {
@@ -215,6 +229,7 @@ export default function FocusedExerciseView({
       setCurrentIndex(currentIndex - 1);
       setShowVideo(false);
       setShowGif(false);
+      setPlateMode(isBarbellAt(currentIndex - 1));
     }
   };
   const goTo = (idx: number) => {
@@ -223,6 +238,7 @@ export default function FocusedExerciseView({
       setCurrentIndex(idx);
       setShowVideo(false);
       setShowGif(false);
+      setPlateMode(isBarbellAt(idx));
     }
   };
 
@@ -232,6 +248,7 @@ export default function FocusedExerciseView({
     if (currentIndex < total - 1) {
       setCurrentIndex(currentIndex + 1);
       setShowVideo(false);
+      setPlateMode(isBarbellAt(currentIndex + 1));
     }
   };
   const unskipCurrent = () => {

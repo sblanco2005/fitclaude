@@ -1398,7 +1398,9 @@ function ExerciseLogRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
-  const [plateMode, setPlateMode] = useState(false);
+  const isBarbell = (ex.exercise?.equipmentRequired?.toLowerCase().includes('barbell') ?? false)
+    || getExerciseName(ex).toLowerCase().includes('barbell');
+  const [plateMode, setPlateMode] = useState(isBarbell);
   const [barWeight, setBarWeight] = useState(45);
   const [unit, setUnit] = useState<WeightUnit>(defaultUnit);
   const hasLogs = logs.length > 0;
@@ -1407,8 +1409,6 @@ function ExerciseLogRow({
   const videoId = firstVid?.youtubeVideoId ?? null;
   const vidPending = firstVid?.status === 'pending';
   const numSets = ex.sets || 3;
-  const isBarbell = (ex.exercise?.equipmentRequired?.toLowerCase().includes('barbell') ?? false)
-    || getExerciseName(ex).toLowerCase().includes('barbell');
 
   // Parse prescribed reps (e.g. "8-10" → 8, "12" → 12)
   const prescribedReps = parseInt(ex.reps ?? '0') || 0;
