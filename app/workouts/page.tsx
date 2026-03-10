@@ -1885,6 +1885,15 @@ function ActiveWorkout({
     }
   }, [isRunning, tick]);
 
+  // Auto-start workout immediately when added to Hit It (skip pre-start screen)
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (!startedRef.current && !isRunning && !isPaused && elapsed === 0) {
+      startedRef.current = true;
+      start();
+    }
+  }, [start, isRunning, isPaused, elapsed]);
+
   const pause = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
