@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import type { Workout, WorkoutExercise, Exercise, Activity } from '@/types';
 import SetRow, { type WeightUnit, lbToKg } from '@/components/workout/SetRow';
 import FocusedExerciseView from '@/components/workout/FocusedExerciseView';
+import MuscleGroupPicker from '@/components/workout/MuscleGroupPicker';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -2414,6 +2415,7 @@ export default function WorkoutsPage() {
   });
   const [spinTarget, setSpinTarget] = useState<{ name: string; muscles: string[]; exerciseCount: number; category: string; confirm: typeof SPIN_CONFIRMS[number] } | null>(null);
   const [spinning, setSpinning] = useState(false);
+  const [musclePickerOpen, setMusclePickerOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<Category>('all');
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
   const [routineSearch, setRoutineSearch] = useState('');
@@ -2946,6 +2948,18 @@ export default function WorkoutsPage() {
             ))
           )}
           </div>
+
+          {/* Muscle Picker FAB */}
+          <button
+            onClick={() => setMusclePickerOpen(true)}
+            className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-lg shadow-primary/25 flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L12 22M2 12L22 12M7 7L17 17M17 7L7 17" opacity="0.3" />
+              <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+              <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+            </svg>
+          </button>
         </div>
       )}
 
@@ -3069,6 +3083,19 @@ export default function WorkoutsPage() {
           setHitItSwapping(null);
         }}
       />
+
+      {/* Muscle Picker Modal */}
+      <Modal isOpen={musclePickerOpen} onClose={() => setMusclePickerOpen(false)} title="Build a Workout" size="lg">
+        <MuscleGroupPicker
+          onGenerate={async (prompt) => {
+            setMusclePickerOpen(false);
+            setChatTopic('workout');
+            setChatOpen(true);
+            await sendMessage(prompt);
+          }}
+          onClose={() => setMusclePickerOpen(false)}
+        />
+      </Modal>
 
       {/* Spin confirmation overlay */}
       {spinTarget && (
