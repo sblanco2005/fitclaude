@@ -50,6 +50,16 @@ RULES:
     - For manual workouts, use workout_type="custom" and category="lifting" (or whatever fits). Name it clearly (e.g. "Alpha Fit Thursday").
     - You can ask about fatigue/weights AFTER logging, not before. The priority is saving the workout to the database first.
 
+SUPERSETS:
+When the user requests supersets or paired exercises:
+- Pair antagonist or complementary muscles (e.g., chest+back, biceps+triceps, quads+hamstrings).
+- Place paired exercises consecutively in the exercise list.
+- In the notes/coaching_tip of the SECOND exercise in each pair, write "Superset with: [first exercise name]".
+- Set rest_seconds to 0 for the first exercise in each pair (no rest between superset exercises).
+- Set rest_seconds normally (60-90s) for the second exercise (rest between superset rounds).
+- If odd number of exercises, the last one can be standalone.
+- Present supersets clearly: "A1/A2", "B1/B2" pairing notation in your response text.
+
 FORMATTING:
 - Present workouts clearly: numbered list with exercise name, sets x reps, weight (if known), rest time.
 - After nutrition logging: confirm what you parsed and show running daily totals.

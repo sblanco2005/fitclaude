@@ -55,6 +55,7 @@ export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPi
   const [numExercises, setNumExercises] = useState(5);
   const [spicyLevel, setSpicyLevel] = useState(0);
   const [category, setCategory] = useState<string>('lifting');
+  const [supersets, setSupersets] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
 
   const toggle = (key: string) => {
@@ -86,6 +87,7 @@ export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPi
       .join(', ');
     let prompt = `Create a ${category} workout focusing on ${muscles} with ${numExercises} exercises`;
     if (spicyLevel > 0) prompt += ` at spicy level ${spicyLevel}`;
+    if (supersets) prompt += '. Use supersets — pair antagonist or complementary exercises to do back-to-back with no rest between paired exercises';
     prompt += '.';
     onGenerate(prompt);
   };
@@ -210,6 +212,24 @@ export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPi
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Supersets toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs text-slate-400 font-medium">Supersets</span>
+              <p className="text-[10px] text-slate-500 mt-0.5">Pair exercises back-to-back</p>
+            </div>
+            <button
+              onClick={() => setSupersets(!supersets)}
+              className={`relative w-10 h-[22px] rounded-full transition-colors ${
+                supersets ? 'bg-primary' : 'bg-slate-700'
+              }`}
+            >
+              <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform ${
+                supersets ? 'translate-x-[18px]' : ''
+              }`} />
+            </button>
           </div>
         </div>
       )}
