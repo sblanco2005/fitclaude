@@ -590,6 +590,7 @@ async def _tool_generate_workout(
             reps=ex.get("reps"),
             rest_seconds=ex.get("rest_seconds"),
             notes=notes_str,
+            superset_group=ex.get("superset_group"),
         )
         db.add(we)
         stored.append({

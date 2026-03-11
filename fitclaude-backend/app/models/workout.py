@@ -55,6 +55,7 @@ class WorkoutExercise(Base):
     notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     set_logs: Mapped[Optional[str]] = mapped_column("setLogs", Text, nullable=True)
     was_spicy: Mapped[bool] = mapped_column("wasSpicy", default=False)
+    superset_group: Mapped[Optional[str]] = mapped_column("supersetGroup", String, nullable=True)
 
     workout: Mapped["Workout"] = relationship(back_populates="exercises")
     exercise: Mapped[Optional["Exercise"]] = relationship()  # noqa: F821

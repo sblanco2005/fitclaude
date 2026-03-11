@@ -62,6 +62,10 @@ TOOL_DEFINITIONS = [
                                 "type": "string",
                                 "description": "Coaching tips and form cues for this exercise",
                             },
+                            "superset_group": {
+                                "type": "string",
+                                "description": "Superset group label (A, B, etc). Exercises with the same label form a superset pair. Omit for standalone exercises.",
+                            },
                         },
                         "required": ["name", "muscle_group", "sets", "reps"],
                     },

@@ -9,6 +9,7 @@ import type { Workout, WorkoutExercise, Exercise, Activity } from '@/types';
 import SetRow, { type WeightUnit, lbToKg } from '@/components/workout/SetRow';
 import FocusedExerciseView from '@/components/workout/FocusedExerciseView';
 import MuscleGroupPicker from '@/components/workout/MuscleGroupPicker';
+import { groupExercises } from '@/lib/workout-utils';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -564,6 +565,7 @@ function RoutineExerciseRow({
   onSwap,
   onUpdate,
   weightUnit = 'lb',
+  supersetLabel,
 }: {
   ex: WorkoutExercise;
   globalIndex: number;
@@ -572,6 +574,7 @@ function RoutineExerciseRow({
   onSwap: () => void;
   onUpdate: (updates: { sets?: number; reps?: string; restSeconds?: number }) => void;
   weightUnit?: 'lb' | 'kg';
+  supersetLabel?: string | null;
 }) {
   const [showVideo, setShowVideo] = useState(false);
   const [showGif, setShowGif] = useState(false);
@@ -615,6 +618,11 @@ function RoutineExerciseRow({
               <p className="text-sm text-white font-semibold truncate flex-1 min-w-0">
                 {getExerciseName(ex)}
                 {ex.wasSpicy && <span className="ml-1">🌶️</span>}
+                {supersetLabel && (
+                  <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-400/15 text-amber-300">
+                    {supersetLabel}
+                  </span>
+                )}
               </p>
               <div className="flex items-center gap-0.5 shrink-0">
                 {videoId && (
@@ -1087,8 +1095,26 @@ function RoutineDetail({
   const latest = workouts[0];
   const muscles = uniqueMuscles(latest);
   const totalSets = latest.exercises.reduce((acc, ex) => acc + ex.sets, 0);
-  const totalExercises = latest.exercises.length;
+  const exerciseGroups = useMemo(() => groupExercises(latest.exercises), [latest.exercises]);
+  const totalExercises = exerciseGroups.length;
   const routineNum = getRoutineDisplayId(workouts);
+
+  // Build a map from exercise ID → superset label (e.g., "A1", "A2")
+  const supersetLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    let groupLetterIdx = 0;
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    for (const group of exerciseGroups) {
+      if (group.supersetGroup && group.exercises.length > 1) {
+        const letter = letters[groupLetterIdx % letters.length];
+        group.exercises.forEach((ex, ei) => {
+          map.set(ex.id, `${letter}${ei + 1}`);
+        });
+        groupLetterIdx++;
+      }
+    }
+    return map;
+  }, [exerciseGroups]);
 
   const groupedByMuscle = useMemo(() => {
     const map = new Map<string, { ex: WorkoutExercise; globalIndex: number }[]>();
@@ -1295,6 +1321,7 @@ function RoutineDetail({
                   onSwap={() => setSwappingExercise(ex)}
                   onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                   weightUnit={weightUnit}
+                  supersetLabel={supersetLabelMap.get(ex.id)}
                 />
               ))}
             </div>
@@ -1317,6 +1344,7 @@ function RoutineDetail({
                       onSwap={() => setSwappingExercise(ex)}
                       onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                       weightUnit={weightUnit}
+                      supersetLabel={supersetLabelMap.get(ex.id)}
                     />
                   ))}
                 </div>
@@ -1953,8 +1981,11 @@ function ActiveWorkout({
     handleSave();
   };
 
-  const loggedCount = Array.from(exerciseLogs.values()).filter((l) => l.length > 0).length;
-  const totalExercises = latest.exercises.length;
+  const hitItGroups = useMemo(() => groupExercises(latest.exercises), [latest.exercises]);
+  const loggedCount = hitItGroups.filter((g) =>
+    g.exercises.some((e) => (exerciseLogs.get(e.id) ?? []).length > 0)
+  ).length;
+  const totalExercises = hitItGroups.length;
 
   const isActive = isRunning || isPaused;
 
@@ -2646,7 +2677,7 @@ export default function WorkoutsPage() {
     const muscles = uniqueMuscles(latest);
     const category = latest.category || 'lifting';
     const confirm = SPIN_CONFIRMS[Math.floor(Math.random() * SPIN_CONFIRMS.length)];
-    setSpinTarget({ name: routineName, muscles, exerciseCount: latest.exercises.length, category, confirm });
+    setSpinTarget({ name: routineName, muscles, exerciseCount: groupExercises(latest.exercises).length, category, confirm });
   };
 
   const confirmSpin = async () => {
