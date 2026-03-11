@@ -98,9 +98,6 @@ interface FocusedExerciseViewProps {
   latestWorkoutId: string;
   onSwapExercise?: (exerciseId: string) => void;
   weightUnit: 'lb' | 'kg';
-  restRemaining: number | null;
-  restTotal: number;
-  onCancelRest: () => void;
   isRunning: boolean;
   isPaused: boolean;
   elapsed: number;
@@ -116,9 +113,6 @@ export default function FocusedExerciseView({
   latestWorkoutId,
   onSwapExercise,
   weightUnit,
-  restRemaining,
-  restTotal,
-  onCancelRest,
   isRunning,
   isPaused,
   elapsed,
@@ -311,8 +305,6 @@ export default function FocusedExerciseView({
     onUpdateLogs(ex.id, filled.sort((a, b) => a.set - b.set));
   };
 
-  const showRestOverlay = restRemaining !== null && restRemaining > 0;
-
   return (
     <div className="flex flex-col h-full">
       {/* ─── Status bar ─── */}
@@ -335,14 +327,10 @@ export default function FocusedExerciseView({
           {fmtTime(elapsed)}
         </span>
 
-        {/* Rest timer (compact) */}
-        {restRemaining !== null && restRemaining > 0 ? (
-          <span className={`text-sm font-bold tabular-nums ${restRemaining <= 5 ? 'text-red-400' : 'text-amber-400'}`}>
-            Rest {fmtTime(restRemaining)}
-          </span>
-        ) : (
-          <span className="text-sm text-transparent">Rest 00:00</span>
-        )}
+        {/* Completed count */}
+        <span className="text-xs font-bold text-slate-500 tabular-nums">
+          {completedCount}/{total}
+        </span>
       </div>
 
       {/* ─── Segmented progress bar ─── */}
@@ -408,7 +396,6 @@ export default function FocusedExerciseView({
           {/* Prescription */}
           <p className="text-sm text-slate-400 font-medium mt-1 tabular-nums">
             {ex.sets} &times; {ex.reps ?? '?'}
-            {ex.restSeconds ? <span className="text-slate-600"> &middot; {ex.restSeconds}s rest</span> : null}
           </p>
 
           {/* Last session data */}
@@ -424,30 +411,7 @@ export default function FocusedExerciseView({
           )}
         </div>
 
-        {/* ─── Rest timer overlay ─── */}
-        {showRestOverlay ? (
-          <div className="flex flex-col items-center justify-center py-10">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Rest</span>
-            <span className={`text-5xl font-black tabular-nums tracking-tight mt-2 ${
-              restRemaining! <= 5 ? 'text-red-400 animate-pulse' : 'text-amber-400'
-            }`}>
-              {fmtTime(restRemaining!)}
-            </span>
-            {/* Progress ring */}
-            <div className="w-full max-w-[200px] h-1.5 bg-slate-800 rounded-full mt-4 overflow-hidden">
-              <div
-                className="h-full bg-amber-400 rounded-full transition-all duration-1000 ease-linear"
-                style={{ width: `${restTotal > 0 ? ((restTotal - restRemaining!) / restTotal) * 100 : 0}%` }}
-              />
-            </div>
-            <button
-              onClick={onCancelRest}
-              className="mt-4 px-6 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider hover:text-white active:bg-slate-700 transition-colors"
-            >
-              Skip Rest
-            </button>
-          </div>
-        ) : isSkipped ? (
+        {isSkipped ? (
           /* ─── Skipped exercise ─── */
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center">
@@ -466,10 +430,10 @@ export default function FocusedExerciseView({
         ) : showVideo && videoId ? (
           /* ─── Video view ─── */
           <div className="py-2">
-            <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
+            <div className="relative aspect-video max-h-[50vh] landscape:max-h-[70vh] rounded-lg overflow-hidden bg-slate-900">
               <iframe
                 src={`https://www.youtube.com/embed/${videoId}`}
-                className="w-full h-full"
+                className="absolute inset-0 w-full h-full"
                 allowFullScreen
                 loading="lazy"
               />
@@ -596,7 +560,7 @@ export default function FocusedExerciseView({
         )}
 
         {/* ─── "Next Exercise" button when current is complete ─── */}
-        {allSetsLogged && !showRestOverlay && nextEx && (
+        {allSetsLogged && nextEx && (
           <button
             onClick={goNext}
             className="w-full py-3 mt-2 rounded-xl bg-primary/15 text-primary font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary/25 active:scale-[0.98] flex items-center justify-center gap-2"

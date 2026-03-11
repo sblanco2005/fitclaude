@@ -557,7 +557,6 @@ function RoutineExerciseRow({
   const [editing, setEditing] = useState(false);
   const [editSets, setEditSets] = useState(ex.sets);
   const [editReps, setEditReps] = useState(ex.reps ?? '');
-  const [editRest, setEditRest] = useState(ex.restSeconds ?? 0);
   const firstVideo = ex.exercise?.videos?.[0] ?? null;
   const videoId = firstVideo?.youtubeVideoId ?? null;
   const videoPending = firstVideo?.status === 'pending';
@@ -567,16 +566,14 @@ function RoutineExerciseRow({
   const startEdit = () => {
     setEditSets(ex.sets);
     setEditReps(ex.reps ?? '');
-    setEditRest(ex.restSeconds ?? 0);
     setEditing(true);
     setTimeout(() => setsInputRef.current?.focus(), 50);
   };
 
   const saveEdit = () => {
-    const updates: { sets?: number; reps?: string; restSeconds?: number } = {};
+    const updates: { sets?: number; reps?: string } = {};
     if (editSets !== ex.sets) updates.sets = editSets;
     if (editReps !== (ex.reps ?? '')) updates.reps = editReps;
-    if (editRest !== (ex.restSeconds ?? 0)) updates.restSeconds = editRest;
     if (Object.keys(updates).length > 0) {
       onUpdate(updates);
     }
@@ -678,17 +675,6 @@ function RoutineExerciseRow({
                   onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
                 />
               </div>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min={0}
-                  value={editRest}
-                  onChange={(e) => setEditRest(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-12 bg-slate-800 text-white text-sm text-center rounded px-1.5 py-1 border border-slate-700 focus:border-emerald-500 outline-none"
-                  onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
-                />
-                <span className="text-xs text-muted">s rest</span>
-              </div>
               <div className="flex gap-1.5 mt-0.5">
                 <button onClick={saveEdit} className="text-[10px] text-emerald-400 font-medium hover:text-emerald-300">Save</button>
                 <button onClick={cancelEdit} className="text-[10px] text-slate-500 hover:text-slate-400">Cancel</button>
@@ -702,19 +688,16 @@ function RoutineExerciseRow({
               {ex.weightKg != null && (
                 <p className="text-[10px] text-muted">{ex.weightKg} kg</p>
               )}
-              {ex.restSeconds != null && (
-                <p className="text-[10px] text-slate-600">{ex.restSeconds}s rest</p>
-              )}
             </button>
           )}
         </div>
       </div>
       {showVideo && videoId && (
         <div className="ml-7 mt-2">
-          <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
+          <div className="relative aspect-video max-h-[50vh] landscape:max-h-[70vh] rounded-lg overflow-hidden bg-slate-900">
             <iframe
               src={`https://www.youtube.com/embed/${videoId}`}
-              className="w-full h-full"
+              className="absolute inset-0 w-full h-full"
               allowFullScreen
               loading="lazy"
             />
@@ -1629,10 +1612,10 @@ function ExerciseLogRow({
             {showVideo ? 'Hide video' : vidPending ? 'Watch form (pending)' : 'Watch form'}
           </button>
           {showVideo && (
-            <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900 mt-1.5">
+            <div className="relative aspect-video max-h-[50vh] landscape:max-h-[70vh] rounded-lg overflow-hidden bg-slate-900 mt-1.5">
               <iframe
                 src={`https://www.youtube.com/embed/${videoId}`}
-                className="w-full h-full"
+                className="absolute inset-0 w-full h-full"
                 allowFullScreen
                 loading="lazy"
               />
@@ -1743,72 +1726,6 @@ function ActiveWorkout({
   const startTimeRef = useRef<number | null>(restored?.startTime ?? null);
   const lastActivityRef = useRef<number>(restored?.lastActivity ?? Date.now());
 
-  // Rest timer state
-  const [restRemaining, setRestRemaining] = useState<number | null>(null);
-  const [restTotal, setRestTotal] = useState(0);
-  const restIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const restRemainingRef = useRef<number | null>(null);
-  const restExerciseRef = useRef<string | null>(null); // which exercise started the rest timer
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const hasRestPeriods = latest.exercises.some((ex) => ex.restSeconds && ex.restSeconds > 0);
-
-  const playBeep = useCallback((frequency: number, duration: number) => {
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
-    try {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = frequency;
-      osc.type = 'sine';
-      gain.gain.value = 0.3;
-      osc.start();
-      osc.stop(ctx.currentTime + duration / 1000);
-    } catch { /* ignore audio errors */ }
-  }, []);
-
-  const cancelRest = useCallback(() => {
-    if (restIntervalRef.current) {
-      clearInterval(restIntervalRef.current);
-      restIntervalRef.current = null;
-    }
-    restRemainingRef.current = null;
-    restExerciseRef.current = null;
-    setRestRemaining(null);
-  }, []);
-
-  const startRest = useCallback((seconds: number) => {
-    cancelRest();
-    if (seconds <= 0) return;
-    setRestTotal(seconds);
-    setRestRemaining(seconds);
-    restRemainingRef.current = seconds;
-    restIntervalRef.current = setInterval(() => {
-      const curr = restRemainingRef.current;
-      if (curr === null || curr <= 0) {
-        if (restIntervalRef.current) {
-          clearInterval(restIntervalRef.current);
-          restIntervalRef.current = null;
-        }
-        restRemainingRef.current = null;
-        setRestRemaining(null);
-        return;
-      }
-      const next = curr - 1;
-      restRemainingRef.current = next;
-      setRestRemaining(next);
-      // Audio beeps in last 5 seconds
-      if (next > 0 && next <= 5) {
-        playBeep(800, 100);
-      } else if (next === 0) {
-        // Done — double beep
-        playBeep(600, 200);
-        setTimeout(() => playBeep(600, 200), 300);
-      }
-    }, 1000);
-  }, [cancelRest, playBeep]);
-
   // Map of exerciseId -> SetLog[]
   const [exerciseLogs, setExerciseLogs] = useState<Map<string, SetLog[]>>(() => {
     if (restored?.logs) {
@@ -1823,36 +1740,14 @@ function ActiveWorkout({
   const exerciseLogsRef = useRef(exerciseLogs);
   exerciseLogsRef.current = exerciseLogs;
 
-  const updateLogs = useCallback((exerciseId: string, logs: SetLog[], restSeconds?: number, totalSets?: number) => {
+  const updateLogs = useCallback((exerciseId: string, logs: SetLog[]) => {
     lastActivityRef.current = Date.now();
-
-    // Read previous logs before updating state
-    const prevLogs = exerciseLogs.get(exerciseId) ?? [];
-    const isNewSet = logs.length > prevLogs.length;
-
-    // Handle rest timer logic outside of state updater (side effects)
-    if (isNewSet) {
-      const isDifferentExercise = restExerciseRef.current !== null && restExerciseRef.current !== exerciseId;
-
-      // If user starts logging a different exercise, cancel any running rest timer
-      if (isDifferentExercise) {
-        cancelRest();
-      }
-
-      // Start rest timer only when ALL prescribed sets for this exercise are done
-      const prescribed = totalSets || 3;
-      if (logs.length >= prescribed && restSeconds && restSeconds > 0) {
-        restExerciseRef.current = exerciseId;
-        startRest(restSeconds);
-      }
-    }
-
     setExerciseLogs((prev) => {
       const next = new Map(prev);
       next.set(exerciseId, logs);
       return next;
     });
-  }, [exerciseLogs, startRest, cancelRest]);
+  }, []);
 
   const stopRef = useRef<() => void>(() => {});
 
@@ -1880,10 +1775,6 @@ function ActiveWorkout({
     setIsRunning(true);
     setIsPaused(false);
     intervalRef.current = setInterval(tick, 1000);
-    // Initialize AudioContext on user gesture
-    if (!audioCtxRef.current) {
-      try { audioCtxRef.current = new AudioContext(); } catch { /* no audio support */ }
-    }
   }, [isRunning, tick]);
 
   // Auto-start workout immediately when added to Hit It (skip pre-start screen)
@@ -1900,14 +1791,13 @@ function ActiveWorkout({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    cancelRest();
     if (startTimeRef.current != null) {
       pausedAtRef.current = Math.floor((Date.now() - startTimeRef.current) / 1000);
       setElapsed(pausedAtRef.current);
     }
     setIsRunning(false);
     setIsPaused(true);
-  }, [cancelRest]);
+  }, []);
 
   const resume = useCallback(() => {
     const now = Date.now();
@@ -1925,13 +1815,12 @@ function ActiveWorkout({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    cancelRest();
     if (startTimeRef.current != null) {
       setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
     }
     setIsRunning(false);
     setIsPaused(false);
-  }, [cancelRest]);
+  }, []);
 
   // Keep stopRef in sync so tick can call it without stale closure
   stopRef.current = pause;
@@ -1947,7 +1836,6 @@ function ActiveWorkout({
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       if (intervalRef.current) clearInterval(intervalRef.current);
-      if (restIntervalRef.current) clearInterval(restIntervalRef.current);
     };
   }, [tick]);
 
@@ -1955,9 +1843,6 @@ function ActiveWorkout({
   useEffect(() => {
     if (restored && restored.running && !restored.paused && startTimeRef.current != null) {
       intervalRef.current = setInterval(tick, 1000);
-      if (!audioCtxRef.current) {
-        try { audioCtxRef.current = new AudioContext(); } catch { /* no audio */ }
-      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2078,9 +1963,6 @@ function ActiveWorkout({
             latestWorkoutId={latest.id}
             onSwapExercise={onSwapExercise ? (exId) => onSwapExercise(latest.id, exId) : undefined}
             weightUnit={weightUnit}
-            restRemaining={restRemaining}
-            restTotal={restTotal}
-            onCancelRest={cancelRest}
             isRunning={isRunning}
             isPaused={isPaused}
             elapsed={elapsed}
@@ -3085,7 +2967,7 @@ export default function WorkoutsPage() {
       />
 
       {/* Muscle Picker Modal */}
-      <Modal isOpen={musclePickerOpen} onClose={() => setMusclePickerOpen(false)} title="Build a Workout" size="lg">
+      <Modal isOpen={musclePickerOpen} onClose={() => setMusclePickerOpen(false)} title="Build a Workout" size="xl">
         <MuscleGroupPicker
           onGenerate={async (prompt) => {
             setMusclePickerOpen(false);

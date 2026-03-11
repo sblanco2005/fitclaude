@@ -1,103 +1,218 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import AnatomyFront from './anatomy/AnatomyFront';
+import AnatomyBack from './anatomy/AnatomyBack';
+import SubgroupChips from './anatomy/SubgroupChips';
+import { MUSCLE_MAP, MUSCLE_REGIONS, PRESETS, type MuscleView } from './anatomy/muscleData';
 import NumericStepper from './NumericStepper';
 
-// ─── muscle data ──────────────────────────────────────────────────────────────
-
-const MUSCLE_GROUPS = [
-  { key: 'chest',      label: 'Chest',      icon: 'M4 12c1-4 4-7 8-7s7 3 8 7c1-4 4-7 8-7s7 3 8 7' },
-  { key: 'back',       label: 'Back',       icon: 'M6 4v16M18 4v16M6 8h12M6 16h12' },
-  { key: 'shoulders',  label: 'Shoulders',  icon: 'M4 14c0-4 3-8 8-8s8 4 8 8M8 10l4-4 4 4' },
-  { key: 'biceps',     label: 'Biceps',     icon: 'M7 20c0-6 3-10 5-12s4 0 5 2c1-2 3-4 5-2s5 6 5 12' },
-  { key: 'triceps',    label: 'Triceps',    icon: 'M8 4v12c0 2 2 4 4 4s4-2 4-4V4M8 10h8' },
-  { key: 'quadriceps', label: 'Quads',      icon: 'M8 4v16M16 4v16M8 4c2 3 6 3 8 0M8 20c2-3 6-3 8 0' },
-  { key: 'hamstrings', label: 'Hamstrings', icon: 'M8 4v16M16 4v16M8 12h8' },
-  { key: 'glutes',     label: 'Glutes',     icon: 'M4 12c0-4 4-8 8-8s8 4 8 8M6 14c2-1 4-1 6 0M12 14c2-1 4-1 6 0' },
-  { key: 'core',       label: 'Core',       icon: 'M8 4h8v16H8zM8 8h8M8 12h8M8 16h8' },
-  { key: 'calves',     label: 'Calves',     icon: 'M9 4c-1 5-2 8-1 12s2 4 3 4 2-1 3-4 0-7-1-12' },
-  { key: 'full_body',  label: 'Full Body',  icon: 'M12 2v6M8 8l4 4 4-4M8 12v4l-2 4M16 12v4l2 4M12 8v8' },
-] as const;
-
-const MUSCLE_BG: Record<string, string> = {
-  chest:      'bg-blue-500/30 border-blue-400/50 text-blue-200',
-  back:       'bg-green-500/30 border-green-400/50 text-green-200',
-  shoulders:  'bg-purple-500/30 border-purple-400/50 text-purple-200',
-  biceps:     'bg-pink-500/30 border-pink-400/50 text-pink-200',
-  triceps:    'bg-pink-500/30 border-pink-400/50 text-pink-200',
-  quadriceps: 'bg-yellow-500/30 border-yellow-400/50 text-yellow-200',
-  hamstrings: 'bg-yellow-500/30 border-yellow-400/50 text-yellow-200',
-  glutes:     'bg-amber-500/30 border-amber-400/50 text-amber-200',
-  core:       'bg-orange-500/30 border-orange-400/50 text-orange-200',
-  calves:     'bg-yellow-500/30 border-yellow-400/50 text-yellow-200',
-  full_body:  'bg-emerald-500/30 border-emerald-400/50 text-emerald-200',
-};
-
-const PRESETS = [
-  { label: 'Push', keys: ['chest', 'shoulders', 'triceps'] },
-  { label: 'Pull', keys: ['back', 'biceps'] },
-  { label: 'Legs', keys: ['quadriceps', 'hamstrings', 'glutes', 'calves'] },
-  { label: 'Upper', keys: ['chest', 'back', 'shoulders', 'biceps', 'triceps'] },
-];
+// ─── constants ───────────────────────────────────────────────────────────────
 
 const CATEGORIES = ['lifting', 'hiit', 'cardio', 'calisthenics'] as const;
 const SPICY_LABELS = ['None', '1', '2', '3'] as const;
 
-// ─── component ────────────────────────────────────────────────────────────────
+// ─── component ───────────────────────────────────────────────────────────────
 
 interface MuscleGroupPickerProps {
   onGenerate: (prompt: string) => void;
   onClose: () => void;
 }
 
-export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPickerProps) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps) {
+  const [selectedMuscles, setSelectedMuscles] = useState<Set<string>>(new Set());
+  const [selectedSubgroups, setSelectedSubgroups] = useState<Map<string, Set<string>>>(new Map());
+  const [activeView, setActiveView] = useState<MuscleView>('front');
   const [numExercises, setNumExercises] = useState(5);
   const [spicyLevel, setSpicyLevel] = useState(0);
   const [category, setCategory] = useState<string>('lifting');
   const [supersets, setSupersets] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
 
-  const toggle = (key: string) => {
-    setSelected(prev => {
+  // Toggle a muscle group on/off
+  const handleMuscleClick = useCallback((muscle: string) => {
+    setSelectedMuscles((prev) => {
       const next = new Set(prev);
-      if (key === 'full_body') {
-        // Full body clears individuals, or deselects itself
-        if (next.has('full_body')) { next.delete('full_body'); } else { next.clear(); next.add('full_body'); }
+      if (next.has(muscle)) {
+        next.delete(muscle);
+        // Clean up subgroups
+        setSelectedSubgroups((sp) => {
+          const ns = new Map(sp);
+          ns.delete(muscle);
+          return ns;
+        });
       } else {
-        next.delete('full_body');
-        if (next.has(key)) next.delete(key); else next.add(key);
+        next.add(muscle);
+        // Initialize all subgroups as selected
+        const region = MUSCLE_MAP[muscle];
+        if (region && region.subgroups.length > 0) {
+          setSelectedSubgroups((sp) => {
+            const ns = new Map(sp);
+            ns.set(muscle, new Set(region.subgroups.map((s) => s.key)));
+            return ns;
+          });
+        }
       }
       return next;
     });
-  };
+  }, []);
 
-  const applyPreset = (keys: string[]) => {
-    setSelected(prev => {
-      const allSelected = keys.every(k => prev.has(k));
-      if (allSelected) return new Set(); // deselect if already matching
+  // Toggle a specific subgroup
+  const handleToggleSubgroup = useCallback((muscle: string, subgroup: string) => {
+    setSelectedSubgroups((prev) => {
+      const ns = new Map(prev);
+      const current = ns.get(muscle);
+      if (!current) return prev;
+      const next = new Set(current);
+      if (next.has(subgroup)) {
+        next.delete(subgroup);
+        // If all subgroups removed, deselect the muscle entirely
+        if (next.size === 0) {
+          ns.delete(muscle);
+          setSelectedMuscles((sm) => {
+            const n = new Set(sm);
+            n.delete(muscle);
+            return n;
+          });
+          return ns;
+        }
+      } else {
+        next.add(subgroup);
+      }
+      ns.set(muscle, next);
+      return ns;
+    });
+  }, []);
+
+  // Apply a preset
+  const applyPreset = useCallback((keys: string[]) => {
+    setSelectedMuscles((prev) => {
+      const allSelected = keys.every((k) => prev.has(k)) && prev.size === keys.length;
+      if (allSelected) {
+        setSelectedSubgroups(new Map());
+        return new Set();
+      }
+      // Set new selection with all subgroups
+      const newSubs = new Map<string, Set<string>>();
+      for (const key of keys) {
+        const region = MUSCLE_MAP[key];
+        if (region && region.subgroups.length > 0) {
+          newSubs.set(key, new Set(region.subgroups.map((s) => s.key)));
+        }
+      }
+      setSelectedSubgroups(newSubs);
       return new Set(keys);
     });
-  };
+  }, []);
 
+  // Build prompt with sub-group detail
   const handleGenerate = () => {
-    if (selected.size === 0) return;
-    const muscles = Array.from(selected)
-      .map(k => MUSCLE_GROUPS.find(m => m.key === k)?.label ?? k)
-      .join(', ');
-    let prompt = `Create a ${category} workout focusing on ${muscles} with ${numExercises} exercises`;
+    if (selectedMuscles.size === 0) return;
+
+    const parts: string[] = [];
+    for (const muscle of selectedMuscles) {
+      const region = MUSCLE_MAP[muscle];
+      if (!region) {
+        parts.push(muscle);
+        continue;
+      }
+
+      const subs = selectedSubgroups.get(muscle);
+      const allSubKeys = region.subgroups.map((s) => s.key);
+
+      // If no subgroups, or all selected, just use the group name
+      if (allSubKeys.length === 0 || !subs || subs.size === allSubKeys.length) {
+        parts.push(region.label);
+      } else {
+        // Specific sub-regions
+        const subLabels = Array.from(subs)
+          .map((sk) => region.subgroups.find((s) => s.key === sk)?.label)
+          .filter(Boolean);
+        parts.push(subLabels.join(', '));
+      }
+    }
+
+    let prompt = `Create a ${category} workout focusing on ${parts.join(', ')} with ${numExercises} exercises`;
     if (spicyLevel > 0) prompt += ` at spicy level ${spicyLevel}`;
-    if (supersets) prompt += '. Use supersets — pair antagonist or complementary exercises to do back-to-back with no rest between paired exercises';
+    if (supersets)
+      prompt += '. Use supersets — pair antagonist or complementary exercises to do back-to-back with no rest between paired exercises';
     prompt += '.';
     onGenerate(prompt);
   };
 
   return (
     <div className="space-y-4">
+      {/* Front/Back view toggle (mobile: tabs, desktop: both shown) */}
+      <div className="flex gap-1 sm:hidden bg-slate-800/50 rounded-lg p-1">
+        {(['front', 'back'] as const).map((view) => (
+          <button
+            key={view}
+            onClick={() => setActiveView(view)}
+            className={`flex-1 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all ${
+              activeView === view
+                ? 'bg-blue-500/30 text-blue-200'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            {view}
+          </button>
+        ))}
+      </div>
+
+      {/* Body map */}
+      <div className="relative bg-slate-900/40 rounded-xl p-2 border border-slate-800/50">
+        {/* Mobile: single view */}
+        <div className="sm:hidden flex justify-center">
+          {activeView === 'front' ? (
+            <AnatomyFront selectedMuscles={selectedMuscles} onMuscleClick={handleMuscleClick} />
+          ) : (
+            <AnatomyBack selectedMuscles={selectedMuscles} onMuscleClick={handleMuscleClick} />
+          )}
+        </div>
+        {/* Desktop: side by side */}
+        <div className="hidden sm:grid sm:grid-cols-2 gap-2">
+          <AnatomyFront selectedMuscles={selectedMuscles} onMuscleClick={handleMuscleClick} />
+          <AnatomyBack selectedMuscles={selectedMuscles} onMuscleClick={handleMuscleClick} />
+        </div>
+      </div>
+
+      {/* Sub-group chips (focus areas) */}
+      <SubgroupChips
+        selectedMuscles={selectedMuscles}
+        selectedSubgroups={selectedSubgroups}
+        onToggleSubgroup={handleToggleSubgroup}
+      />
+
+      {/* Selected muscles summary chips */}
+      {selectedMuscles.size > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {Array.from(selectedMuscles).map((key) => {
+            const region = MUSCLE_MAP[key];
+            return (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-500/20 border border-blue-400/30 text-blue-200"
+              >
+                {region?.label ?? key}
+                <button
+                  onClick={() => handleMuscleClick(key)}
+                  className="ml-0.5 hover:text-white transition-colors"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       {/* Quick presets */}
-      <div className="flex gap-2">
-        {PRESETS.map(p => {
-          const active = p.keys.every(k => selected.has(k)) && selected.size === p.keys.length;
+      <div className="flex gap-2 flex-wrap">
+        {PRESETS.map((p) => {
+          const active =
+            p.keys.every((k) => selectedMuscles.has(k)) && selectedMuscles.size === p.keys.length;
           return (
             <button
               key={p.label}
@@ -114,37 +229,6 @@ export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPi
         })}
       </div>
 
-      {/* Muscle group grid */}
-      <div className="grid grid-cols-3 gap-2">
-        {MUSCLE_GROUPS.map(m => {
-          const isSelected = selected.has(m.key);
-          const colorCls = MUSCLE_BG[m.key] ?? 'bg-slate-500/30 border-slate-400/50 text-slate-200';
-          return (
-            <button
-              key={m.key}
-              onClick={() => toggle(m.key)}
-              className={`relative flex flex-col items-center justify-center gap-1 min-h-[72px] rounded-xl border transition-all ${
-                isSelected
-                  ? `${colorCls} scale-[1.02]`
-                  : 'bg-slate-800/40 border-slate-700/50 text-slate-400 hover:bg-slate-800/60'
-              }`}
-            >
-              {isSelected && (
-                <div className="absolute top-1.5 right-1.5">
-                  <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              )}
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-80">
-                <path d={m.icon} />
-              </svg>
-              <span className="text-[11px] font-semibold">{m.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
       {/* Options toggle */}
       <button
         onClick={() => setShowOptions(!showOptions)}
@@ -152,7 +236,10 @@ export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPi
       >
         <svg
           className={`w-3 h-3 transition-transform ${showOptions ? 'rotate-90' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
@@ -178,7 +265,7 @@ export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPi
           <div>
             <span className="text-xs text-slate-400 font-medium block mb-1.5">Category</span>
             <div className="flex gap-1.5 flex-wrap">
-              {CATEGORIES.map(c => (
+              {CATEGORIES.map((c) => (
                 <button
                   key={c}
                   onClick={() => setCategory(c)}
@@ -208,7 +295,7 @@ export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPi
                       : 'bg-slate-700/50 text-slate-400 hover:text-white'
                   }`}
                 >
-                  {i === 0 ? label : '🌶️'.repeat(i)}
+                  {i === 0 ? label : '\u{1F336}\uFE0F'.repeat(i)}
                 </button>
               ))}
             </div>
@@ -226,9 +313,11 @@ export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPi
                 supersets ? 'bg-primary' : 'bg-slate-700'
               }`}
             >
-              <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform ${
-                supersets ? 'translate-x-[18px]' : ''
-              }`} />
+              <span
+                className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white transition-transform ${
+                  supersets ? 'translate-x-[18px]' : ''
+                }`}
+              />
             </button>
           </div>
         </div>
@@ -237,15 +326,15 @@ export default function MuscleGroupPicker({ onGenerate, onClose }: MuscleGroupPi
       {/* Generate button */}
       <button
         onClick={handleGenerate}
-        disabled={selected.size === 0}
+        disabled={selectedMuscles.size === 0}
         className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${
-          selected.size > 0
+          selectedMuscles.size > 0
             ? 'bg-primary text-white hover:bg-primary/90 active:scale-[0.98]'
             : 'bg-slate-800 text-slate-600 cursor-not-allowed'
         }`}
       >
-        {selected.size === 0
-          ? 'Select muscles to start'
+        {selectedMuscles.size === 0
+          ? 'Tap muscles to start'
           : `Generate ${category} workout`}
       </button>
     </div>
