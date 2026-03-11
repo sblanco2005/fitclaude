@@ -242,9 +242,9 @@ export const HEAD_PATH = 'M100,8 C88,8 80,16 80,28 C80,40 84,48 88,54 C92,58 96,
 
 // ─── colors ──────────────────────────────────────────────────────────────────
 
-export const SELECTED_FILL = 'rgba(59, 130, 246, 0.55)';
-export const SELECTED_STROKE = 'rgba(96, 165, 250, 0.8)';
-export const UNSELECTED_FILL = 'rgba(30, 41, 59, 0.45)';
-export const UNSELECTED_STROKE = 'rgba(148, 163, 184, 0.12)';
-export const HOVER_FILL = 'rgba(59, 130, 246, 0.25)';
-export const OUTLINE_STROKE = 'rgba(148, 163, 184, 0.2)';
+export const SELECTED_FILL = 'rgba(59, 130, 246, 0.60)';
+export const SELECTED_STROKE = 'rgba(96, 165, 250, 0.95)';
+export const UNSELECTED_FILL = 'rgba(51, 65, 85, 0.60)';
+export const UNSELECTED_STROKE = 'rgba(148, 163, 184, 0.45)';
+export const HOVER_FILL = 'rgba(59, 130, 246, 0.30)';
+export const OUTLINE_STROKE = 'rgba(148, 163, 184, 0.55)';

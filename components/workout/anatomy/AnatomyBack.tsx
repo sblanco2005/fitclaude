@@ -27,16 +27,16 @@ export default function AnatomyBack({ selectedMuscles, onMuscleClick }: AnatomyB
       {/* Body outline */}
       <path
         d={BODY_OUTLINE_BACK}
-        fill="rgba(15, 23, 42, 0.3)"
+        fill="rgba(15, 23, 42, 0.4)"
         stroke={OUTLINE_STROKE}
-        strokeWidth="1"
+        strokeWidth="1.5"
       />
       {/* Head */}
       <path
         d={HEAD_PATH}
-        fill="rgba(15, 23, 42, 0.3)"
+        fill="rgba(15, 23, 42, 0.4)"
         stroke={OUTLINE_STROKE}
-        strokeWidth="1"
+        strokeWidth="1.5"
       />
 
       {/* Clickable muscle regions */}
@@ -48,7 +48,7 @@ export default function AnatomyBack({ selectedMuscles, onMuscleClick }: AnatomyB
             d={mp.d}
             fill={isSelected ? SELECTED_FILL : UNSELECTED_FILL}
             stroke={isSelected ? SELECTED_STROKE : UNSELECTED_STROKE}
-            strokeWidth={isSelected ? 1.2 : 0.6}
+            strokeWidth={isSelected ? 1.5 : 1.0}
             className="cursor-pointer transition-all duration-200 hover:brightness-125"
             style={{
               transition: 'fill 200ms ease, stroke 200ms ease',
