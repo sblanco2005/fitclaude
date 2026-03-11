@@ -143,62 +143,83 @@ function RoutineCard({
   name,
   workouts,
   onClick,
+  onToggleFavorite,
 }: {
   name: string;
   workouts: Workout[];
   onClick: () => void;
+  onToggleFavorite: (workoutId: string, current: boolean) => void;
 }) {
   const latest = workouts[0];
   const typeColor = TYPE_COLORS[latest.workoutType] ?? 'default';
   const muscles = uniqueMuscles(latest);
   const routineNum = getRoutineDisplayId(workouts);
   const isLifting = (latest.category || 'lifting') === 'lifting';
+  const isFav = latest.isFavorite;
 
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left px-4 py-3 rounded-xl glass hover:bg-slate-800/60 hover:border-slate-600 transition-all duration-200"
-    >
-      {/* Row 1: #N + name + badge + spin + hit it */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {routineNum != null && (
-            <span className="text-xs text-slate-500 tabular-nums shrink-0">#{routineNum}</span>
-          )}
-          <p className="font-bold text-white text-sm leading-tight truncate capitalize">
-            {name.replace(/_/g, ' ')}
-          </p>
-          {isLifting ? (
-            <Badge variant={typeColor} size="sm">
-              {latest.workoutType.replace('_', ' ')}
-            </Badge>
-          ) : (
-            <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${CATEGORY_COLORS[latest.category!] || 'bg-slate-700/30 text-slate-400 border-slate-600'}`}>
-              {latest.category}
-            </span>
-          )}
-          {latest.source === 'manual' && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/20">
-              ext
-            </span>
+    <div className="flex items-center gap-1">
+      <button
+        onClick={onClick}
+        className="flex-1 min-w-0 text-left px-4 py-3 rounded-xl glass hover:bg-slate-800/60 hover:border-slate-600 transition-all duration-200"
+      >
+        {/* Row 1: #N + name + badge */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {routineNum != null && (
+              <span className="text-xs text-slate-500 tabular-nums shrink-0">#{routineNum}</span>
+            )}
+            <p className="font-bold text-white text-sm leading-tight truncate capitalize">
+              {name.replace(/_/g, ' ')}
+            </p>
+            {isLifting ? (
+              <Badge variant={typeColor} size="sm">
+                {latest.workoutType.replace('_', ' ')}
+              </Badge>
+            ) : (
+              <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${CATEGORY_COLORS[latest.category!] || 'bg-slate-700/30 text-slate-400 border-slate-600'}`}>
+                {latest.category}
+              </span>
+            )}
+            {latest.source === 'manual' && (
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                ext
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: stats + muscles */}
+        <div className="flex items-center gap-2 mt-1 ml-0.5">
+          <span className="text-[11px] text-slate-500">{workouts.length}x done</span>
+          {isLifting && muscles.length > 0 && (
+            <>
+              <span className="text-slate-700">&middot;</span>
+              <span className="text-[10px] text-slate-500/80 uppercase tracking-wider truncate">
+                {muscles.slice(0, 2).join(' · ')}
+                {muscles.length > 2 && ` +${muscles.length - 2}`}
+              </span>
+            </>
           )}
         </div>
-      </div>
+      </button>
 
-      {/* Row 2: stats + muscles */}
-      <div className="flex items-center gap-2 mt-1 ml-0.5">
-        <span className="text-[11px] text-slate-500">{workouts.length}x done</span>
-        {isLifting && muscles.length > 0 && (
-          <>
-            <span className="text-slate-700">&middot;</span>
-            <span className="text-[10px] text-slate-500/80 uppercase tracking-wider truncate">
-              {muscles.slice(0, 2).join(' · ')}
-              {muscles.length > 2 && ` +${muscles.length - 2}`}
-            </span>
-          </>
-        )}
-      </div>
-    </button>
+      {/* Favorite heart */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(latest.id, isFav); }}
+        className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-slate-800/60"
+      >
+        <svg
+          className={`w-5 h-5 transition-colors ${isFav ? 'text-red-400 fill-red-400' : 'text-slate-600 hover:text-slate-400'}`}
+          viewBox="0 0 24 24"
+          fill={isFav ? 'currentColor' : 'none'}
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+        </svg>
+      </button>
+    </div>
   );
 }
 
@@ -2303,6 +2324,7 @@ export default function WorkoutsPage() {
   const [routineSearch, setRoutineSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [finishedWorkouts, setFinishedWorkouts] = useState<
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
   >([]);
@@ -2418,8 +2440,11 @@ export default function WorkoutsPage() {
         return false;
       });
     }
+    if (favoritesOnly) {
+      filtered = filtered.filter(([, group]) => group[0].isFavorite);
+    }
     return filtered;
-  }, [routineGroups, categoryFilter, muscleFilter, routineSearch]);
+  }, [routineGroups, categoryFilter, muscleFilter, routineSearch, favoritesOnly]);
 
   // Categories that actually have routines (for showing only relevant pills)
   const activeCategories = useMemo(() => {
@@ -2478,6 +2503,22 @@ export default function WorkoutsPage() {
 
     setSelectedRoutine(null);
     setTab('hit-it');
+  };
+
+  const toggleFavorite = async (workoutId: string, currentValue: boolean) => {
+    try {
+      await fetch(`/api/workouts/${workoutId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isFavorite: !currentValue }),
+      });
+      // Optimistic update
+      setWorkouts((prev) =>
+        prev.map((w) => w.id === workoutId ? { ...w, isFavorite: !currentValue } : w)
+      );
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err);
+    }
   };
 
   const removeFromHitIt = (name: string) => {
@@ -2726,6 +2767,23 @@ export default function WorkoutsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </button>
+                <button
+                  onClick={() => setFavoritesOnly((v) => !v)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    favoritesOnly ? 'text-red-400 bg-red-400/10' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                  title="Show favorites only"
+                >
+                  <svg
+                    className="w-[18px] h-[18px]"
+                    viewBox="0 0 24 24"
+                    fill={favoritesOnly ? 'currentColor' : 'none'}
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+                  </svg>
+                </button>
                 {(activeCategories.size > 1 || activeMuscles.size > 1) && (
                   <button
                     onClick={() => setFilterOpen((v) => !v)}
@@ -2803,11 +2861,13 @@ export default function WorkoutsPage() {
                 <p className="text-muted text-sm font-medium">
                   {routineGroups.length === 0
                     ? 'No routines yet. Chat with your coach to generate one!'
-                    : routineSearch
-                      ? `No routines match "${routineSearch}"`
-                      : muscleFilter
-                        ? `No ${muscleFilter} routines${categoryFilter !== 'all' ? ` in ${categoryFilter}` : ''}.`
-                        : `No ${categoryFilter} routines yet.`}
+                    : favoritesOnly
+                      ? 'No favorite routines yet. Tap the heart on a routine to save it.'
+                      : routineSearch
+                        ? `No routines match "${routineSearch}"`
+                        : muscleFilter
+                          ? `No ${muscleFilter} routines${categoryFilter !== 'all' ? ` in ${categoryFilter}` : ''}.`
+                          : `No ${categoryFilter} routines yet.`}
                 </p>
                 {routineGroups.length === 0 && (
                   <button
@@ -2826,6 +2886,7 @@ export default function WorkoutsPage() {
                 name={key}
                 workouts={group}
                 onClick={() => setSelectedRoutine(key)}
+                onToggleFavorite={toggleFavorite}
               />
             ))
           )}

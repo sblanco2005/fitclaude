@@ -114,6 +114,7 @@ export interface Workout {
   notes: string | null;
   fatigueRating: number | null;
   completed: boolean;
+  isFavorite: boolean;
   createdAt: string;
   exercises: WorkoutExercise[];
 }

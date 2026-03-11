@@ -33,7 +33,7 @@ export const PATCH = withAuth(async (request, user, params) => {
 
   const body = await request.json();
 
-  const allowedFields = ['name', 'completed', 'fatigueRating', 'notes', 'durationMinutes'];
+  const allowedFields = ['name', 'completed', 'fatigueRating', 'notes', 'durationMinutes', 'isFavorite'];
   const updates: Record<string, unknown> = {};
   for (const field of allowedFields) {
     if (field in body) {

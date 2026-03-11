@@ -159,6 +159,7 @@ model Workout {
   notes           String?  @db.Text
   fatigueRating   Int?     // 1-10
   completed       Boolean  @default(false)
+  isFavorite      Boolean  @default(false)
   createdAt       DateTime @default(now())
 
   user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
