@@ -958,6 +958,7 @@ async def handle_chat(
         # Tool-use loop
         workout_id = None
         nutrition_log_id = None
+        nutrition_logged_this_turn = False  # Guard: only one log_nutrition per user message
 
         logger.info(f"[Coach] Initial stop_reason: {response.stop_reason}")
         while response.stop_reason == "tool_use":
@@ -965,6 +966,15 @@ async def handle_chat(
             for block in response.content:
                 if block.type == "tool_use":
                     logger.info(f"[Coach] Tool call: {block.name} with input keys: {list(block.input.keys())}")
+                    # Deduplicate: skip extra log_nutrition calls in the same turn
+                    if block.name == "log_nutrition" and nutrition_logged_this_turn:
+                        logger.warning("[Coach] Skipping duplicate log_nutrition call in same turn")
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": json.dumps({"error": "Duplicate log_nutrition call skipped — items should be combined into a single call."}),
+                        })
+                        continue
                     result = await _execute_tool(block.name, block.input, user_id, db, user_tz=user_tz)
                     logger.info(f"[Coach] Tool result keys: {list(result.keys())}")
                     # Track IDs for response (but strip from what Claude sees)
@@ -972,6 +982,7 @@ async def handle_chat(
                         workout_id = result["workout_id"]
                     if "nutrition_log_id" in result:
                         nutrition_log_id = result["nutrition_log_id"]
+                        nutrition_logged_this_turn = True
 
                     # Strip internal IDs before sending to Claude
                     claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id")}
