@@ -229,6 +229,19 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
         })}
       </div>
 
+      {/* Always-visible: exercise count */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-400 font-medium">Exercises</span>
+        <NumericStepper
+          value={numExercises}
+          onChange={setNumExercises}
+          step={1}
+          min={3}
+          max={10}
+          inputWidth="w-10"
+        />
+      </div>
+
       {/* Options toggle */}
       <button
         onClick={() => setShowOptions(!showOptions)}
@@ -248,19 +261,6 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
 
       {showOptions && (
         <div className="space-y-3 p-3 bg-slate-800/30 rounded-xl">
-          {/* Number of exercises */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">Exercises</span>
-            <NumericStepper
-              value={numExercises}
-              onChange={setNumExercises}
-              step={1}
-              min={3}
-              max={10}
-              inputWidth="w-10"
-            />
-          </div>
-
           {/* Category */}
           <div>
             <span className="text-xs text-slate-400 font-medium block mb-1.5">Category</span>

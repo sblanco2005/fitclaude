@@ -407,31 +407,6 @@ export default function FocusedExerciseView({
         {/* Coaching tip */}
         {tip && <p className="text-xs text-slate-500 italic mt-1 leading-relaxed">{tip}</p>}
 
-        {/* Video/GIF/Toolbar row */}
-        {!exIsSkipped && (vidId || exGifUrl) && (
-          <div className="flex gap-1.5 mt-1.5">
-            {vidId && (
-              <button
-                onClick={() => { setShowVideo(isShowingVideo ? null : exercise.id); setShowGif(null); }}
-                className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                  isShowingVideo ? 'bg-red-500/20 text-red-400' : vidIsPending ? 'bg-amber-400/10 text-amber-400/60' : 'bg-slate-800 text-slate-500 hover:text-red-400'
-                }`}
-              >
-                {isShowingVideo ? 'Hide Video' : 'Video'}
-              </button>
-            )}
-            {exGifUrl && (
-              <button
-                onClick={() => { setShowGif(isShowingGif ? null : exercise.id); setShowVideo(null); }}
-                className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                  isShowingGif ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-500 hover:text-cyan-400'
-                }`}
-              >
-                {isShowingGif ? 'Hide Demo' : 'Demo'}
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Video embed */}
         {isShowingVideo && vidId && (
@@ -724,6 +699,51 @@ export default function FocusedExerciseView({
         </button>
 
         <div className="flex items-center gap-2">
+          {/* Media buttons — use first exercise with video/gif in the group */}
+          {(() => {
+            const mediaEx = currentGroup.exercises.find((e) => e.exercise?.videos?.[0] || e.exercise?.gifUrl) ?? null;
+            if (!mediaEx) return null;
+            const mVid = mediaEx.exercise?.videos?.[0] ?? null;
+            const mVidId = mVid?.youtubeVideoId ?? null;
+            const mVidPending = mVid?.status === 'pending';
+            const mGifUrl = mediaEx.exercise?.gifUrl ?? null;
+            const mShowingVideo = showVideo === mediaEx.id && mVidId;
+            const mShowingGif = showGif === mediaEx.id && mGifUrl;
+            return (
+              <>
+                {mVidId && (
+                  <button
+                    onClick={() => { setShowVideo(mShowingVideo ? null : mediaEx.id); setShowGif(null); }}
+                    className={`w-11 h-11 flex items-center justify-center rounded-xl transition-colors ${
+                      mShowingVideo ? 'bg-red-500/20 text-red-400' : mVidPending ? 'bg-amber-400/10 text-amber-400/50' : 'bg-slate-800 text-slate-500 hover:text-red-400 active:bg-slate-700'
+                    }`}
+                    title="YouTube tutorial"
+                  >
+                    {/* YouTube icon */}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1C4.5 20.5 12 20.5 12 20.5s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.8zM9.8 15.5V8.5l6.3 3.5-6.3 3.5z" />
+                    </svg>
+                  </button>
+                )}
+                {mGifUrl && (
+                  <button
+                    onClick={() => { setShowGif(mShowingGif ? null : mediaEx.id); setShowVideo(null); }}
+                    className={`w-11 h-11 flex items-center justify-center rounded-xl transition-colors ${
+                      mShowingGif ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-500 hover:text-cyan-400 active:bg-slate-700'
+                    }`}
+                    title="Exercise demo"
+                  >
+                    {/* Circular play / demo icon */}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                      <circle cx="12" cy="12" r="9" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 8.5l5 3.5-5 3.5V8.5z" fill="currentColor" stroke="none" />
+                    </svg>
+                  </button>
+                )}
+              </>
+            );
+          })()}
+
           {!isSkipped && !groupAllDone && (
             <button
               onClick={skipCurrent}
