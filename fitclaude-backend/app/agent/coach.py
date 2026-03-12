@@ -679,8 +679,13 @@ async def _tool_log_nutrition(
         raise
 
     # Get daily totals using user's local date
+    # Wrapped in try/except so a totals query failure doesn't hide the successful log
     user_today = user_now.date()
-    daily = await _get_daily_totals(db, user_id, user_today, user_tz=user_tz)
+    try:
+        daily = await _get_daily_totals(db, user_id, user_today, user_tz=user_tz)
+    except Exception as e:
+        logger.error(f"[Coach] Failed to get daily totals after logging: {e}")
+        daily = {"date": str(user_today), "total_calories": 0, "total_protein_g": 0, "total_carbs_g": 0, "total_fat_g": 0, "meal_count": 0}
 
     return {
         "nutrition_log_id": log.id,
@@ -1014,7 +1019,7 @@ async def handle_chat(
         # the model didn't call log_nutrition, retry once with a forced instruction.
         if (
             topic == "nutrition"
-            and nutrition_log_id is None
+            and not nutrition_logged_this_turn
             and _looks_like_food_log(user_message)
             and response.stop_reason == "end_turn"
         ):
@@ -1042,6 +1047,15 @@ async def handle_chat(
                 for block in response.content:
                     if block.type == "tool_use":
                         logger.info(f"[Coach] Retry tool call: {block.name}")
+                        # Dedup guard for retry loop too
+                        if block.name == "log_nutrition" and nutrition_logged_this_turn:
+                            logger.warning("[Coach] Skipping duplicate log_nutrition in retry loop")
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": json.dumps({"error": "Already logged this turn."}),
+                            })
+                            continue
                         result = await _execute_tool(block.name, block.input, user_id, db, user_tz=user_tz)
                         if "nutrition_log_id" in result:
                             nutrition_log_id = result["nutrition_log_id"]
