@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "fitclaude": {
+      "command": "/Users/santiagoblanco/API/FitClaude/.venv/bin/python",
+      "args": ["/Users/santiagoblanco/API/FitClaude/fitclaude-backend/mcp_server.py"],
+      "env": {
+        "FITCLAUDE_USER_ID": "cmlpymku200008t2629btl4vt"
+      }
+    }
+  }
+}

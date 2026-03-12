@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import type { Workout, WorkoutExercise, ExerciseGroup } from '@/types';
 import SetRow, { type WeightUnit, lbToKg } from '@/components/workout/SetRow';
 import ExerciseListSheet from '@/components/workout/ExerciseListSheet';
@@ -137,6 +137,18 @@ export default function FocusedExerciseView({
     return n.includes('barbell') || (first.exercise?.equipmentRequired?.toLowerCase().includes('barbell') ?? false);
   });
   const [barWeight, setBarWeight] = useState(45);
+
+  // Auto-detect barbell exercises when current group changes (including after swap)
+  useEffect(() => {
+    const g = groups[currentGroupIndex];
+    if (!g) return;
+    const hasBarbell = g.exercises.some((e) => {
+      const n = getExerciseName(e).toLowerCase();
+      return n.includes('barbell') || (e.exercise?.equipmentRequired?.toLowerCase().includes('barbell') ?? false);
+    });
+    setPlateMode(hasBarbell);
+    if (hasBarbell) setBarWeight(45);
+  }, [currentGroupIndex, groups]);
 
   // Draft values: track unlogged set edits so we can auto-save on navigate
   const draftsRef = useRef<Map<string, { weight: number; reps: number }>>(new Map());
