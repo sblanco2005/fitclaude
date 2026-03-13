@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 const navItems = [
   {
@@ -65,7 +65,6 @@ function hasActiveHitIt(): boolean {
 
 export function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const handleNavClick = useCallback(
@@ -81,10 +80,13 @@ export function BottomNav() {
 
   const confirmLeave = useCallback(() => {
     if (pendingHref) {
-      router.push(pendingHref);
       setPendingHref(null);
+      // Use window.location for a full navigation — router.push stays in the
+      // same React tree and the workouts page can re-mount before unmounting,
+      // causing a flicker back to Hit It.
+      window.location.href = pendingHref;
     }
-  }, [pendingHref, router]);
+  }, [pendingHref]);
 
   const cancelLeave = useCallback(() => {
     setPendingHref(null);
