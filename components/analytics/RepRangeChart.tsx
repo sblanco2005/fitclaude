@@ -62,7 +62,7 @@ export function RepRangeChart({ data }: RepRangeChartProps) {
           </ResponsiveContainer>
           {/* Center label */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px] text-muted">{RANGE_LABELS[dominant.range]}</span>
+            <span className="text-xs text-muted">{RANGE_LABELS[dominant.range]}</span>
             <span className="text-lg font-bold text-white">{dominant.percentage}%</span>
           </div>
         </div>
@@ -78,7 +78,7 @@ export function RepRangeChart({ data }: RepRangeChartProps) {
                 {d.range} reps
               </span>
               <span className="text-xs font-medium text-white">{d.totalSets} sets</span>
-              <span className="text-[10px] text-muted w-8 text-right">{d.percentage}%</span>
+              <span className="text-xs text-muted w-8 text-right">{d.percentage}%</span>
             </div>
           ))}
         </div>

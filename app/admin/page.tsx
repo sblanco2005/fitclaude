@@ -364,7 +364,7 @@ export default function AdminPage() {
                 <button
                   key={p}
                   onClick={() => setUsagePeriod(p)}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
                     usagePeriod === p
                       ? 'bg-amber-500/15 text-amber-400'
                       : 'bg-card text-muted hover:text-slate-300'
@@ -385,26 +385,26 @@ export default function AdminPage() {
                 <div className="grid grid-cols-4 gap-2">
                   <div className="bg-card border border-border-dark rounded-xl p-3 text-center">
                     <div className="text-lg font-bold text-white">{usageData.totals.totalCalls.toLocaleString()}</div>
-                    <div className="text-[9px] text-muted uppercase tracking-wider font-bold">API Calls</div>
+                    <div className="text-xs text-muted uppercase tracking-wider font-bold">API Calls</div>
                   </div>
                   <div className="bg-card border border-border-dark rounded-xl p-3 text-center">
                     <div className="text-lg font-bold text-amber-400">{fmtCost(usageData.totals.totalCostUsd)}</div>
-                    <div className="text-[9px] text-muted uppercase tracking-wider font-bold">Total Cost</div>
+                    <div className="text-xs text-muted uppercase tracking-wider font-bold">Total Cost</div>
                   </div>
                   <div className="bg-card border border-border-dark rounded-xl p-3 text-center">
                     <div className="text-lg font-bold text-blue-400">{fmtTokens(usageData.totals.totalInputTokens)}</div>
-                    <div className="text-[9px] text-muted uppercase tracking-wider font-bold">Input</div>
+                    <div className="text-xs text-muted uppercase tracking-wider font-bold">Input</div>
                   </div>
                   <div className="bg-card border border-border-dark rounded-xl p-3 text-center">
                     <div className="text-lg font-bold text-emerald-400">{fmtTokens(usageData.totals.totalOutputTokens)}</div>
-                    <div className="text-[9px] text-muted uppercase tracking-wider font-bold">Output</div>
+                    <div className="text-xs text-muted uppercase tracking-wider font-bold">Output</div>
                   </div>
                 </div>
 
                 {/* Per-user table */}
                 <div className="rounded-xl border border-border-dark overflow-hidden">
                   <div className="px-4 py-2 bg-slate-800/30 border-b border-border-dark">
-                    <div className="grid grid-cols-12 gap-2 text-[9px] text-muted uppercase tracking-widest font-bold">
+                    <div className="grid grid-cols-12 gap-2 text-xs text-muted uppercase tracking-widest font-bold">
                       <div className="col-span-3">User</div>
                       <div className="col-span-1 text-right">Calls</div>
                       <div className="col-span-2 text-right">Input</div>
@@ -429,7 +429,7 @@ export default function AdminPage() {
                                 {u.user?.name || u.user?.email || u.userId.slice(0, 8)}
                               </p>
                               {u.user?.tier && (
-                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                <span className={`text-xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                                   u.user.tier === 'unlimited' ? 'bg-amber-500/15 text-amber-400'
                                   : u.user.tier === 'pro' ? 'bg-blue-500/15 text-blue-400'
                                   : 'bg-slate-500/15 text-slate-400'
@@ -451,7 +451,7 @@ export default function AdminPage() {
                               {fmtCost(u.totalCostUsd)}
                             </div>
                             <div className="col-span-2 text-right">
-                              <span className={`text-[10px] font-medium ${
+                              <span className={`text-xs font-medium ${
                                 u.limits?.isThrottled ? 'text-red-400' : 'text-muted'
                               }`}>
                                 {fmtLimits(u)}
@@ -468,7 +468,7 @@ export default function AdminPage() {
                                 <div className="space-y-4">
                                   {/* Daily breakdown */}
                                   <div>
-                                    <h4 className="text-[10px] text-muted uppercase tracking-widest font-bold mb-2">Daily Breakdown</h4>
+                                    <h4 className="text-xs text-muted uppercase tracking-widest font-bold mb-2">Daily Breakdown</h4>
                                     <div className="space-y-1">
                                       {userDetail.dailyBreakdown.slice(0, 10).map((day) => (
                                         <div key={day.date} className="grid grid-cols-4 gap-2 text-xs py-1">
@@ -486,7 +486,7 @@ export default function AdminPage() {
                                   {/* By endpoint */}
                                   {Object.keys(userDetail.byEndpoint).length > 0 && (
                                     <div>
-                                      <h4 className="text-[10px] text-muted uppercase tracking-widest font-bold mb-2">By Endpoint</h4>
+                                      <h4 className="text-xs text-muted uppercase tracking-widest font-bold mb-2">By Endpoint</h4>
                                       <div className="flex gap-3">
                                         {Object.entries(userDetail.byEndpoint).map(([ep, data]) => (
                                           <div key={ep} className="text-xs">
@@ -502,7 +502,7 @@ export default function AdminPage() {
                                   {/* Break-even */}
                                   {usagePeriod === '30d' && u.totalCostUsd > 0 && (
                                     <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/15">
-                                      <h4 className="text-[10px] text-amber-400 uppercase tracking-widest font-bold mb-1">Break-Even</h4>
+                                      <h4 className="text-xs text-amber-400 uppercase tracking-widest font-bold mb-1">Break-Even</h4>
                                       <p className="text-xs text-slate-300">
                                         Monthly cost: <span className="text-amber-400 font-semibold">{fmtCost(u.totalCostUsd)}</span>
                                         {' '}&rarr; charge at least{' '}
@@ -514,7 +514,7 @@ export default function AdminPage() {
 
                                   {/* Tier selector */}
                                   <div>
-                                    <h4 className="text-[10px] text-muted uppercase tracking-widest font-bold mb-2">User Tier</h4>
+                                    <h4 className="text-xs text-muted uppercase tracking-widest font-bold mb-2">User Tier</h4>
                                     <div className="flex items-center gap-2">
                                       {(['free', 'pro', 'unlimited'] as UserTier[]).map((t) => {
                                         const cfg = TIER_CONFIGS[t];
@@ -524,7 +524,7 @@ export default function AdminPage() {
                                             key={t}
                                             onClick={() => handleSetTier(u.userId, t)}
                                             disabled={savingTier}
-                                            className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all border ${
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border ${
                                               isActive
                                                 ? t === 'unlimited' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
                                                 : t === 'pro' ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
@@ -542,7 +542,7 @@ export default function AdminPage() {
                                     </div>
                                     {/* Suggested tier based on usage */}
                                     {usagePeriod === '30d' && u.totalCalls > 0 && (
-                                      <p className="text-[10px] text-slate-500 mt-1.5">
+                                      <p className="text-xs text-slate-500 mt-1.5">
                                         Avg {(u.totalCalls / 30).toFixed(1)} calls/day →{' '}
                                         <span className={`font-semibold ${
                                           suggestTier(u) === 'unlimited' ? 'text-amber-400'
@@ -557,10 +557,10 @@ export default function AdminPage() {
 
                                   {/* Rate limits editor */}
                                   <div>
-                                    <h4 className="text-[10px] text-muted uppercase tracking-widest font-bold mb-2">Rate Limits</h4>
+                                    <h4 className="text-xs text-muted uppercase tracking-widest font-bold mb-2">Rate Limits</h4>
                                     <div className="grid grid-cols-2 gap-2">
                                       <div>
-                                        <label className="text-[10px] text-slate-500 block mb-0.5">Calls/Day</label>
+                                        <label className="text-xs text-slate-500 block mb-0.5">Calls/Day</label>
                                         <input
                                           type="number"
                                           value={editingLimits.maxCallsPerDay ?? ''}
@@ -570,7 +570,7 @@ export default function AdminPage() {
                                         />
                                       </div>
                                       <div>
-                                        <label className="text-[10px] text-slate-500 block mb-0.5">Calls/Week</label>
+                                        <label className="text-xs text-slate-500 block mb-0.5">Calls/Week</label>
                                         <input
                                           type="number"
                                           value={editingLimits.maxCallsPerWeek ?? ''}
@@ -580,7 +580,7 @@ export default function AdminPage() {
                                         />
                                       </div>
                                       <div>
-                                        <label className="text-[10px] text-slate-500 block mb-0.5">Calls/Month</label>
+                                        <label className="text-xs text-slate-500 block mb-0.5">Calls/Month</label>
                                         <input
                                           type="number"
                                           value={editingLimits.maxCallsPerMonth ?? ''}
@@ -590,7 +590,7 @@ export default function AdminPage() {
                                         />
                                       </div>
                                       <div>
-                                        <label className="text-[10px] text-slate-500 block mb-0.5">Cost/Month ($)</label>
+                                        <label className="text-xs text-slate-500 block mb-0.5">Cost/Month ($)</label>
                                         <input
                                           type="number"
                                           step="0.01"
@@ -615,7 +615,7 @@ export default function AdminPage() {
                                       <button
                                         onClick={() => handleSaveLimits(u.userId)}
                                         disabled={savingLimits}
-                                        className="px-4 py-1.5 rounded-lg bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest hover:bg-primary/30 transition-colors disabled:opacity-50"
+                                        className="px-4 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary/30 transition-colors disabled:opacity-50"
                                       >
                                         {savingLimits ? 'Saving...' : 'Save Limits'}
                                       </button>
@@ -661,10 +661,10 @@ export default function AdminPage() {
         {jobResult && (
           <div className="mb-4 p-3 rounded-xl bg-slate-800/80 border border-slate-700">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Job Result</span>
+              <span className="text-xs font-bold text-primary uppercase tracking-widest">Job Result</span>
               <button onClick={() => setJobResult(null)} className="text-slate-500 hover:text-white text-xs">dismiss</button>
             </div>
-            <pre className="text-[10px] text-slate-300 font-mono whitespace-pre-wrap">{jobResult}</pre>
+            <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap">{jobResult}</pre>
           </div>
         )}
 
@@ -678,7 +678,7 @@ export default function AdminPage() {
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-white">Unlinked Exercises</span>
                 {unlinked.length > 0 && (
-                  <span className="text-[10px] font-bold bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-bold bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
                     {unlinked.length}
                   </span>
                 )}
@@ -703,7 +703,7 @@ export default function AdminPage() {
                 ) : (
                   <div className="divide-y divide-slate-800/60">
                     <div className="px-4 py-2 bg-slate-800/30">
-                      <p className="text-[10px] text-muted uppercase tracking-widest font-bold">
+                      <p className="text-xs text-muted uppercase tracking-widest font-bold">
                         Run Video Linker to search for tutorials
                       </p>
                     </div>
@@ -713,12 +713,12 @@ export default function AdminPage() {
                           <div className="flex items-center gap-1.5">
                             <p className="text-sm text-white font-medium truncate">{ex.name}</p>
                             {ex.source === 'workout' && (
-                              <span className="text-[9px] font-bold bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                              <span className="text-xs font-bold bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
                                 Not in library
                               </span>
                             )}
                           </div>
-                          <p className="text-[10px] text-slate-500 capitalize">{ex.muscleGroup}</p>
+                          <p className="text-xs text-slate-500 capitalize">{ex.muscleGroup}</p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {ex.pendingCount > 0 && (
@@ -732,7 +732,7 @@ export default function AdminPage() {
                             </Badge>
                           )}
                           {ex.source === 'library' && ex.pendingCount === 0 && ex.rejectedCount === 0 && (
-                            <span className="text-[10px] text-slate-600 font-medium">No videos</span>
+                            <span className="text-xs text-slate-600 font-medium">No videos</span>
                           )}
                           {ex.source === 'workout' && (
                             <button
@@ -748,7 +748,7 @@ export default function AdminPage() {
                                 });
                                 fetchUnlinked();
                               }}
-                              className="text-[10px] font-bold text-primary bg-primary/15 hover:bg-primary/25 px-2 py-1 rounded-lg transition-colors"
+                              className="text-xs font-bold text-primary bg-primary/15 hover:bg-primary/25 px-2 py-1 rounded-lg transition-colors"
                             >
                               + Add to Library
                             </button>
@@ -768,7 +768,7 @@ export default function AdminPage() {
           <h2 className="text-sm font-bold text-white uppercase tracking-widest">
             {activeTab === 'tutorials' ? 'Tutorial' : 'Reference'} Videos
           </h2>
-          <span className="text-[10px] text-muted font-medium">{filteredVideos.length} {statusFilter}</span>
+          <span className="text-xs text-muted font-medium">{filteredVideos.length} {statusFilter}</span>
         </div>
 
         {/* Status filter pills + search bar */}
@@ -778,7 +778,7 @@ export default function AdminPage() {
               <button
                 key={s}
                 onClick={() => { setStatusFilter(s); setSelectedVidIds(new Set()); }}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
                   statusFilter === s
                     ? s === 'pending'
                       ? 'bg-amber-500/15 text-amber-400'
@@ -823,13 +823,13 @@ export default function AdminPage() {
             <div className="ml-auto flex gap-1.5">
               <button
                 onClick={() => handleBulkVideo('approve')}
-                className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/30 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500/30 transition-colors"
               >
                 Approve All
               </button>
               <button
                 onClick={() => handleBulkVideo('reject')}
-                className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-[10px] font-bold hover:bg-red-500/30 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 transition-colors"
               >
                 Reject All
               </button>
@@ -860,7 +860,7 @@ export default function AdminPage() {
             <>
               <button
                 onClick={toggleSelectAllVid}
-                className="text-[10px] text-muted hover:text-white font-medium transition-colors"
+                className="text-xs text-muted hover:text-white font-medium transition-colors"
               >
                 {filteredVideos.every((v) => selectedVidIds.has(v.id)) ? 'Deselect all' : 'Select all'}
               </button>
@@ -899,7 +899,7 @@ export default function AdminPage() {
                           onClick={() => setExpandedVidId(isExpanded ? null : vid.id)}
                           className="text-left w-full"
                         >
-                          <p className="text-[10px] text-primary font-bold uppercase tracking-widest">{vid.exerciseName}</p>
+                          <p className="text-xs text-primary font-bold uppercase tracking-widest">{vid.exerciseName}</p>
                           <h3 className="text-sm font-bold text-white mt-0.5 line-clamp-2">{vid.title}</h3>
                           <div className="flex flex-wrap gap-1.5 mt-1.5">
                             {vid.channelName && <Badge size="sm">{vid.channelName}</Badge>}
@@ -958,13 +958,13 @@ export default function AdminPage() {
                       <div className="flex gap-1.5 px-4 pb-3">
                         <button
                           onClick={() => handleVideoAction(vid.id, 'approve', 'tutorial')}
-                          className="flex-1 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-500/25 transition-colors"
+                          className="flex-1 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 text-xs font-bold uppercase tracking-widest hover:bg-emerald-500/25 transition-colors"
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => handleVideoAction(vid.id, 'reject')}
-                          className="py-1.5 px-3 rounded-lg bg-red-500/10 text-red-400 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/20 transition-colors"
+                          className="py-1.5 px-3 rounded-lg bg-red-500/10 text-red-400 text-xs font-bold uppercase tracking-widest hover:bg-red-500/20 transition-colors"
                         >
                           Reject
                         </button>
@@ -972,14 +972,14 @@ export default function AdminPage() {
                           <button
                             onClick={() => handleRefetch(vid.exerciseId!)}
                             disabled={refetchingExercise === vid.exerciseId}
-                            className="py-1.5 px-3 rounded-lg bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                            className="py-1.5 px-3 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-bold uppercase tracking-widest hover:bg-amber-500/20 transition-colors disabled:opacity-50"
                           >
                             {refetchingExercise === vid.exerciseId ? 'Searching...' : 'Re-fetch'}
                           </button>
                         )}
                         <button
                           onClick={() => handleDeleteVideo(vid.id)}
-                          className="py-1.5 px-3 rounded-lg bg-slate-800 text-slate-500 text-[10px] font-bold hover:bg-slate-700 hover:text-slate-300 transition-colors"
+                          className="py-1.5 px-3 rounded-lg bg-slate-800 text-slate-500 text-xs font-bold hover:bg-slate-700 hover:text-slate-300 transition-colors"
                         >
                           Delete
                         </button>
@@ -992,7 +992,7 @@ export default function AdminPage() {
                         </Badge>
                         <button
                           onClick={() => handleDeleteVideo(vid.id)}
-                          className="text-[10px] text-slate-600 hover:text-red-400 font-medium transition-colors"
+                          className="text-xs text-slate-600 hover:text-red-400 font-medium transition-colors"
                         >
                           Delete
                         </button>

@@ -33,7 +33,7 @@ function ComplianceRing({ value, label, color }: { value: number; label: string;
           <span className="text-white text-sm font-bold">{value}%</span>
         </div>
       </div>
-      <span className="text-muted text-[10px] mt-1 uppercase tracking-wider">{label}</span>
+      <span className="text-muted text-xs mt-1 uppercase tracking-wider">{label}</span>
     </div>
   );
 }
@@ -61,7 +61,7 @@ export function ComplianceCards({ calorieCompliance, proteinCompliance, calorieT
           <ComplianceRing value={proteinCompliance} label="Protein" color="#3b82f6" />
         )}
       </div>
-      <p className="text-muted text-[10px] text-center mt-2">Days within 10% of target</p>
+      <p className="text-muted text-xs text-center mt-2">Days within 10% of target</p>
     </div>
   );
 }

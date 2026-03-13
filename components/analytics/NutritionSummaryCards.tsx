@@ -17,7 +17,7 @@ export function NutritionSummaryCards({ nutrition }: Props) {
     <div className="grid grid-cols-3 gap-2">
       {stats.map((s) => (
         <div key={s.label} className="bg-card border border-border-dark rounded-xl p-2.5">
-          <div className="text-muted text-[10px] uppercase tracking-wider">{s.label}</div>
+          <div className="text-muted text-xs uppercase tracking-wider">{s.label}</div>
           <div className="text-white font-bold text-lg leading-tight">
             {s.value.toLocaleString()}
             {s.unit && <span className="text-xs text-muted font-normal ml-0.5">{s.unit}</span>}

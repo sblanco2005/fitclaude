@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TextArea } from '@/components/ui/TextArea';
+import { useToast } from '@/components/ui/Toast';
 import type { UserProfile } from '@/types';
 
 const fitnessGoals = [
@@ -24,6 +25,7 @@ const experienceLevels = [
 
 export default function SettingsPage() {
   const { data: session } = useSession();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,8 +55,9 @@ export default function SettingsPage() {
         body: JSON.stringify(profile),
       });
       setSaved(true);
+      toast('Profile saved');
     } catch {
-      // handle error
+      toast('Failed to save profile', 'error');
     } finally {
       setSaving(false);
     }
@@ -62,8 +65,11 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-muted">Loading profile...</div>
+      <div className="p-4 space-y-4 max-w-lg mx-auto">
+        <div className="h-7 w-48 bg-slate-800 rounded animate-pulse" />
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-slate-800/60 rounded-xl h-32 animate-pulse" />
+        ))}
       </div>
     );
   }
@@ -87,7 +93,7 @@ export default function SettingsPage() {
             <select
               value={profile.fitnessGoal || ''}
               onChange={(e) => updateField('fitnessGoal', e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-base text-white focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Select a goal</option>
               {fitnessGoals.map((g) => (
@@ -101,7 +107,7 @@ export default function SettingsPage() {
             <select
               value={profile.experienceLevel || ''}
               onChange={(e) => updateField('experienceLevel', e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-base text-white focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Select level</option>
               {experienceLevels.map((l) => (
@@ -159,7 +165,7 @@ export default function SettingsPage() {
             Kilograms (kg)
           </button>
         </div>
-        <p className="text-[10px] text-muted mt-2">
+        <p className="text-xs text-muted mt-2">
           Sets your default logging unit. You can still toggle per-set while logging.
         </p>
       </Card>
@@ -195,7 +201,7 @@ export default function SettingsPage() {
             <TextArea
               label="Available Equipment"
               placeholder={"Barbell + plates (up to 300lb)\nDumbbells 5-50lb\nPull-up bar\nAdjustable bench\nSquat rack"}
-              rows={5}
+              rows={3}
               value={profile.equipmentText || ''}
               onChange={(e) => updateField('equipmentText', e.target.value)}
             />
@@ -267,15 +273,15 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-3 gap-2 text-center bg-slate-800/50 rounded-lg py-2.5">
                   <div>
                     <div className="text-sm font-semibold text-blue-400">{Math.round(protG)}g</div>
-                    <div className="text-[10px] text-muted">protein</div>
+                    <div className="text-xs text-muted">protein</div>
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-amber-400">{carbsG}g</div>
-                    <div className="text-[10px] text-muted">carbs</div>
+                    <div className="text-xs text-muted">carbs</div>
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-red-400">{fatG}g</div>
-                    <div className="text-[10px] text-muted">fat</div>
+                    <div className="text-xs text-muted">fat</div>
                   </div>
                 </div>
               </div>

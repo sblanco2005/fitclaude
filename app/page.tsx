@@ -67,8 +67,18 @@ export default function DashboardPage() {
 
   if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-muted">Loading...</div>
+      <div className="p-4 pb-1 space-y-3 max-w-lg mx-auto">
+        <div className="h-7 w-32 bg-slate-800 rounded animate-pulse" />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="h-20 bg-slate-800/60 rounded-xl animate-pulse" />
+          <div className="h-20 bg-slate-800/60 rounded-xl animate-pulse" />
+        </div>
+        <div className="h-4 w-16 bg-slate-800 rounded animate-pulse" />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="h-36 bg-slate-800/60 rounded-xl animate-pulse" />
+          <div className="h-36 bg-slate-800/60 rounded-xl animate-pulse" />
+        </div>
+        <div className="h-16 bg-slate-800/60 rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -95,7 +105,7 @@ export default function DashboardPage() {
   const hasWorkouts = todayWorkouts.length > 0 || todayActivities.length > 0;
 
   return (
-    <div className="p-3 pb-1 space-y-3 max-w-lg mx-auto">
+    <div className="p-4 pb-1 space-y-3 max-w-lg mx-auto">
       <h2 className="text-xl font-bold text-white">
         Hey, {session.user?.name?.split(' ')[0] || 'there'}
       </h2>
@@ -117,7 +127,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Today's Summary — two blocks */}
-      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Today</h3>
+      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Today</h3>
       <div className="grid grid-cols-2 gap-3">
         {/* Nutrition block */}
         <Card className="p-3">
@@ -129,23 +139,23 @@ export default function DashboardPage() {
             <div className="space-y-1.5">
               <div className="text-center">
                 <div className="text-lg font-bold text-primary">{Math.round(totals.calories)}</div>
-                <div className="text-[10px] text-muted">kcal</div>
+                <div className="text-xs text-muted">kcal</div>
               </div>
               <div className="grid grid-cols-3 gap-1 text-center">
                 <div>
                   <div className="text-xs font-semibold text-blue-400">{Math.round(totals.proteinG)}g</div>
-                  <div className="text-[9px] text-muted">protein</div>
+                  <div className="text-xs text-muted">protein</div>
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-amber-400">{Math.round(totals.carbsG)}g</div>
-                  <div className="text-[9px] text-muted">carbs</div>
+                  <div className="text-xs text-muted">carbs</div>
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-red-400">{Math.round(totals.fatG)}g</div>
-                  <div className="text-[9px] text-muted">fat</div>
+                  <div className="text-xs text-muted">fat</div>
                 </div>
               </div>
-              <div className="text-[10px] text-muted text-center pt-0.5">
+              <div className="text-xs text-muted text-center pt-0.5">
                 {mealCount} meal{mealCount !== 1 ? 's' : ''} logged
               </div>
             </div>
@@ -164,28 +174,28 @@ export default function DashboardPage() {
             <div className="space-y-1.5">
               {todayWorkouts.slice(0, 2).map((w) => (
                 <Link key={w.id} href={`/workouts?id=${w.id}`} className="block">
-                  <div className="py-1.5 px-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
+                  <div className="py-2.5 px-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
                     <div className="text-xs font-medium text-white truncate">
                       {w.name || w.workoutType.replace('_', ' ')}
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-[10px] text-muted">{w.exercises?.length || 0} exercises</span>
-                      <span className="text-[9px] font-medium text-white bg-primary/30 px-1.5 py-0.5 rounded-full">Done</span>
+                      <span className="text-xs text-muted">{w.exercises?.length || 0} exercises</span>
+                      <span className="text-xs font-medium text-white bg-primary/30 px-1.5 py-0.5 rounded-full">Done</span>
                     </div>
                   </div>
                 </Link>
               ))}
               {todayActivities.slice(0, todayWorkouts.length >= 2 ? 0 : 2 - todayWorkouts.length).map((a) => (
-                <div key={a.id} className="py-1.5 px-2 rounded-lg bg-slate-800/50">
+                <div key={a.id} className="py-2.5 px-3 rounded-lg bg-slate-800/50">
                   <div className="text-xs font-medium text-white truncate capitalize">{a.name}</div>
                   <div className="flex items-center justify-between mt-0.5">
-                    <span className="text-[10px] text-muted">{a.durationMinutes ? `${a.durationMinutes} min` : 'Activity'}</span>
-                    <span className="text-[9px] font-medium text-white bg-amber-500/30 px-1.5 py-0.5 rounded-full">Activity</span>
+                    <span className="text-xs text-muted">{a.durationMinutes ? `${a.durationMinutes} min` : 'Activity'}</span>
+                    <span className="text-xs font-medium text-white bg-amber-500/30 px-1.5 py-0.5 rounded-full">Activity</span>
                   </div>
                 </div>
               ))}
               {(todayWorkouts.length + todayActivities.length) > 2 && (
-                <div className="text-[10px] text-muted text-center">+{todayWorkouts.length + todayActivities.length - 2} more</div>
+                <div className="text-xs text-muted text-center">+{todayWorkouts.length + todayActivities.length - 2} more</div>
               )}
             </div>
           ) : (

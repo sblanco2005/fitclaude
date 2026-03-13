@@ -118,7 +118,7 @@ export default function ChatPage() {
               )}
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
               {msg.role === 'assistant' && msg.modelUsed && (
-                <span className={`mt-1.5 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                <span className={`mt-1.5 inline-block text-xs font-medium px-1.5 py-0.5 rounded-full ${
                   msg.modelUsed.includes('MiniMax')
                     ? 'bg-amber-900/40 text-amber-400'
                     : 'bg-slate-800/60 text-slate-500'
@@ -147,10 +147,11 @@ export default function ChatPage() {
       {imagePreview && (
         <div className="px-4 py-2 border-t border-border-dark">
           <div className="relative inline-block">
-            <img src={imagePreview} alt="Preview" className="h-16 rounded-lg" />
+            <img src={imagePreview} alt="Preview" className="h-24 rounded-lg" />
             <button
               onClick={clearImage}
-              className="absolute -top-2 -right-2 w-5 h-5 bg-danger rounded-full flex items-center justify-center text-white text-xs"
+              className="absolute -top-2 -right-2 w-7 h-7 bg-danger rounded-full flex items-center justify-center text-white text-sm"
+              aria-label="Remove image"
             >
               x
             </button>
@@ -171,6 +172,7 @@ export default function ChatPage() {
           <button
             onClick={() => fileInputRef.current?.click()}
             className="p-2 text-muted hover:text-white transition-colors flex-shrink-0"
+            aria-label="Upload image"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -183,12 +185,13 @@ export default function ChatPage() {
             onKeyDown={handleKeyDown}
             placeholder={placeholders[chatTopic]}
             rows={1}
-            className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none text-sm"
+            className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none text-base"
           />
           <button
             onClick={handleSend}
             disabled={chatLoading || (!input.trim() && !imageData)}
             className="p-2 bg-primary rounded-xl text-white disabled:opacity-50 transition-colors hover:bg-primary-dark flex-shrink-0"
+            aria-label="Send message"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

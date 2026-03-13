@@ -126,7 +126,7 @@ export default function NumericStepper({
       </button>
 
       {label && (
-        <span className={`${lg ? 'text-xs' : 'text-[10px]'} text-slate-500 font-medium ml-0.5`}>{label}</span>
+        <span className={`${lg ? 'text-xs' : 'text-xs'} text-slate-500 font-medium ml-0.5`}>{label}</span>
       )}
     </div>
   );

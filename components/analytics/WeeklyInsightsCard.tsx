@@ -52,7 +52,7 @@ export function WeeklyInsightsCard() {
           <div className="h-3 bg-slate-800 rounded animate-pulse w-4/5" />
           <div className="h-3 bg-slate-800 rounded animate-pulse w-full mt-4" />
           <div className="h-3 bg-slate-800 rounded animate-pulse w-3/4" />
-          <div className="text-[10px] text-muted text-center mt-3">Analyzing your training data...</div>
+          <div className="text-xs text-muted text-center mt-3">Analyzing your training data...</div>
         </div>
       )}
 
@@ -88,7 +88,7 @@ export function WeeklyInsightsCard() {
             })}
           </div>
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-dark">
-            <span className="text-[10px] text-slate-600">
+            <span className="text-xs text-slate-600">
               Generated {new Date(insights.generatedAt).toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -98,7 +98,7 @@ export function WeeklyInsightsCard() {
             </span>
             <button
               onClick={generate}
-              className="text-[10px] text-primary hover:text-white transition-colors"
+              className="text-xs text-primary hover:text-white transition-colors"
             >
               Regenerate
             </button>

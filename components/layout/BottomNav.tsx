@@ -119,7 +119,7 @@ export function BottomNav() {
                 }`}
               >
                 {item.icon}
-                <span className="text-[11px] font-medium truncate max-w-full">{item.label}</span>
+                <span className="text-xs font-medium truncate max-w-full">{item.label}</span>
               </Link>
             );
           })}

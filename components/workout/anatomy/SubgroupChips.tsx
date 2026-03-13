@@ -22,7 +22,7 @@ export default function SubgroupChips({
 
   return (
     <div className="space-y-2">
-      <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Focus Areas</span>
+      <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Focus Areas</span>
       {musclesWithSubs.map((region) => {
         const activeSubs = selectedSubgroups.get(region.key);
         return (
@@ -35,7 +35,7 @@ export default function SubgroupChips({
                   <button
                     key={sub.key}
                     onClick={() => onToggleSubgroup(region.key, sub.key)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                       isActive
                         ? 'bg-blue-500/30 border border-blue-400/50 text-blue-200'
                         : 'bg-slate-800/50 border border-slate-700/40 text-slate-500 hover:text-slate-400'

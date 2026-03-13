@@ -98,7 +98,7 @@ export function ProgressChart({ data }: ProgressChartProps) {
             <button
               key={series.exerciseName}
               onClick={() => toggleExercise(series.exerciseName)}
-              className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all border ${
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
                 active
                   ? 'text-white border-transparent'
                   : 'text-slate-500 border-slate-700 bg-transparent'

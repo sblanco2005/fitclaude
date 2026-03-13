@@ -291,7 +291,7 @@ export function ChatDrawer() {
               <span className="text-sm font-semibold text-white">
                 Coach Fit
               </span>
-              <span className="text-[10px] font-medium text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full capitalize">
+              <span className="text-xs font-medium text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full capitalize">
                 {chatTopic}
               </span>
             </div>
@@ -357,7 +357,7 @@ export function ChatDrawer() {
                         {renderMarkdown(msg.content)}
                       </div>
                       {msg.modelUsed && (
-                        <span className={`mt-1.5 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                        <span className={`mt-1.5 inline-block text-xs font-medium px-1.5 py-0.5 rounded-full ${
                           msg.modelUsed.includes('MiniMax')
                             ? 'bg-amber-900/40 text-amber-400'
                             : 'bg-slate-800 text-slate-500'

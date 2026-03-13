@@ -146,7 +146,8 @@ export default function ExercisesPage() {
       />
 
       {/* Muscle Group Filter */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="relative">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1" style={{ maskImage: 'linear-gradient(to right, black 90%, transparent)', WebkitMaskImage: 'linear-gradient(to right, black 90%, transparent)' }}>
         {muscleGroups.map((group) => (
           <button
             key={group}
@@ -160,6 +161,7 @@ export default function ExercisesPage() {
             {group === 'all' ? 'All' : group.replace('_', ' ')}
           </button>
         ))}
+      </div>
       </div>
 
       {/* Exercise List */}
@@ -215,10 +217,11 @@ export default function ExercisesPage() {
                         {isAdmin && (
                           <button
                             onClick={(e) => { e.stopPropagation(); startRename(exercise); }}
-                            className="text-slate-600 hover:text-slate-300 transition-colors"
+                            className="p-2 -m-1 text-slate-600 hover:text-slate-300 transition-colors"
                             title="Rename exercise"
+                            aria-label="Rename exercise"
                           >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
                           </button>
@@ -313,7 +316,7 @@ export default function ExercisesPage() {
             <select
               value={createForm.muscleGroup}
               onChange={(e) => setCreateForm((f) => ({ ...f, muscleGroup: e.target.value }))}
-              className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Select...</option>
               {muscleGroups.filter((g) => g !== 'all').map((g) => (
@@ -327,7 +330,7 @@ export default function ExercisesPage() {
             <select
               value={createForm.exerciseType}
               onChange={(e) => setCreateForm((f) => ({ ...f, exerciseType: e.target.value }))}
-              className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Select...</option>
               {exerciseTypes.map((t) => (
@@ -341,7 +344,7 @@ export default function ExercisesPage() {
             <select
               value={createForm.difficulty}
               onChange={(e) => setCreateForm((f) => ({ ...f, difficulty: e.target.value }))}
-              className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {difficultyOptions.map((d) => (
                 <option key={d} value={d}>{d}</option>
@@ -374,7 +377,7 @@ export default function ExercisesPage() {
               value={createForm.instructions}
               onChange={(e) => setCreateForm((f) => ({ ...f, instructions: e.target.value }))}
               rows={3}
-              className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             />
           </div>
 

@@ -3,6 +3,7 @@ import { Roboto, JetBrains_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { AppShell } from "@/components/layout/AppShell";
 import { FitClaudeProvider } from "@/context/FitClaudeContext";
+import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
 const roboto = Roboto({
@@ -47,7 +48,9 @@ export default function RootLayout({
       >
         <SessionProvider>
           <FitClaudeProvider>
-            <AppShell>{children}</AppShell>
+            <ToastProvider>
+              <AppShell>{children}</AppShell>
+            </ToastProvider>
           </FitClaudeProvider>
         </SessionProvider>
       </body>

@@ -69,7 +69,7 @@ export default function ExerciseListSheet({
               <div key={gi}>
                 {isSuperset && (
                   <div className="flex items-center gap-2 px-3 pt-2 pb-1">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/60">
+                    <span className="text-xs font-black uppercase tracking-widest text-amber-400/60">
                       Superset {group.supersetGroup}
                     </span>
                     <div className="flex-1 h-px bg-amber-400/10" />
@@ -99,7 +99,7 @@ export default function ExerciseListSheet({
                     >
                       <div className="w-6 h-6 flex items-center justify-center shrink-0">
                         {ssLabel ? (
-                          <span className="w-6 h-6 flex items-center justify-center rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black">
+                          <span className="w-6 h-6 flex items-center justify-center rounded-full bg-amber-400/20 text-amber-300 text-xs font-black">
                             {ssLabel}
                           </span>
                         ) : isSkip ? (
@@ -126,16 +126,16 @@ export default function ExerciseListSheet({
                           {getExerciseName(ex)}
                         </div>
                         {muscle && (
-                          <div className="text-[10px] text-slate-600 uppercase tracking-wider mt-0.5">
+                          <div className="text-xs text-slate-600 uppercase tracking-wider mt-0.5">
                             {muscle}
                           </div>
                         )}
                       </div>
 
                       {isSkip ? (
-                        <span className="text-[10px] font-bold text-slate-600 shrink-0">Skip</span>
+                        <span className="text-xs font-bold text-slate-600 shrink-0">Skip</span>
                       ) : (
-                        <span className={`text-[10px] tabular-nums font-bold shrink-0 ${allDone ? 'text-primary' : 'text-slate-600'}`}>
+                        <span className={`text-xs tabular-nums font-bold shrink-0 ${allDone ? 'text-primary' : 'text-slate-600'}`}>
                           {logs.length}/{numSets}
                         </span>
                       )}

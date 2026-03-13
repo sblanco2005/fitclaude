@@ -26,11 +26,11 @@ export function PlateauAlerts({ plateaus }: PlateauAlertsProps) {
           >
             <div>
               <div className="text-sm font-medium text-white">{p.exerciseName}</div>
-              <div className="text-[10px] text-amber-400/70">
+              <div className="text-xs text-amber-400/70">
                 Stuck at {p.stuckAtWeight} lb for {p.sessionCount} sessions
               </div>
             </div>
-            <span className="text-[10px] text-slate-500">
+            <span className="text-xs text-slate-500">
               {new Date(p.lastDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           </div>

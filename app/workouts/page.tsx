@@ -178,12 +178,12 @@ function RoutineCard({
                 {latest.workoutType.replace('_', ' ')}
               </Badge>
             ) : (
-              <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${CATEGORY_COLORS[latest.category!] || 'bg-slate-700/30 text-slate-400 border-slate-600'}`}>
+              <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${CATEGORY_COLORS[latest.category!] || 'bg-slate-700/30 text-slate-400 border-slate-600'}`}>
                 {latest.category}
               </span>
             )}
             {latest.source === 'manual' && (
-              <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/20">
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/20">
                 ext
               </span>
             )}
@@ -192,11 +192,11 @@ function RoutineCard({
 
         {/* Row 2: stats + muscles */}
         <div className="flex items-center gap-2 mt-1 ml-0.5">
-          <span className="text-[11px] text-slate-500">{workouts.length}x done</span>
+          <span className="text-xs text-slate-500">{workouts.length}x done</span>
           {isLifting && muscles.length > 0 && (
             <>
               <span className="text-slate-700">&middot;</span>
-              <span className="text-[10px] text-slate-500/80 uppercase tracking-wider truncate">
+              <span className="text-xs text-slate-500/80 uppercase tracking-wider truncate">
                 {muscles.slice(0, 2).join(' · ')}
                 {muscles.length > 2 && ` +${muscles.length - 2}`}
               </span>
@@ -303,24 +303,24 @@ function SessionLogCard({
                 {formatDate(workout.date)}
               </p>
               {workout.completed && (
-                <span className="text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                <span className="text-xs font-bold uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded">
                   Done
                 </span>
               )}
             </div>
             <div className="flex items-center gap-3 mt-0.5">
               {workout.durationMinutes && (
-                <span className="text-[10px] text-muted font-medium tabular-nums">
+                <span className="text-xs text-muted font-medium tabular-nums">
                   {workout.durationMinutes} min
                 </span>
               )}
               {hasLogs && (
-                <span className="text-[10px] text-slate-500 font-medium">
+                <span className="text-xs text-slate-500 font-medium">
                   {loggedExercises.length} logged
                 </span>
               )}
               {!hasLogs && (
-                <span className="text-[10px] text-slate-600 font-medium italic">
+                <span className="text-xs text-slate-600 font-medium italic">
                   No logs
                 </span>
               )}
@@ -362,7 +362,7 @@ function SessionLogCard({
                 {/* Exercise name row */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={`text-[10px] font-bold w-5 shrink-0 tabular-nums ${hasExLogs ? 'text-primary' : 'text-slate-600'}`}>
+                    <span className={`text-xs font-bold w-5 shrink-0 tabular-nums ${hasExLogs ? 'text-primary' : 'text-slate-600'}`}>
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <span className={`text-xs font-medium truncate ${hasExLogs ? 'text-white' : 'text-slate-400'}`}>
@@ -370,7 +370,7 @@ function SessionLogCard({
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[10px] text-muted tabular-nums font-medium">
+                    <span className="text-xs text-muted tabular-nums font-medium">
                       {ex.sets}x{ex.reps ?? '?'}
                     </span>
                     {hasExLogs && !isEditing && (
@@ -379,7 +379,7 @@ function SessionLogCard({
                         className="text-slate-600 hover:text-slate-400 active:text-slate-300 transition-colors p-2 -m-1 rounded-md"
                         title="Edit logs"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
                       </button>
@@ -405,13 +405,13 @@ function SessionLogCard({
                     <div className="flex gap-1.5 mt-2">
                       <button
                         onClick={() => submitEdit(ex.id)}
-                        className="px-3 py-1.5 bg-primary rounded-lg text-white text-[10px] font-bold shrink-0"
+                        className="px-3 py-1.5 bg-primary rounded-lg text-white text-xs font-bold shrink-0"
                       >
                         Save
                       </button>
                       <button
                         onClick={() => { setEditingExId(null); setEditLogs([]); }}
-                        className="px-3 py-1.5 bg-slate-700 rounded-lg text-slate-300 text-[10px] font-bold shrink-0"
+                        className="px-3 py-1.5 bg-slate-700 rounded-lg text-slate-300 text-xs font-bold shrink-0"
                       >
                         Cancel
                       </button>
@@ -428,7 +428,7 @@ function SessionLogCard({
                     {logs.map((l) => (
                       <span
                         key={l.set}
-                        className="text-[10px] tabular-nums bg-primary/10 text-primary/80 px-1.5 py-0.5 rounded font-medium"
+                        className="text-xs tabular-nums bg-primary/10 text-primary/80 px-1.5 py-0.5 rounded font-medium"
                       >
                         S{l.set} {formatWeight(l.weight, weightUnit)} × {l.reps}
                       </span>
@@ -444,7 +444,7 @@ function SessionLogCard({
             <div className="pt-2 border-t border-slate-800/50">
               <div className="flex items-center gap-4">
                 <div>
-                  <p className="text-[10px] text-muted uppercase tracking-widest">Volume</p>
+                  <p className="text-xs text-muted uppercase tracking-widest">Volume</p>
                   <p className="text-sm font-black text-white tabular-nums">
                     {(() => {
                       const volLb = loggedExercises.reduce((acc, ex) => {
@@ -458,7 +458,7 @@ function SessionLogCard({
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted uppercase tracking-widest">Sets</p>
+                  <p className="text-xs text-muted uppercase tracking-widest">Sets</p>
                   <p className="text-sm font-black text-white tabular-nums">
                     {loggedExercises.reduce((acc, ex) => acc + parseStoredSetLogs(ex.setLogs).length, 0)}
                   </p>
@@ -467,28 +467,28 @@ function SessionLogCard({
                   {!confirmClearLogs ? (
                     <button
                       onClick={() => setConfirmClearLogs(true)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-red-400 text-[10px] font-bold transition-colors"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-red-400 text-xs font-bold transition-colors"
                     >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                       Clear Logs
                     </button>
                   ) : (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-red-400 font-medium">Clear all?</span>
+                      <span className="text-xs text-red-400 font-medium">Clear all?</span>
                       <button
                         onClick={() => {
                           onDeleteLogs(workout.id);
                           setConfirmClearLogs(false);
                         }}
-                        className="px-3 py-2 rounded-md bg-red-500/20 text-red-400 text-[10px] font-bold hover:bg-red-500/30 active:scale-[0.95] transition-colors"
+                        className="px-3 py-2 rounded-md bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 active:scale-[0.95] transition-colors"
                       >
                         Yes
                       </button>
                       <button
                         onClick={() => setConfirmClearLogs(false)}
-                        className="px-3 py-2 rounded-md bg-slate-700 text-slate-300 text-[10px] font-bold hover:bg-slate-600 active:scale-[0.95] transition-colors"
+                        className="px-3 py-2 rounded-md bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 active:scale-[0.95] transition-colors"
                       >
                         No
                       </button>
@@ -497,9 +497,9 @@ function SessionLogCard({
                   {canDeleteSession && !confirmDeleteSession && (
                     <button
                       onClick={() => setConfirmDeleteSession(true)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-red-400 text-[10px] font-bold transition-colors"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-red-400 text-xs font-bold transition-colors"
                     >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                       Delete
@@ -509,19 +509,19 @@ function SessionLogCard({
               </div>
               {confirmDeleteSession && (
                 <div className="flex items-center justify-end gap-1.5 mt-2">
-                  <span className="text-[10px] text-red-400 font-medium">Delete session?</span>
+                  <span className="text-xs text-red-400 font-medium">Delete session?</span>
                   <button
                     onClick={() => {
                       onDeleteSession(workout.id);
                       setConfirmDeleteSession(false);
                     }}
-                    className="px-3 py-2 rounded-md bg-red-500/20 text-red-400 text-[10px] font-bold hover:bg-red-500/30 active:scale-[0.95] transition-colors"
+                    className="px-3 py-2 rounded-md bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 active:scale-[0.95] transition-colors"
                   >
                     Yes
                   </button>
                   <button
                     onClick={() => setConfirmDeleteSession(false)}
-                    className="px-3 py-2 rounded-md bg-slate-700 text-slate-300 text-[10px] font-bold hover:bg-slate-600 active:scale-[0.95] transition-colors"
+                    className="px-3 py-2 rounded-md bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 active:scale-[0.95] transition-colors"
                   >
                     No
                   </button>
@@ -610,7 +610,7 @@ function RoutineExerciseRow({
     <div className="py-2 border-b border-slate-800/40 last:border-0">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2.5 min-w-0 flex-1">
-          <span className="text-[10px] text-slate-500 font-bold tabular-nums mt-0.5 shrink-0">
+          <span className="text-xs text-slate-500 font-bold tabular-nums mt-0.5 shrink-0">
             {String(globalIndex).padStart(2, '0')}
           </span>
           <div className="min-w-0 flex-1">
@@ -619,7 +619,7 @@ function RoutineExerciseRow({
                 {getExerciseName(ex)}
                 {ex.wasSpicy && <span className="ml-1">🌶️</span>}
                 {supersetLabel && (
-                  <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-400/15 text-amber-300">
+                  <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-black bg-amber-400/15 text-amber-300">
                     {supersetLabel}
                   </span>
                 )}
@@ -635,7 +635,7 @@ function RoutineExerciseRow({
                     }`}
                     title={videoPending ? 'Video pending approval' : 'Watch tutorial'}
                   >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                     </svg>
                     {videoPending && (
@@ -651,7 +651,7 @@ function RoutineExerciseRow({
                     }`}
                     title="View form demo"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <circle cx="12" cy="12" r="10" />
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01" />
                     </svg>
@@ -662,7 +662,7 @@ function RoutineExerciseRow({
                   className="shrink-0 p-1.5 rounded transition-colors text-slate-600 hover:text-amber-400"
                   title="Swap exercise"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                   </svg>
                 </button>
@@ -674,7 +674,7 @@ function RoutineExerciseRow({
               </p>
             )}
             {lastLog && (
-              <p className="text-[10px] text-slate-500 font-bold mt-0.5 tabular-nums">
+              <p className="text-xs text-slate-500 font-bold mt-0.5 tabular-nums">
                 Last: {lastLog.map((l) => `${formatWeight(l.weight, weightUnit)}×${l.reps}`).join('  ')}
               </p>
             )}
@@ -705,8 +705,8 @@ function RoutineExerciseRow({
                 />
               </div>
               <div className="flex gap-1.5 mt-0.5">
-                <button onClick={saveEdit} className="text-[10px] text-emerald-400 font-medium hover:text-emerald-300">Save</button>
-                <button onClick={cancelEdit} className="text-[10px] text-slate-500 hover:text-slate-400">Cancel</button>
+                <button onClick={saveEdit} className="text-xs text-emerald-400 font-medium hover:text-emerald-300">Save</button>
+                <button onClick={cancelEdit} className="text-xs text-slate-500 hover:text-slate-400">Cancel</button>
               </div>
             </div>
           ) : (
@@ -715,7 +715,7 @@ function RoutineExerciseRow({
                 {ex.sets} x {ex.reps ?? '?'}
               </p>
               {ex.weightKg != null && (
-                <p className="text-[10px] text-muted">{ex.weightKg} kg</p>
+                <p className="text-xs text-muted">{ex.weightKg} kg</p>
               )}
             </button>
           )}
@@ -731,7 +731,7 @@ function RoutineExerciseRow({
               loading="lazy"
             />
             {videoPending && (
-              <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-400/90 text-black text-[10px] font-bold uppercase tracking-wider">
+              <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-400/90 text-black text-xs font-bold uppercase tracking-wider">
                 Pending
               </div>
             )}
@@ -979,7 +979,7 @@ function SwapExerciseModal({
         <div className="flex flex-wrap gap-1.5">
           <button
             onClick={() => setMuscleFilter(null)}
-            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
+            className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
               !muscleFilter ? 'bg-primary/20 text-primary' : 'bg-slate-800 text-slate-500 hover:text-slate-300'
             }`}
           >
@@ -989,7 +989,7 @@ function SwapExerciseModal({
             <button
               key={mg}
               onClick={() => setMuscleFilter(muscleFilter === mg ? null : mg)}
-              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
+              className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
                 muscleFilter === mg
                   ? (MUSCLE_COLORS[mg.toLowerCase()] ?? 'bg-slate-500/20 text-slate-300')
                   : 'bg-slate-800 text-slate-500 hover:text-slate-300'
@@ -1027,7 +1027,7 @@ function SwapExerciseModal({
                         {ex.name}
                       </p>
                       {aiMatch && (
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
                           aiMatch.confidence === 'high' ? 'bg-primary/20 text-primary' :
                           aiMatch.confidence === 'medium' ? 'bg-amber-400/20 text-amber-400' :
                           'bg-slate-600/20 text-slate-400'
@@ -1036,7 +1036,7 @@ function SwapExerciseModal({
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-500">{ex.muscleGroup} · {ex.difficulty} · {ex.exerciseType}</p>
+                    <p className="text-xs text-slate-500">{ex.muscleGroup} · {ex.difficulty} · {ex.exerciseType}</p>
                   </div>
                   <svg className="w-4 h-4 text-slate-600 group-hover:text-primary shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
@@ -1262,21 +1262,21 @@ function RoutineDetail({
         <div className={`grid ${latest.durationMinutes ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mt-3`}>
           <div className="text-center">
             <p className="text-lg font-black text-white">{totalExercises}</p>
-            <p className="text-[9px] text-muted uppercase tracking-widest">Exercises</p>
+            <p className="text-xs text-muted uppercase tracking-widest">Exercises</p>
           </div>
           <div className="text-center">
             <p className="text-lg font-black text-white">{totalSets}</p>
-            <p className="text-[9px] text-muted uppercase tracking-widest">Sets</p>
+            <p className="text-xs text-muted uppercase tracking-widest">Sets</p>
           </div>
           {latest.durationMinutes && (
             <div className="text-center">
               <p className="text-lg font-black text-white">{latest.durationMinutes}</p>
-              <p className="text-[9px] text-muted uppercase tracking-widest">Min</p>
+              <p className="text-xs text-muted uppercase tracking-widest">Min</p>
             </div>
           )}
           <div className="text-center">
             <p className="text-lg font-black text-white">{workouts.length}</p>
-            <p className="text-[9px] text-muted uppercase tracking-widest">Sessions</p>
+            <p className="text-xs text-muted uppercase tracking-widest">Sessions</p>
           </div>
         </div>
 
@@ -1355,7 +1355,7 @@ function RoutineDetail({
           {/* Tips */}
           {latest.notes && (
             <div>
-              <p className="text-[10px] text-muted uppercase tracking-[0.15em] font-bold mb-2">
+              <p className="text-xs text-muted uppercase tracking-[0.15em] font-bold mb-2">
                 Tips
               </p>
               <div className="bg-primary/5 border border-primary/10 rounded-lg px-4 py-3">
@@ -1492,9 +1492,9 @@ function ExerciseLogRow({
         className={`flex items-center justify-between py-1.5 text-sm ${isRunning ? 'cursor-pointer' : ''}`}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`text-[10px] font-bold w-5 shrink-0 tabular-nums ${hasLogs ? 'text-primary' : 'text-slate-600'}`}>
+          <span className={`text-xs font-bold w-5 shrink-0 tabular-nums ${hasLogs ? 'text-primary' : 'text-slate-600'}`}>
             {hasLogs ? (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             ) : (
@@ -1529,7 +1529,7 @@ function ExerciseLogRow({
       {hasLogs && !expanded && (
         <div className="flex flex-wrap gap-1 ml-7 mt-0.5 mb-1">
           {logs.map((l) => (
-            <span key={l.set} className="text-[10px] tabular-nums bg-primary/15 text-primary px-1.5 py-0.5 rounded font-medium">
+            <span key={l.set} className="text-xs tabular-nums bg-primary/15 text-primary px-1.5 py-0.5 rounded font-medium">
               S{l.set} {formatSetLog(l, defaultUnit)}
             </span>
           ))}
@@ -1545,7 +1545,7 @@ function ExerciseLogRow({
             <button
               type="button"
               onClick={() => setUnit(unit === 'lb' ? 'kg' : 'lb')}
-              className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors p-1 rounded ${
+              className={`flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors p-1 rounded ${
                 unit === 'kg'
                   ? 'text-blue-400'
                   : 'text-slate-500 hover:text-blue-400'
@@ -1564,7 +1564,7 @@ function ExerciseLogRow({
                 <button
                   type="button"
                   onClick={() => setPlateMode(!plateMode)}
-                  className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors p-1 rounded ${
+                  className={`flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors p-1 rounded ${
                     plateMode
                       ? 'text-amber-400'
                       : 'text-amber-500/70 hover:text-amber-400'
@@ -1579,7 +1579,7 @@ function ExerciseLogRow({
                 </button>
                 {plateMode && (
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-slate-600">bar:</span>
+                    <span className="text-xs text-slate-600">bar:</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1589,9 +1589,9 @@ function ExerciseLogRow({
                         setBarWeight(Math.max(0, Math.min(100, v)));
                       }}
                       onFocus={(e) => e.target.select()}
-                      className="w-8 h-5 text-center bg-slate-900 border border-slate-700 rounded text-[10px] text-slate-400 tabular-nums font-medium focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:text-white"
+                      className="w-8 h-5 text-center bg-slate-900 border border-slate-700 rounded text-xs text-slate-400 tabular-nums font-medium focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:text-white"
                     />
-                    <span className="text-[10px] text-slate-600">{unit}</span>
+                    <span className="text-xs text-slate-600">{unit}</span>
                   </div>
                 )}
               </>
@@ -1621,7 +1621,7 @@ function ExerciseLogRow({
           {logs.length > 0 && logs.length < numSets && (
             <button
               onClick={handleFillRemaining}
-              className="w-full py-1.5 mt-1 rounded-lg text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/15 active:scale-[0.98] transition-colors truncate"
+              className="w-full py-1.5 mt-1 rounded-lg text-xs font-bold text-primary bg-primary/10 hover:bg-primary/15 active:scale-[0.98] transition-colors truncate"
             >
               Fill ({formatWeight(logs[logs.length - 1].weight, unit)} &times; {logs[logs.length - 1].reps})
             </button>
@@ -1632,9 +1632,9 @@ function ExerciseLogRow({
             {onSwap && (
               <button
                 onClick={(e) => { e.stopPropagation(); onSwap(); }}
-                className="flex items-center gap-1 text-[10px] font-medium text-slate-500 hover:text-amber-400 transition-colors"
+                className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-amber-400 transition-colors"
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                 </svg>
                 Swap
@@ -1649,13 +1649,13 @@ function ExerciseLogRow({
         <div className="ml-7 mt-2">
           <button
             onClick={() => setShowVideo((v) => !v)}
-            className={`flex items-center gap-1.5 text-[10px] font-medium transition-colors ${
+            className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
               vidPending
                 ? showVideo ? 'text-amber-400' : 'text-amber-400/60 hover:text-amber-400'
                 : showVideo ? 'text-red-400' : 'text-slate-500 hover:text-red-400'
             }`}
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
               <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
             </svg>
             {showVideo ? 'Hide video' : vidPending ? 'Watch form (pending)' : 'Watch form'}
@@ -1669,7 +1669,7 @@ function ExerciseLogRow({
                 loading="lazy"
               />
               {vidPending && (
-                <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-400/90 text-black text-[10px] font-bold uppercase tracking-wider">
+                <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-400/90 text-black text-xs font-bold uppercase tracking-wider">
                   Pending
                 </div>
               )}
@@ -1999,7 +1999,7 @@ function ActiveWorkout({
             {routineName.replace(/_/g, ' ')}
           </h4>
           {isPaused && (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/70">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-400/70">
               Paused
             </span>
           )}
@@ -2041,7 +2041,7 @@ function ActiveWorkout({
           {isPaused && !saving && !saveStatus && (
             <>
               {autoStopped && (
-                <p className="text-[10px] text-amber-400 font-bold text-center uppercase tracking-wider">
+                <p className="text-xs text-amber-400 font-bold text-center uppercase tracking-wider">
                   Auto-paused after inactivity
                 </p>
               )}
@@ -2232,7 +2232,7 @@ function FinishedWorkoutCard({
           <p className="text-sm font-bold text-white capitalize tracking-wide truncate">
             {fw.name.replace(/_/g, ' ')}
           </p>
-          <p className="text-[10px] text-muted mt-0.5">
+          <p className="text-xs text-muted mt-0.5">
             Finished at {fw.finishedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             {loggedExercises.length > 0 && (
               <span className="text-slate-500 ml-2">
@@ -2265,7 +2265,7 @@ function FinishedWorkoutCard({
                 <p className="text-xs font-semibold text-white">{name}</p>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                   {logs.map((log, j) => (
-                    <span key={j} className="text-[11px] text-slate-400 tabular-nums">
+                    <span key={j} className="text-xs text-slate-400 tabular-nums">
                       {formatWeight(log.weight, weightUnit)} &times; {log.reps}
                     </span>
                   ))}
@@ -2287,9 +2287,9 @@ function FinishedWorkoutCard({
         <div className="px-4 pb-3">
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="flex items-center gap-1.5 text-[10px] font-medium text-slate-600 hover:text-red-400 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-red-400 transition-colors"
           >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
             Remove from session
@@ -2782,7 +2782,7 @@ export default function WorkoutsPage() {
                   onClick={() => { setSearchExpanded(false); setRoutineSearch(''); }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -2827,7 +2827,7 @@ export default function WorkoutsPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                     </svg>
                     {activeFilterCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center">
+                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
                         {activeFilterCount}
                       </span>
                     )}
@@ -2842,13 +2842,13 @@ export default function WorkoutsPage() {
             <div className="px-4 pb-3 space-y-2">
               {activeCategories.size > 1 && (
                 <div>
-                  <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Category</p>
+                  <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1.5">Category</p>
                   <div className="flex flex-wrap gap-1.5">
                     {CATEGORIES.filter((c) => c === 'all' || activeCategories.has(c)).map((cat) => (
                       <button
                         key={cat}
                         onClick={() => { setCategoryFilter(cat); setMuscleFilter(null); }}
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
+                        className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
                           categoryFilter === cat
                             ? cat === 'all'
                               ? 'bg-primary/20 text-primary border-primary/30'
@@ -2864,13 +2864,13 @@ export default function WorkoutsPage() {
               )}
               {activeMuscles.size > 1 && (
                 <div>
-                  <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Muscle</p>
+                  <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1.5">Muscle</p>
                   <div className="flex flex-wrap gap-1.5">
                     {MUSCLE_PILL_ORDER.filter((m) => activeMuscles.has(m)).map((muscle) => (
                       <button
                         key={muscle}
                         onClick={() => setMuscleFilter(muscleFilter === muscle ? null : muscle)}
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
+                        className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all border ${
                           muscleFilter === muscle
                             ? (MUSCLE_COLORS[muscle] || 'bg-slate-500/20 text-slate-300') + ' border-transparent'
                             : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
@@ -3024,7 +3024,7 @@ export default function WorkoutsPage() {
                     <div key={item.data.id} className="px-4 py-3 rounded-xl glass">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          <span className="px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
                             Activity
                           </span>
                           <p className="font-bold text-white text-sm capitalize">{item.data.name}</p>
@@ -3033,7 +3033,7 @@ export default function WorkoutsPage() {
                           <span className="text-xs text-muted tabular-nums">{item.data.durationMinutes} min</span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{formatDate(item.data.date)}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{formatDate(item.data.date)}</p>
                       {item.data.notes && (
                         <p className="text-xs text-slate-400 mt-1">{item.data.notes}</p>
                       )}
@@ -3083,7 +3083,7 @@ export default function WorkoutsPage() {
             <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">
               {spinTarget.confirm.body}
             </p>
-            <p className="text-[10px] text-slate-500 mt-2 text-center">
+            <p className="text-xs text-slate-500 mt-2 text-center">
               {spinTarget.muscles.join(' & ').toUpperCase()} · {spinTarget.exerciseCount} exercises
             </p>
             <div className="flex gap-2 mt-4">

@@ -191,14 +191,14 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
             return (
               <span
                 key={key}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-500/20 border border-blue-400/30 text-blue-200"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/20 border border-blue-400/30 text-blue-200"
               >
                 {region?.label ?? key}
                 <button
                   onClick={() => handleMuscleClick(key)}
                   className="ml-0.5 hover:text-white transition-colors"
                 >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -248,7 +248,7 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
         className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-300 transition-colors"
       >
         <svg
-          className={`w-3 h-3 transition-transform ${showOptions ? 'rotate-90' : ''}`}
+          className={`w-4 h-4 transition-transform ${showOptions ? 'rotate-90' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -269,7 +269,7 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
                 <button
                   key={c}
                   onClick={() => setCategory(c)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                     category === c
                       ? 'bg-primary text-white'
                       : 'bg-slate-700/50 text-slate-400 hover:text-white'
@@ -289,7 +289,7 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
                 <button
                   key={i}
                   onClick={() => setSpicyLevel(i)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                     spicyLevel === i
                       ? 'bg-primary text-white'
                       : 'bg-slate-700/50 text-slate-400 hover:text-white'
@@ -305,7 +305,7 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
           <div className="flex items-center justify-between">
             <div>
               <span className="text-xs text-slate-400 font-medium">Supersets</span>
-              <p className="text-[10px] text-slate-500 mt-0.5">Pair exercises back-to-back</p>
+              <p className="text-xs text-slate-500 mt-0.5">Pair exercises back-to-back</p>
             </div>
             <button
               onClick={() => setSupersets(!supersets)}

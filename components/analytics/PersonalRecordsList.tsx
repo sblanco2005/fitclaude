@@ -64,17 +64,17 @@ export function PersonalRecordsList({ records }: PersonalRecordsListProps) {
                   </svg>
                 </span>
               )}
-              <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium ${muscleClass}`}>
+              <span className={`shrink-0 px-1.5 py-0.5 rounded text-xs font-medium ${muscleClass}`}>
                 {pr.muscleGroup}
               </span>
               <span className="text-sm text-white truncate flex-1">{pr.exerciseName}</span>
               <span className="text-sm font-semibold text-primary shrink-0">
                 {pr.prWeight} lb
               </span>
-              <span className="text-[10px] text-muted shrink-0">
+              <span className="text-xs text-muted shrink-0">
                 x{pr.prReps}
               </span>
-              <span className="text-[10px] text-slate-500 shrink-0 w-12 text-right">
+              <span className="text-xs text-slate-500 shrink-0 w-12 text-right">
                 {formatPrDate(pr.prDate)}
               </span>
             </div>

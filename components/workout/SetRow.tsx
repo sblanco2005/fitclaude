@@ -150,17 +150,17 @@ export default function SetRow({
           onClick={handleEdit}
           className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
         >
-          <svg className="w-3.5 h-3.5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <svg className="w-4 h-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
-          <span className="text-[11px] tabular-nums font-medium text-primary">
+          <span className="text-xs tabular-nums font-medium text-primary">
             S{setNumber}
           </span>
-          <span className="text-[11px] tabular-nums font-medium text-slate-300">
+          <span className="text-xs tabular-nums font-medium text-slate-300">
             {toDisplay(initialWeight)}{unit} × {initialReps}
           </span>
           {unit !== 'lb' && (
-            <span className="text-[9px] tabular-nums text-slate-500">
+            <span className="text-xs tabular-nums text-slate-500">
               ({initialWeight}lb)
             </span>
           )}
@@ -193,7 +193,7 @@ export default function SetRow({
   return (
     <div className="py-1">
       <div className="flex items-center gap-1.5">
-        <span className="text-[10px] tabular-nums font-bold text-slate-500 w-5 shrink-0">
+        <span className="text-xs tabular-nums font-bold text-slate-500 w-5 shrink-0">
           S{setNumber}
         </span>
 
@@ -208,8 +208,8 @@ export default function SetRow({
               label="/side"
               inputWidth="w-14"
             />
-            <span className="text-[10px] text-slate-500 font-medium">=</span>
-            <span className="text-[11px] tabular-nums font-bold text-white">
+            <span className="text-xs text-slate-500 font-medium">=</span>
+            <span className="text-xs tabular-nums font-bold text-white">
               {weight}{unit}
             </span>
           </div>
@@ -260,7 +260,7 @@ export default function SetRow({
 
       {/* Conversion preview */}
       {weight > 0 && (
-        <p className="text-[9px] text-slate-500 ml-6 mt-0.5 tabular-nums">
+        <p className="text-xs text-slate-500 ml-6 mt-0.5 tabular-nums">
           = {convertedLabel}
         </p>
       )}

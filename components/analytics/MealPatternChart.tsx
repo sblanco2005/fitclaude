@@ -73,7 +73,7 @@ export function MealPatternChart({ mealTypeDistribution, topFoods, avgMealsPerDa
                 <span className="text-xs text-muted w-4 shrink-0 pt-0.5">{i + 1}.</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-slate-300 truncate capitalize">{food.name}</div>
-                  <div className="text-[10px] text-muted">
+                  <div className="text-xs text-muted">
                     {food.avgCalories} cal · {food.avgProtein}g protein
                   </div>
                 </div>

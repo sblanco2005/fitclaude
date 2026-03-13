@@ -374,12 +374,12 @@ export default function FocusedExerciseView({
         {/* Superset label + muscle pill */}
         <div className="flex items-center gap-2 pt-2 pb-1">
           {supersetLabel && (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400/20 text-amber-300 text-[11px] font-black shrink-0">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400/20 text-amber-300 text-xs font-black shrink-0">
               {supersetLabel}
             </span>
           )}
           {muscle && (
-            <span className={`inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest ${muscleCls}`}>
+            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${muscleCls}`}>
               {muscle}
             </span>
           )}
@@ -391,11 +391,11 @@ export default function FocusedExerciseView({
             {eName}
           </h3>
           {exIsSkipped ? (
-            <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded-full shrink-0">
+            <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded-full shrink-0">
               Skipped
             </span>
           ) : allDone ? (
-            <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
+            <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
               <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
@@ -411,7 +411,7 @@ export default function FocusedExerciseView({
 
         {/* Last session */}
         {lastLogs && (
-          <p className="text-[11px] text-slate-600 font-bold mt-0.5 tabular-nums">
+          <p className="text-xs text-slate-600 font-bold mt-0.5 tabular-nums">
             Last: {lastLogs.slice(0, 4).map((l) => `${formatWeight(l.weight, unit)}×${l.reps}`).join('  ')}
           </p>
         )}
@@ -431,7 +431,7 @@ export default function FocusedExerciseView({
                 loading="lazy"
               />
               {vidIsPending && (
-                <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-400/90 text-black text-[10px] font-bold uppercase tracking-wider">
+                <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-400/90 text-black text-xs font-bold uppercase tracking-wider">
                   Pending
                 </div>
               )}
@@ -457,7 +457,7 @@ export default function FocusedExerciseView({
                 <button
                   type="button"
                   onClick={() => setUnit(unit === 'lb' ? 'kg' : 'lb')}
-                  className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors p-1 rounded ${
+                  className={`flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors p-1 rounded ${
                     unit === 'kg' ? 'text-blue-400' : 'text-slate-500 hover:text-blue-400'
                   }`}
                 >
@@ -472,7 +472,7 @@ export default function FocusedExerciseView({
                     <button
                       type="button"
                       onClick={() => setPlateMode(!plateMode)}
-                      className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors p-1 rounded ${
+                      className={`flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-colors p-1 rounded ${
                         plateMode ? 'text-amber-400' : 'text-amber-500/70 hover:text-amber-400'
                       }`}
                     >
@@ -485,7 +485,7 @@ export default function FocusedExerciseView({
                     </button>
                     {plateMode && (
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-slate-600">bar:</span>
+                        <span className="text-xs text-slate-600">bar:</span>
                         <input
                           type="text"
                           inputMode="numeric"
@@ -495,9 +495,9 @@ export default function FocusedExerciseView({
                             setBarWeight(Math.max(0, Math.min(100, v)));
                           }}
                           onFocus={(e) => e.target.select()}
-                          className="w-8 h-5 text-center bg-slate-900 border border-slate-700 rounded text-[10px] text-slate-400 tabular-nums font-medium focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:text-white"
+                          className="w-8 h-5 text-center bg-slate-900 border border-slate-700 rounded text-xs text-slate-400 tabular-nums font-medium focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:text-white"
                         />
-                        <span className="text-[10px] text-slate-600">{unit}</span>
+                        <span className="text-xs text-slate-600">{unit}</span>
                       </div>
                     )}
                   </>
@@ -530,7 +530,7 @@ export default function FocusedExerciseView({
             {exLogs.length > 0 && exLogs.length < numSets && (
               <button
                 onClick={() => handleFillRemaining(exercise)}
-                className="w-full py-1.5 mt-1 rounded-lg text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/15 active:scale-[0.98] transition-colors truncate"
+                className="w-full py-1.5 mt-1 rounded-lg text-xs font-bold text-primary bg-primary/10 hover:bg-primary/15 active:scale-[0.98] transition-colors truncate"
               >
                 Fill ({formatWeight(exLogs[exLogs.length - 1].weight, unit)} &times; {exLogs[exLogs.length - 1].reps})
               </button>
@@ -551,7 +551,7 @@ export default function FocusedExerciseView({
           className="flex items-center gap-1.5 min-w-[44px] min-h-[44px] justify-center"
         >
           <span className="text-sm font-black text-white tabular-nums">{currentGroupIndex + 1}/{totalGroups}</span>
-          <svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
@@ -608,8 +608,8 @@ export default function FocusedExerciseView({
           {/* Superset header badge */}
           {isSuperset && (
             <div className="flex items-center gap-2 pt-3 pb-1">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400/15 text-amber-300 text-[10px] font-black uppercase tracking-widest">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400/15 text-amber-300 text-xs font-black uppercase tracking-widest">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 Superset
@@ -647,7 +647,7 @@ export default function FocusedExerciseView({
                     {isSuperset && ei > 0 && (
                       <div className="flex items-center gap-2 my-2">
                         <div className="flex-1 h-px bg-amber-400/20" />
-                        <span className="text-[9px] font-bold text-amber-400/40 uppercase tracking-widest">No Rest</span>
+                        <span className="text-xs font-bold text-amber-400/40 uppercase tracking-widest">No Rest</span>
                         <div className="flex-1 h-px bg-amber-400/20" />
                       </div>
                     )}
@@ -679,16 +679,16 @@ export default function FocusedExerciseView({
           onClick={goNext}
           className="flex items-center gap-3 px-4 py-2.5 bg-slate-800/40 border-t border-slate-800/60 active:bg-slate-800/70 transition-colors"
         >
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Next</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Next</span>
           <span className="text-xs font-semibold text-slate-400 truncate flex-1 text-left">
             {nextGroup.exercises.map((e) => getExerciseName(e)).join(' + ')}
           </span>
           {nextGroup.exercises.length > 1 && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase bg-amber-400/15 text-amber-300 shrink-0">
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-bold uppercase bg-amber-400/15 text-amber-300 shrink-0">
               SS
             </span>
           )}
-          <svg className="w-3.5 h-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </button>
