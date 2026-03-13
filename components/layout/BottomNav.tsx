@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 const navItems = [
   {
@@ -65,6 +65,7 @@ function hasActiveHitIt(): boolean {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const handleNavClick = useCallback(
@@ -80,16 +81,18 @@ export function BottomNav() {
 
   const confirmLeave = useCallback(() => {
     if (pendingHref) {
-      setPendingHref(null);
-      // Tell the destination page to skip the "active workout → redirect back"
-      // logic. The flag is consumed once on the next page load.
+      const dest = pendingHref;
+      // Clear the active tab so the workouts page won't auto-switch to Hit It
+      // if it briefly re-mounts during client-side navigation.
+      localStorage.removeItem('fitclaude:activeTab');
+      // Tell pages (like home) to skip the "active workout → redirect back" logic.
       sessionStorage.setItem('fitclaude:hitItLeave', '1');
-      // Use window.location for a full navigation — router.push stays in the
-      // same React tree and the workouts page can re-mount before unmounting,
-      // causing a flicker back to Hit It.
-      window.location.href = pendingHref;
+      setPendingHref(null);
+      // Use router.push for client-side navigation — avoids full page reload
+      // which can cause race conditions with localStorage-based redirects.
+      router.push(dest);
     }
-  }, [pendingHref]);
+  }, [pendingHref, router]);
 
   const cancelLeave = useCallback(() => {
     setPendingHref(null);
