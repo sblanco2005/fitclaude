@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="108" fill="#0f172a"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <!-- Dumbbell -->
+  <rect x="96" y="180" width="64" height="128" rx="16" fill="#22c55e"/>
+  <rect x="352" y="180" width="64" height="128" rx="16" fill="#22c55e"/>
+  <rect x="150" y="224" width="212" height="40" rx="10" fill="#4ade80"/>
+  <rect x="72" y="200" width="32" height="88" rx="10" fill="#16a34a"/>
+  <rect x="408" y="200" width="32" height="88" rx="10" fill="#16a34a"/>
+  <!-- FitClaude text -->
+  <text x="256" y="408" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="64" fill="#94a3b8">FitClaude</text>
+</svg>

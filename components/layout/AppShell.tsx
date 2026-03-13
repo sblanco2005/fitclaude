@@ -6,6 +6,7 @@ import { useFitClaude } from '@/context/FitClaudeContext';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
+import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -28,6 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {!isChatPage && <ChatDrawer />}
         <BottomNav />
       </div>
+      <InstallPrompt />
     </div>
   );
 }

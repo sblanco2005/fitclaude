@@ -23,6 +23,12 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "FitClaude",
   description: "AI-powered fitness coach by Anthropic Claude",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "FitClaude",
+  },
 };
 
 export default function RootLayout({
@@ -32,6 +38,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+      </head>
       <body
         className={`${roboto.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
