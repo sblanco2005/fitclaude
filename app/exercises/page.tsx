@@ -133,11 +133,9 @@ export default function ExercisesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">Exercise Library</h2>
-        {isAdmin && (
-          <Button size="sm" onClick={() => { setShowCreateModal(true); setCreateError(null); setCreateSuccess(null); }}>
-            + Add
-          </Button>
-        )}
+        <Button size="sm" onClick={() => { setShowCreateModal(true); setCreateError(null); setCreateSuccess(null); }}>
+          + Add
+        </Button>
       </div>
 
       {/* Search */}

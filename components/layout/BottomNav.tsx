@@ -81,6 +81,9 @@ export function BottomNav() {
   const confirmLeave = useCallback(() => {
     if (pendingHref) {
       setPendingHref(null);
+      // Tell the destination page to skip the "active workout → redirect back"
+      // logic. The flag is consumed once on the next page load.
+      sessionStorage.setItem('fitclaude:hitItLeave', '1');
       // Use window.location for a full navigation — router.push stays in the
       // same React tree and the workouts page can re-mount before unmounting,
       // causing a flicker back to Hit It.

@@ -21,12 +21,18 @@ export default function DashboardPage() {
       return;
     }
     // If there's an active workout in Hit It, go straight to the workouts page
+    // — unless the user explicitly chose to leave via the confirmation dialog
     if (status === 'authenticated') {
       try {
-        const queue = JSON.parse(localStorage.getItem('fitclaude:hitItQueue') || '[]');
-        if (Array.isArray(queue) && queue.length > 0) {
-          router.replace('/workouts');
-          return;
+        const didLeave = sessionStorage.getItem('fitclaude:hitItLeave');
+        if (didLeave) {
+          sessionStorage.removeItem('fitclaude:hitItLeave');
+        } else {
+          const queue = JSON.parse(localStorage.getItem('fitclaude:hitItQueue') || '[]');
+          if (Array.isArray(queue) && queue.length > 0) {
+            router.replace('/workouts');
+            return;
+          }
         }
       } catch { /* ignore */ }
     }
