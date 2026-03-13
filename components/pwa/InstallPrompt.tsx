@@ -76,9 +76,9 @@ export function InstallPrompt() {
             <p className="text-sm font-semibold text-white">Install FitClaude</p>
             {isIOS ? (
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Tap the{' '}
+                Tap Safari&apos;s share button{' '}
                 <svg className="inline w-4 h-4 -mt-0.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v12m0-12l-3 3m3-3l3 3" /><path strokeLinecap="round" strokeLinejoin="round" d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4" /></svg>
-                {' '}button below, then scroll down and tap <strong className="text-white">&quot;Add to Home Screen&quot;</strong>
+                {' '}in the toolbar at the bottom of your screen, then tap <strong className="text-white">&quot;Add to Home Screen&quot;</strong>
               </p>
             ) : (
               <p className="text-xs text-slate-400 mt-0.5">
