@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
-import { getUserDayBounds } from '@/lib/timezone';
+import { getUserDayBounds, getUserTodayStr } from '@/lib/timezone';
 
 export const GET = withAuth(async (request, user) => {
   const { searchParams } = new URL(request.url);
@@ -28,5 +28,12 @@ export const GET = withAuth(async (request, user) => {
     { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 }
   );
 
-  return NextResponse.json({ logs, totals });
+  // Check if today has already been closed (summary exists)
+  const todayStr = getUserTodayStr(timezone);
+  const summaryDate = new Date(todayStr + 'T00:00:00Z');
+  const summary = await prisma.dailyNutritionSummary.findUnique({
+    where: { userId_date: { userId: user.id, date: summaryDate } },
+  });
+
+  return NextResponse.json({ logs, totals, closed: !!summary });
 });

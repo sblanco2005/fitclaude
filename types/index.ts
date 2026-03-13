@@ -180,6 +180,7 @@ export interface DailyNutrition {
     fatG: number;
     fiberG: number;
   };
+  closed?: boolean;
 }
 
 export interface DailyNutritionSummary {

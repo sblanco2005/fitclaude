@@ -716,6 +716,7 @@ export default function NutritionPage() {
       });
       if (res.ok) {
         setHistoryLoaded(false);
+        fetchToday();
         setTab('history');
       }
     } catch (err) {
@@ -811,8 +812,12 @@ export default function NutritionPage() {
             )}
           </Card>
 
-          {/* Close Day button */}
-          {today?.logs && today.logs.length > 0 && (
+          {/* Close Day button or closed banner */}
+          {today?.closed ? (
+            <div className="w-full py-3 px-4 bg-green-500/10 border border-green-500/30 text-green-400 font-medium rounded-xl text-sm text-center">
+              Day closed — saved to history
+            </div>
+          ) : today?.logs && today.logs.length > 0 ? (
             <button
               onClick={handleCloseDay}
               disabled={closing}
@@ -820,7 +825,7 @@ export default function NutritionPage() {
             >
               {closing ? 'Saving...' : 'Close Day & Save to History'}
             </button>
-          )}
+          ) : null}
         </>
       )}
 
