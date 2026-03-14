@@ -65,6 +65,13 @@ function MealRow({
   const inputRef = useRef<HTMLInputElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+  }, []);
+
   const startEdit = () => {
     setRawInput(log.rawInput);
     setMealType(log.mealType ?? '');
