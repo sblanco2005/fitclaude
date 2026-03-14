@@ -2475,6 +2475,8 @@ function WorkoutsPageInner() {
   const [assignCollectionRoutine, setAssignCollectionRoutine] = useState<string | null>(null);
   const [editingCollection, setEditingCollection] = useState<WorkoutCollection | null>(null);
   const [deletingCollection, setDeletingCollection] = useState<WorkoutCollection | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
   const [spunRoutineName, setSpunRoutineName] = useState<string | null>(null);
   const prevRoutineNamesRef = useRef<Set<string>>(new Set());
 
@@ -3012,9 +3014,21 @@ function WorkoutsPageInner() {
                 return (
                   <button
                     key={col.id}
-                    onClick={() => setActiveCollection(isActive ? null : col.id)}
+                    onClick={() => {
+                      if (longPressFired.current) { longPressFired.current = false; return; }
+                      setActiveCollection(isActive ? null : col.id);
+                    }}
                     onContextMenu={(e) => { e.preventDefault(); setEditingCollection(col); }}
-                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all border flex items-center gap-1 ${
+                    onTouchStart={() => {
+                      longPressFired.current = false;
+                      longPressTimer.current = setTimeout(() => {
+                        longPressFired.current = true;
+                        setEditingCollection(col);
+                      }, 500);
+                    }}
+                    onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+                    onTouchMove={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all border flex items-center gap-1 select-none ${
                       isActive
                         ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
                         : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
