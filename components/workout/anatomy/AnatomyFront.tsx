@@ -32,7 +32,7 @@ export default function AnatomyFront({ selectedMuscles, onMuscleClick }: Anatomy
       />
 
       {/* Clickable muscle regions */}
-      {FRONT_PATHS.filter((mp) => ['chest', 'core', 'biceps'].includes(mp.muscle)).map((mp) => {
+      {FRONT_PATHS.filter((mp) => ['chest', 'core', 'biceps', 'shoulders', 'forearms', 'quadriceps'].includes(mp.muscle)).map((mp) => {
         const isSelected = selectedMuscles.has(mp.muscle);
         return (
           <path
