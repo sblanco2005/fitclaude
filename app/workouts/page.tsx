@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { Modal } from '@/components/ui/Modal';
-import type { Workout, WorkoutExercise, Exercise, Activity } from '@/types';
+import type { Workout, WorkoutExercise, Exercise, Activity, WorkoutCollection } from '@/types';
 import SetRow, { type WeightUnit, lbToKg } from '@/components/workout/SetRow';
 import FocusedExerciseView from '@/components/workout/FocusedExerciseView';
 import MuscleGroupPicker from '@/components/workout/MuscleGroupPicker';
@@ -127,6 +127,100 @@ function formatTimer(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+// ─── CreateCollectionForm ────────────────────────────────────────────────────
+
+const COLLECTION_EMOJIS = ['🔥', '💪', '🏋️', '⚡', '🎯', '🚀', '💎', '🌟', '🏆', '🦾', '🧠', '❤️'];
+const COLLECTION_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+
+function CreateCollectionForm({
+  initial,
+  onSubmit,
+  onCancel,
+  onDelete,
+}: {
+  initial?: { name: string; emoji: string | null; color: string | null };
+  onSubmit: (name: string, emoji?: string, color?: string) => void;
+  onCancel: () => void;
+  onDelete?: () => void;
+}) {
+  const [name, setName] = useState(initial?.name || '');
+  const [emoji, setEmoji] = useState(initial?.emoji || '');
+  const [color, setColor] = useState(initial?.color || '');
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs text-slate-400 font-medium block mb-1.5">Name</label>
+        <input
+          type="text"
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Alpha Fit"
+          className="w-full px-3 py-2.5 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary/50"
+        />
+      </div>
+      <div>
+        <label className="text-xs text-slate-400 font-medium block mb-1.5">Icon</label>
+        <div className="flex flex-wrap gap-1.5">
+          {COLLECTION_EMOJIS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => setEmoji(emoji === e ? '' : e)}
+              className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all ${
+                emoji === e ? 'bg-slate-700 ring-2 ring-primary' : 'bg-slate-800/40 hover:bg-slate-700/60'
+              }`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-slate-400 font-medium block mb-1.5">Color</label>
+        <div className="flex flex-wrap gap-1.5">
+          {COLLECTION_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(color === c ? '' : c)}
+              className={`w-8 h-8 rounded-full transition-all ${
+                color === c ? 'ring-2 ring-offset-2 ring-offset-slate-900 ring-white scale-110' : 'hover:scale-105'
+              }`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="flex gap-2 pt-1">
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors"
+          >
+            Delete
+          </button>
+        )}
+        <div className="flex-1" />
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => { if (name.trim()) onSubmit(name.trim(), emoji || undefined, color || undefined); }}
+          disabled={!name.trim()}
+          className="px-4 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-40"
+        >
+          {initial ? 'Save' : 'Create'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── RoutineCard (compact list item) ─────────────────────────────────────────
 
 function getRoutineDisplayId(workouts: Workout[]): number | null {
@@ -145,11 +239,13 @@ function RoutineCard({
   workouts,
   onClick,
   onToggleFavorite,
+  onAddToCollection,
 }: {
   name: string;
   workouts: Workout[];
   onClick: () => void;
   onToggleFavorite: (workoutId: string, current: boolean) => void;
+  onAddToCollection?: (routineName: string) => void;
 }) {
   const latest = workouts[0];
   const typeColor = TYPE_COLORS[latest.workoutType] ?? 'default';
@@ -205,6 +301,17 @@ function RoutineCard({
         </div>
       </button>
 
+      {/* Collection folder */}
+      {onAddToCollection && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onAddToCollection(name); }}
+          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-slate-800/60"
+        >
+          <svg className="w-[18px] h-[18px] text-slate-600 hover:text-slate-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+        </button>
+      )}
       {/* Favorite heart */}
       <button
         onClick={(e) => { e.stopPropagation(); onToggleFavorite(latest.id, isFav); }}
@@ -2361,6 +2468,11 @@ export default function WorkoutsPage() {
   >([]);
   const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [collections, setCollections] = useState<WorkoutCollection[]>([]);
+  const [activeCollection, setActiveCollection] = useState<string | null>(null);
+  const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
+  const [assignCollectionRoutine, setAssignCollectionRoutine] = useState<string | null>(null);
+  const [editingCollection, setEditingCollection] = useState<WorkoutCollection | null>(null);
 
   // Persist Hit It queue and active tab to localStorage
   useEffect(() => {
@@ -2412,11 +2524,19 @@ export default function WorkoutsPage() {
       .catch(() => setActivities([]));
   }, []);
 
+  const fetchCollections = useCallback(() => {
+    fetch('/api/collections')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setCollections(Array.isArray(data) ? data : []))
+      .catch(() => setCollections([]));
+  }, []);
+
   // Initial load + re-fetch when chat creates/modifies workouts
   useEffect(() => {
     fetchWorkouts();
     fetchActivities();
-  }, [fetchWorkouts, fetchActivities, dataVersion]);
+    fetchCollections();
+  }, [fetchWorkouts, fetchActivities, fetchCollections, dataVersion]);
 
   const routineGroups = useMemo(() => {
     const map = new Map<string, Workout[]>();
@@ -2474,8 +2594,15 @@ export default function WorkoutsPage() {
     if (favoritesOnly) {
       filtered = filtered.filter(([, group]) => group[0].isFavorite);
     }
+    if (activeCollection) {
+      const col = collections.find((c) => c.id === activeCollection);
+      if (col) {
+        const names = new Set(col.routineNames);
+        filtered = filtered.filter(([key]) => names.has(key));
+      }
+    }
     return filtered;
-  }, [routineGroups, categoryFilter, muscleFilter, routineSearch, favoritesOnly]);
+  }, [routineGroups, categoryFilter, muscleFilter, routineSearch, favoritesOnly, activeCollection, collections]);
 
   // Categories that actually have routines (for showing only relevant pills)
   const activeCategories = useMemo(() => {
@@ -2494,6 +2621,79 @@ export default function WorkoutsPage() {
     }
     return ms;
   }, [routineGroups]);
+
+  const createCollection = async (name: string, emoji?: string, color?: string) => {
+    try {
+      const res = await fetch('/api/collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, emoji: emoji || null, color: color || null }),
+      });
+      if (!res.ok) return;
+      const col = await res.json();
+      setCollections((prev) => [...prev, col]);
+    } catch (err) {
+      console.error('Failed to create collection:', err);
+    }
+  };
+
+  const deleteCollection = async (id: string) => {
+    try {
+      await fetch(`/api/collections/${id}`, { method: 'DELETE' });
+      setCollections((prev) => prev.filter((c) => c.id !== id));
+      if (activeCollection === id) setActiveCollection(null);
+    } catch (err) {
+      console.error('Failed to delete collection:', err);
+    }
+  };
+
+  const updateCollection = async (id: string, data: { name?: string; emoji?: string; color?: string }) => {
+    try {
+      const res = await fetch(`/api/collections/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) return;
+      const updated = await res.json();
+      setCollections((prev) => prev.map((c) => (c.id === id ? updated : c)));
+    } catch (err) {
+      console.error('Failed to update collection:', err);
+    }
+  };
+
+  const toggleRoutineInCollection = async (collectionId: string, routineName: string) => {
+    const col = collections.find((c) => c.id === collectionId);
+    if (!col) return;
+    const isIn = col.routineNames.includes(routineName);
+    try {
+      if (isIn) {
+        await fetch(`/api/collections/${collectionId}/workouts`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ routineName }),
+        });
+        setCollections((prev) =>
+          prev.map((c) =>
+            c.id === collectionId ? { ...c, routineNames: c.routineNames.filter((n) => n !== routineName) } : c
+          )
+        );
+      } else {
+        await fetch(`/api/collections/${collectionId}/workouts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ routineName }),
+        });
+        setCollections((prev) =>
+          prev.map((c) =>
+            c.id === collectionId ? { ...c, routineNames: [...c.routineNames, routineName] } : c
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Failed to toggle routine in collection:', err);
+    }
+  };
 
   const activeFilterCount = (categoryFilter !== 'all' ? 1 : 0) + (muscleFilter ? 1 : 0);
 
@@ -2763,6 +2963,51 @@ export default function WorkoutsPage() {
       {/* Routines Tab — full-width list */}
       {tab === 'routines' && (
         <div className="flex-1 overflow-y-auto scrollbar-hide">
+          {/* Collection strip */}
+          {collections.length > 0 && (
+            <div className="flex items-center gap-1.5 px-4 pb-2 overflow-x-auto scrollbar-hide">
+              <button
+                onClick={() => setActiveCollection(null)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all border ${
+                  activeCollection === null
+                    ? 'bg-primary/20 text-primary border-primary/30'
+                    : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
+                }`}
+              >
+                All
+              </button>
+              {collections.map((col) => {
+                const count = col.routineNames.length;
+                const isActive = activeCollection === col.id;
+                return (
+                  <button
+                    key={col.id}
+                    onClick={() => setActiveCollection(isActive ? null : col.id)}
+                    onContextMenu={(e) => { e.preventDefault(); setEditingCollection(col); }}
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all border flex items-center gap-1 ${
+                      isActive
+                        ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                        : 'bg-transparent text-slate-500 border-slate-700/50 hover:text-slate-300'
+                    }`}
+                    style={col.color && isActive ? { borderColor: col.color + '60', backgroundColor: col.color + '20', color: col.color } : undefined}
+                  >
+                    {col.emoji && <span>{col.emoji}</span>}
+                    <span className="truncate max-w-[100px]">{col.name}</span>
+                    {count > 0 && <span className="text-slate-500 tabular-nums">{count}</span>}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setCreateCollectionOpen(true)}
+                className="shrink-0 w-7 h-7 rounded-full border border-dashed border-slate-700/50 text-slate-500 hover:text-slate-300 hover:border-slate-500 flex items-center justify-center transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            </div>
+          )}
+
           {/* Compact toolbar: search + filter toggle */}
           <div className="flex items-center gap-2 px-4 pb-2">
             {searchExpanded ? (
@@ -2918,6 +3163,7 @@ export default function WorkoutsPage() {
                 workouts={group}
                 onClick={() => setSelectedRoutine(key)}
                 onToggleFavorite={toggleFavorite}
+                onAddToCollection={(routineName) => setAssignCollectionRoutine(routineName)}
               />
             ))
           )}
@@ -3070,6 +3316,88 @@ export default function WorkoutsPage() {
           onClose={() => setMusclePickerOpen(false)}
         />
       </Modal>
+
+      {/* Create Collection Modal */}
+      <Modal isOpen={createCollectionOpen} onClose={() => setCreateCollectionOpen(false)} title="New Collection" size="sm">
+        <CreateCollectionForm
+          onSubmit={(name, emoji, color) => {
+            createCollection(name, emoji, color);
+            setCreateCollectionOpen(false);
+          }}
+          onCancel={() => setCreateCollectionOpen(false)}
+        />
+      </Modal>
+
+      {/* Edit Collection Modal */}
+      {editingCollection && (
+        <Modal isOpen={true} onClose={() => setEditingCollection(null)} title="Edit Collection" size="sm">
+          <CreateCollectionForm
+            initial={editingCollection}
+            onSubmit={(name, emoji, color) => {
+              updateCollection(editingCollection.id, { name, emoji, color });
+              setEditingCollection(null);
+            }}
+            onCancel={() => setEditingCollection(null)}
+            onDelete={() => {
+              deleteCollection(editingCollection.id);
+              setEditingCollection(null);
+            }}
+          />
+        </Modal>
+      )}
+
+      {/* Assign Routine to Collection Modal */}
+      {assignCollectionRoutine && (
+        <Modal isOpen={true} onClose={() => setAssignCollectionRoutine(null)} title="Add to Collection" size="sm">
+          <div className="space-y-2">
+            {collections.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted mb-3">No collections yet</p>
+                <button
+                  onClick={() => { setAssignCollectionRoutine(null); setCreateCollectionOpen(true); }}
+                  className="px-4 py-2 rounded-lg bg-primary text-white text-xs font-bold"
+                >
+                  Create First Collection
+                </button>
+              </div>
+            ) : (
+              <>
+                {collections.map((col) => {
+                  const isIn = col.routineNames.includes(assignCollectionRoutine);
+                  return (
+                    <button
+                      key={col.id}
+                      onClick={() => toggleRoutineInCollection(col.id, assignCollectionRoutine)}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl glass hover:bg-slate-800/60 transition-colors"
+                    >
+                      <span className="text-lg">{col.emoji || '📁'}</span>
+                      <span className="flex-1 text-left text-sm font-medium text-white">{col.name}</span>
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                        isIn ? 'bg-primary border-primary' : 'border-slate-600'
+                      }`}>
+                        {isIn && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => { setAssignCollectionRoutine(null); setCreateCollectionOpen(true); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-slate-700/50 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span className="text-sm font-medium">New Collection</span>
+                </button>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {/* Spin confirmation overlay */}
       {spinTarget && (

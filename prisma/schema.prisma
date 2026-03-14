@@ -55,6 +55,7 @@ model User {
   activities           Activity[]
   tokenUsages          TokenUsage[]
   usageLimit           UserUsageLimit?
+  collections          WorkoutCollection[]
 
   @@map("users")
 }
@@ -428,4 +429,37 @@ model UserUsageLimit {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_usage_limits")
+}
+
+// ============================================
+// Workout Collections
+// ============================================
+
+model WorkoutCollection {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  emoji     String?
+  color     String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workouts WorkoutCollectionWorkout[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("workout_collections")
+}
+
+model WorkoutCollectionWorkout {
+  id           String @id @default(cuid())
+  collectionId String
+  routineName  String
+
+  collection WorkoutCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, routineName])
+  @@index([collectionId])
+  @@map("workout_collection_workouts")
 }

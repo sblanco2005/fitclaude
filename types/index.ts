@@ -154,6 +154,17 @@ export interface Activity {
   createdAt: string;
 }
 
+// Workout Collections
+export interface WorkoutCollection {
+  id: string;
+  name: string;
+  emoji: string | null;
+  color: string | null;
+  sortOrder: number;
+  createdAt: string;
+  routineNames: string[];
+}
+
 // Nutrition
 export interface NutritionLog {
   id: string;
