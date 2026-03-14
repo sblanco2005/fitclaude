@@ -2474,6 +2474,7 @@ function WorkoutsPageInner() {
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [assignCollectionRoutine, setAssignCollectionRoutine] = useState<string | null>(null);
   const [editingCollection, setEditingCollection] = useState<WorkoutCollection | null>(null);
+  const [deletingCollection, setDeletingCollection] = useState<WorkoutCollection | null>(null);
   const [spunRoutineName, setSpunRoutineName] = useState<string | null>(null);
   const prevRoutineNamesRef = useRef<Set<string>>(new Set());
 
@@ -2665,11 +2666,22 @@ function WorkoutsPageInner() {
     }
   };
 
-  const deleteCollection = async (id: string) => {
+  const deleteCollection = async (id: string, deleteRoutines?: boolean) => {
+    const col = collections.find((c) => c.id === id);
     try {
+      // Delete routines inside the collection if requested
+      if (deleteRoutines && col && col.routineNames.length > 0) {
+        for (const name of col.routineNames) {
+          const group = routineGroups.find(([k]) => k === name)?.[1];
+          if (group) {
+            await Promise.all(group.map((w) => fetch(`/api/workouts/${w.id}`, { method: 'DELETE' })));
+          }
+        }
+      }
       await fetch(`/api/collections/${id}`, { method: 'DELETE' });
       setCollections((prev) => prev.filter((c) => c.id !== id));
       if (activeCollection === id) setActiveCollection(null);
+      if (deleteRoutines) fetchWorkouts();
     } catch (err) {
       console.error('Failed to delete collection:', err);
     }
@@ -3337,11 +3349,86 @@ function WorkoutsPageInner() {
             }}
             onCancel={() => setEditingCollection(null)}
             onDelete={() => {
-              deleteCollection(editingCollection.id);
+              setDeletingCollection(editingCollection);
               setEditingCollection(null);
             }}
           />
         </Modal>
+      )}
+
+      {/* Delete Collection Confirmation */}
+      {deletingCollection && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 pb-20">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeletingCollection(null)} />
+          <div className="relative w-full max-w-sm glass rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+            <div className="p-5 text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-500/20 flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-1">
+                Delete &ldquo;{deletingCollection.emoji ? `${deletingCollection.emoji} ` : ''}{deletingCollection.name}&rdquo;?
+              </h3>
+              {deletingCollection.routineNames.length > 0 ? (
+                <>
+                  <p className="text-sm text-slate-400 mb-5">
+                    This collection has {deletingCollection.routineNames.length} routine{deletingCollection.routineNames.length !== 1 ? 's' : ''}. Do you also want to delete the routines inside?
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => {
+                        deleteCollection(deletingCollection.id, true);
+                        setDeletingCollection(null);
+                      }}
+                      className="w-full px-4 py-3 rounded-xl bg-red-500/20 text-red-400 font-medium text-sm active:scale-95 transition-transform"
+                    >
+                      Delete Collection & Routines
+                    </button>
+                    <button
+                      onClick={() => {
+                        deleteCollection(deletingCollection.id, false);
+                        setDeletingCollection(null);
+                      }}
+                      className="w-full px-4 py-3 rounded-xl bg-amber-500/20 text-amber-400 font-medium text-sm active:scale-95 transition-transform"
+                    >
+                      Delete Collection Only
+                    </button>
+                    <button
+                      onClick={() => setDeletingCollection(null)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm active:scale-95 transition-transform"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-400 mb-5">
+                    This collection is empty. It will be permanently removed.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setDeletingCollection(null)}
+                      className="flex-1 px-4 py-3 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm active:scale-95 transition-transform"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        deleteCollection(deletingCollection.id);
+                        setDeletingCollection(null);
+                      }}
+                      className="flex-1 px-4 py-3 rounded-xl bg-red-500/20 text-red-400 font-medium text-sm active:scale-95 transition-transform"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Assign Routine to Collection Modal */}
