@@ -236,6 +236,7 @@ export interface AnalyticsData {
   personalRecords: PersonalRecord[];
   plateaus: PlateauAlert[];
   repRangeAnalysis: RepRangeData[];
+  musclesWorked: string[];
   nutrition: NutritionAnalytics;
 }
 

@@ -10,6 +10,7 @@ import { PersonalRecordsList } from '@/components/analytics/PersonalRecordsList'
 import { PlateauAlerts } from '@/components/analytics/PlateauAlerts';
 import { RepRangeChart } from '@/components/analytics/RepRangeChart';
 import { WeeklyInsightsCard } from '@/components/analytics/WeeklyInsightsCard';
+import { MusclesWorkedCard } from '@/components/analytics/MusclesWorkedCard';
 import { CalorieTrendChart } from '@/components/analytics/CalorieTrendChart';
 import { MacroChart } from '@/components/analytics/MacroChart';
 import { NutritionSummaryCards } from '@/components/analytics/NutritionSummaryCards';
@@ -120,6 +121,7 @@ export default function AnalyticsPage() {
               totalVolume={data.totalVolume}
               avgVolumePerSession={data.avgVolumePerSession}
             />
+            <MusclesWorkedCard musclesWorked={data.musclesWorked || []} />
             <VolumeChart data={data.volumeByWeek} />
             <ProgressChart data={data.progressiveOverload} />
             <PersonalRecordsList records={data.personalRecords} />

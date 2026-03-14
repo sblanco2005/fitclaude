@@ -247,6 +247,39 @@ export const GET = withAuth(async (request, user) => {
         percentage: totalSets > 0 ? Math.round((r.totalSets / totalSets) * 100) : 0,
       }));
 
+    // ── Muscles worked in period ──
+    const EXERCISE_TO_ANATOMY: Record<string, string[]> = {
+      chest: ['chest'],
+      back: ['back'],
+      shoulders: ['shoulders'],
+      biceps: ['biceps'],
+      triceps: ['triceps'],
+      core: ['core'],
+      glutes: ['glutes'],
+      hamstrings: ['hamstrings'],
+      quadriceps: ['quadriceps'],
+      calves: ['calves'],
+      forearms: ['forearms'],
+      legs: ['quadriceps', 'hamstrings', 'glutes', 'calves'],
+      arms: ['biceps', 'triceps'],
+      posterior_chain: ['back', 'glutes', 'hamstrings'],
+      full_body: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'core', 'glutes', 'hamstrings', 'quadriceps', 'calves'],
+    };
+    const musclesWorkedSet = new Set<string>();
+    for (const w of workouts) {
+      for (const ex of w.exercises) {
+        if (!ex.exercise?.muscleGroup) continue;
+        const mg = ex.exercise.muscleGroup.toLowerCase();
+        const mapped = EXERCISE_TO_ANATOMY[mg];
+        if (mapped) {
+          for (const m of mapped) musclesWorkedSet.add(m);
+        } else {
+          musclesWorkedSet.add(mg);
+        }
+      }
+    }
+    const musclesWorked = Array.from(musclesWorkedSet);
+
     const totalWorkouts = workouts.length;
     const avgVolumePerSession = totalWorkouts > 0 ? Math.round(totalVolume / totalWorkouts) : 0;
 
@@ -385,6 +418,7 @@ export const GET = withAuth(async (request, user) => {
       totalWorkouts,
       totalVolume: Math.round(totalVolume),
       avgVolumePerSession,
+      musclesWorked,
       volumeBySession,
       volumeByWeek,
       progressiveOverload,
