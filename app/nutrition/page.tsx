@@ -224,15 +224,48 @@ function MealRow({
     );
   }
 
-  const handleTouchStart = () => {
-    longPressTimer.current = setTimeout(() => {
-      startEdit();
-      navigator.vibrate?.(10);
-    }, 400);
-  };
-  const handleTouchEnd = () => {
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdAnimFrame = useRef<number | null>(null);
+  const holdStartTime = useRef<number>(0);
+  const longPressFired = useRef(false);
+  const HOLD_DURATION = 3000; // 3 seconds
+
+  const clearHold = () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
     longPressTimer.current = null;
+    if (holdAnimFrame.current) cancelAnimationFrame(holdAnimFrame.current);
+    holdAnimFrame.current = null;
+    setHoldProgress(0);
+    longPressFired.current = false;
+  };
+
+  const animateProgress = () => {
+    const elapsed = Date.now() - holdStartTime.current;
+    const progress = Math.min(elapsed / HOLD_DURATION, 1);
+    setHoldProgress(progress);
+    if (progress < 1) {
+      holdAnimFrame.current = requestAnimationFrame(animateProgress);
+    }
+  };
+
+  const handleTouchStart = () => {
+    longPressFired.current = false;
+    holdStartTime.current = Date.now();
+    animateProgress();
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      setHoldProgress(0);
+      startEdit();
+      navigator.vibrate?.(10);
+    }, HOLD_DURATION);
+  };
+
+  const handleTouchEnd = () => {
+    clearHold();
+  };
+
+  const handleTouchMove = () => {
+    clearHold();
   };
 
   return (
@@ -240,9 +273,16 @@ function MealRow({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
-      onDoubleClick={startEdit}
-      className="flex items-start justify-between py-2 min-h-[52px] border-b border-slate-800 last:border-0 group cursor-pointer active:bg-slate-800/30 transition-colors"
+      onTouchMove={handleTouchMove}
+      className="flex items-start justify-between py-2 min-h-[52px] border-b border-slate-800 last:border-0 group cursor-pointer relative overflow-hidden"
     >
+      {/* Hold-to-edit progress bar */}
+      {holdProgress > 0 && (
+        <div
+          className="absolute bottom-0 left-0 h-0.5 bg-primary transition-none"
+          style={{ width: `${holdProgress * 100}%` }}
+        />
+      )}
       <div className="min-w-0 flex-1">
         <p className="text-sm text-white">{cleanRawInput(log.rawInput)}</p>
         <div className="flex items-center gap-2">
@@ -251,7 +291,7 @@ function MealRow({
           )}
           <span className="text-xs text-slate-600 flex items-center gap-0.5">
             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><circle cx="4" cy="12" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="20" cy="12" r="2.5"/></svg>
-            hold to edit
+            hold 3s to edit
           </span>
         </div>
       </div>
