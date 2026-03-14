@@ -24,11 +24,11 @@ export default function AnatomyBack({ selectedMuscles, onMuscleClick }: AnatomyB
       {/* Physique photo background */}
       <image
         href="/images/anatomy-back.png"
-        x="20"
-        y="-10"
-        width="160"
+        x="10"
+        y="-15"
+        width="180"
         height="420"
-        preserveAspectRatio="xMidYMin meet"
+        preserveAspectRatio="xMidYMid slice"
         style={{ opacity: 0.85 }}
       />
 

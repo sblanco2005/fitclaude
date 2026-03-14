@@ -135,10 +135,8 @@ export interface MusclePath {
 
 // FRONT VIEW paths
 export const FRONT_PATHS: MusclePath[] = [
-  // ── Chest (left) ──
-  { id: 'chest-l', muscle: 'chest', d: 'M72,108 C72,100 78,92 88,90 L100,90 L100,120 C95,122 85,122 78,118 C74,115 72,112 72,108Z' },
-  // ── Chest (right) ──
-  { id: 'chest-r', muscle: 'chest', d: 'M100,90 L112,90 C122,92 128,100 128,108 C128,112 126,115 122,118 C115,122 105,122 100,120Z' },
+  // ── Chest (single combined path) ──
+  { id: 'chest', muscle: 'chest', d: 'M54,124 C54,114 62,104 80,101 L120,101 C138,104 146,114 146,124 C146,132 140,135 132,139 C122,143 108,143 100,141 C92,143 78,143 68,139 C60,135 54,132 54,124Z' },
 
   // ── Shoulders / Front Delts (left) ──
   { id: 'shoulder-front-l', muscle: 'shoulders', d: 'M60,88 C58,82 62,76 68,74 C74,72 80,76 82,82 L82,92 C76,90 68,88 60,88Z' },
@@ -146,22 +144,17 @@ export const FRONT_PATHS: MusclePath[] = [
   { id: 'shoulder-front-r', muscle: 'shoulders', d: 'M140,88 C142,82 138,76 132,74 C126,72 120,76 118,82 L118,92 C124,90 132,88 140,88Z' },
 
   // ── Biceps (left) ──
-  { id: 'biceps-l', muscle: 'biceps', d: 'M58,100 C56,96 54,92 56,88 L62,88 C64,92 66,100 66,108 L66,140 C64,140 60,138 58,134 C56,128 56,116 58,100Z' },
+  { id: 'biceps-l', muscle: 'biceps', d: 'M32,128 C30,124 32,120 36,118 C40,116 42,118 42,124 L34,166 C32,174 28,180 24,182 C20,182 18,178 18,172Z' },
   // ── Biceps (right) ──
-  { id: 'biceps-r', muscle: 'biceps', d: 'M142,100 C144,96 146,92 144,88 L138,88 C136,92 134,100 134,108 L134,140 C136,140 140,138 142,134 C144,128 144,116 142,100Z' },
+  { id: 'biceps-r', muscle: 'biceps', d: 'M168,128 C170,124 168,120 164,118 C160,116 158,118 158,124 L166,166 C168,174 172,180 176,182 C180,182 182,178 182,172Z' },
 
   // ── Forearms (left) ──
   { id: 'forearm-front-l', muscle: 'forearms', d: 'M56,142 C54,148 52,158 50,170 C48,180 48,190 50,196 L60,196 C62,190 64,178 64,168 C64,158 62,148 60,142Z' },
   // ── Forearms (right) ──
   { id: 'forearm-front-r', muscle: 'forearms', d: 'M144,142 C146,148 148,158 150,170 C152,180 152,190 150,196 L140,196 C138,190 136,178 136,168 C136,158 138,148 140,142Z' },
 
-  // ── Core / Abs ──
-  { id: 'core-l', muscle: 'core', d: 'M82,122 L100,122 L100,180 L82,180 C80,170 78,155 78,145 C78,135 80,128 82,122Z' },
-  { id: 'core-r', muscle: 'core', d: 'M100,122 L118,122 C120,128 122,135 122,145 C122,155 120,170 118,180 L100,180Z' },
-  // ── Obliques (left) ──
-  { id: 'oblique-l', muscle: 'core', d: 'M72,120 L82,122 C80,130 78,140 78,150 L78,172 L72,170 C70,160 68,145 68,135 C68,128 70,124 72,120Z' },
-  // ── Obliques (right) ──
-  { id: 'oblique-r', muscle: 'core', d: 'M128,120 L118,122 C120,130 122,140 122,150 L122,172 L128,170 C130,160 132,145 132,135 C132,128 130,124 128,120Z' },
+  // ── Core / Abs (single combined path) ──
+  { id: 'core', muscle: 'core', d: 'M68,145 L132,145 L132,202 C128,206 118,209 100,209 C82,209 72,206 68,202Z' },
 
   // ── Quadriceps (left) ──
   { id: 'quads-l', muscle: 'quadriceps', d: 'M78,186 C80,184 84,182 90,182 L100,182 L100,270 L92,272 C86,270 82,264 80,256 C78,246 76,230 76,216 C76,204 77,194 78,186Z' },
@@ -242,7 +235,7 @@ export const HEAD_PATH = 'M100,8 C88,8 80,16 80,28 C80,40 84,48 88,54 C92,58 96,
 
 // ─── colors ──────────────────────────────────────────────────────────────────
 
-export const SELECTED_FILL = 'rgba(59, 130, 246, 0.30)';
+export const SELECTED_FILL = 'rgba(59, 130, 246, 1.0)';
 export const SELECTED_STROKE = 'rgba(96, 165, 250, 0.70)';
 export const UNSELECTED_FILL = 'rgba(0, 0, 0, 0.05)';
 export const UNSELECTED_STROKE = 'rgba(148, 163, 184, 0.15)';

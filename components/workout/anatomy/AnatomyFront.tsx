@@ -6,7 +6,6 @@ import {
   SELECTED_STROKE,
   UNSELECTED_FILL,
   UNSELECTED_STROKE,
-  HOVER_FILL,
 } from './muscleData';
 
 interface AnatomyFrontProps {
@@ -24,39 +23,29 @@ export default function AnatomyFront({ selectedMuscles, onMuscleClick }: Anatomy
       {/* Physique photo background */}
       <image
         href="/images/anatomy-front.png"
-        x="25"
-        y="-10"
-        width="150"
-        height="420"
+        x="-10"
+        y="10"
+        width="220"
+        height="680"
         preserveAspectRatio="xMidYMin meet"
         style={{ opacity: 0.85 }}
       />
 
       {/* Clickable muscle regions */}
-      {FRONT_PATHS.map((mp) => {
+      {FRONT_PATHS.filter((mp) => ['chest', 'core', 'biceps'].includes(mp.muscle)).map((mp) => {
         const isSelected = selectedMuscles.has(mp.muscle);
         return (
           <path
             key={mp.id}
             d={mp.d}
-            fill={isSelected ? SELECTED_FILL : UNSELECTED_FILL}
-            stroke={isSelected ? SELECTED_STROKE : UNSELECTED_STROKE}
-            strokeWidth={isSelected ? 1.5 : 1.0}
-            className="cursor-pointer transition-all duration-200 hover:brightness-125"
             style={{
+              fill: isSelected ? SELECTED_FILL : UNSELECTED_FILL,
+              stroke: isSelected ? SELECTED_STROKE : UNSELECTED_STROKE,
+              strokeWidth: isSelected ? 1.5 : 1.0,
               transition: 'fill 200ms ease, stroke 200ms ease',
+              cursor: 'pointer',
             }}
             onClick={() => onMuscleClick(mp.muscle)}
-            onMouseEnter={(e) => {
-              if (!isSelected) {
-                e.currentTarget.style.fill = HOVER_FILL;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isSelected) {
-                e.currentTarget.style.fill = UNSELECTED_FILL;
-              }
-            }}
           />
         );
       })}
