@@ -340,6 +340,7 @@ _EQUIPMENT_ALIASES: dict[str, list[str]] = {
     "barbell": ["barbell", "barbells", "bar"],
     "dumbbells": ["dumbbell", "dumbbells", "dumbells", "db"],
     "bench": ["bench", "flat bench", "incline", "decline"],
+    "smith machine": ["smith machine", "smith"],
     "cables": ["cables", "cable machine", "cable"],
     "pull-up bar": ["pullup", "pull-up", "pull up", "chin-up", "chinup"],
     "kettlebells": ["kettlebell", "kettlebells", "kb"],
@@ -363,12 +364,13 @@ def _parse_user_equipment(equipment_text: str) -> set[str]:
             if alias in text_lower:
                 available.add(canonical)
                 break
-    # Remove "machine" if it was only matched via "cable machine" or similar compound terms
-    # Only keep "machine" if user explicitly mentions standalone machines (gym machine, weight machine, etc.)
-    if "machine" in available and "cables" in available:
-        # Check if "machine" appears outside of "cable machine"
+    # Remove "machine" if it was only matched via compound terms like
+    # "smith machine", "cable machine", "row machine" — these are NOT generic gym machines.
+    # Only keep "machine" if user explicitly has standalone machines (leg press, pec deck, etc.)
+    if "machine" in available:
         import re
-        stripped = re.sub(r"cable\s+machine", "", text_lower)
+        # Strip all known compound "X machine" terms
+        stripped = re.sub(r"(smith|cable|row|rowing)\s+machine", "", text_lower)
         if "machine" not in stripped and "machines" not in stripped:
             available.discard("machine")
     return available
