@@ -1,6 +1,23 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
+
+export const DELETE = withAuth(async (request, user) => {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+    await prisma.activity.deleteMany({
+      where: { id, userId: user.id },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error('Failed to delete activity:', error);
+    return NextResponse.json({ error: 'Failed to delete activity' }, { status: 500 });
+  }
+});
 
 export const GET = withAuth(async (request, user) => {
   try {

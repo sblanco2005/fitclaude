@@ -284,19 +284,15 @@ function RoutineCard({
           </div>
         </div>
 
-        {/* Row 2: stats + muscles */}
-        <div className="flex items-center gap-2 mt-1 ml-0.5">
-          <span className="text-xs text-slate-500">{workouts.length}x done</span>
-          {isLifting && muscles.length > 0 && (
-            <>
-              <span className="text-slate-700">&middot;</span>
-              <span className="text-xs text-slate-500/80 uppercase tracking-wider truncate">
-                {muscles.slice(0, 2).join(' · ')}
-                {muscles.length > 2 && ` +${muscles.length - 2}`}
-              </span>
-            </>
-          )}
-        </div>
+        {/* Row 2: muscles */}
+        {isLifting && muscles.length > 0 && (
+          <div className="flex items-center gap-2 mt-1 ml-0.5">
+            <span className="text-xs text-slate-500/80 uppercase tracking-wider truncate">
+              {muscles.slice(0, 2).join(' · ')}
+              {muscles.length > 2 && ` +${muscles.length - 2}`}
+            </span>
+          </div>
+        )}
       </button>
 
       {/* Collection folder */}
@@ -2447,6 +2443,8 @@ function WorkoutsPageInner() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>(() => {
     if (typeof window !== 'undefined') {
+      const urlTab = searchParams.get('tab');
+      if (urlTab === 'hit-it' || urlTab === 'routines' || urlTab === 'history') return urlTab;
       const saved = localStorage.getItem('fitclaude:activeTab');
       if (saved === 'hit-it' || saved === 'routines' || saved === 'history') return saved;
     }
@@ -2536,6 +2534,11 @@ function WorkoutsPageInner() {
       .then((data) => setActivities(Array.isArray(data) ? data : []))
       .catch(() => setActivities([]));
   }, []);
+
+  const handleDeleteActivity = async (activityId: string) => {
+    await fetch(`/api/activities?id=${activityId}`, { method: 'DELETE' });
+    fetchActivities();
+  };
 
   const fetchCollections = useCallback(() => {
     fetch('/api/collections')
@@ -3340,9 +3343,20 @@ function WorkoutsPageInner() {
                           </span>
                           <p className="font-bold text-white text-sm capitalize">{item.data.name}</p>
                         </div>
-                        {item.data.durationMinutes && (
-                          <span className="text-xs text-muted tabular-nums">{item.data.durationMinutes} min</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {item.data.durationMinutes && (
+                            <span className="text-xs text-muted tabular-nums">{item.data.durationMinutes} min</span>
+                          )}
+                          <button
+                            onClick={() => handleDeleteActivity(item.data.id)}
+                            className="p-1.5 text-slate-600 hover:text-red-400 active:text-red-500 transition-colors"
+                            aria-label="Delete activity"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{formatDate(item.data.date)}</p>
                       {item.data.notes && (
