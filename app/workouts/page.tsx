@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -2415,7 +2415,7 @@ const SPIN_CONFIRMS = [
   { title: 'Out with the old?', body: 'Coach is warming up a fresh set of exercises for you. Ready?' },
 ];
 
-export default function WorkoutsPage() {
+function WorkoutsPageInner() {
   const { chatOpen, dataVersion, sendMessage, setChatOpen, setChatTopic, setCustomBack, profile } = useFitClaude();
   const searchParams = useSearchParams();
   const weightUnit = (profile?.weightUnit === 'kg' ? 'kg' : 'lb') as 'lb' | 'kg';
@@ -3414,5 +3414,13 @@ export default function WorkoutsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function WorkoutsPage() {
+  return (
+    <Suspense>
+      <WorkoutsPageInner />
+    </Suspense>
   );
 }
