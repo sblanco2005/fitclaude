@@ -166,13 +166,13 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
           {activeView === 'front' ? (
             <AnatomyFront selectedMuscles={selectedMuscles} onMuscleClick={handleMuscleClick} />
           ) : (
-            <AnatomyBack selectedMuscles={selectedMuscles} onMuscleClick={handleMuscleClick} />
+            <AnatomyBack selectedMuscles={selectedMuscles} selectedSubgroups={selectedSubgroups} onMuscleClick={handleMuscleClick} />
           )}
         </div>
         {/* Desktop: side by side */}
         <div className="hidden sm:grid sm:grid-cols-2 gap-2">
           <AnatomyFront selectedMuscles={selectedMuscles} onMuscleClick={handleMuscleClick} />
-          <AnatomyBack selectedMuscles={selectedMuscles} onMuscleClick={handleMuscleClick} />
+          <AnatomyBack selectedMuscles={selectedMuscles} selectedSubgroups={selectedSubgroups} onMuscleClick={handleMuscleClick} />
         </div>
       </div>
 

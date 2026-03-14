@@ -130,6 +130,7 @@ export const PRESETS = [
 export interface MusclePath {
   id: string;
   muscle: string;
+  subgroup?: string;
   d: string;
 }
 
@@ -176,32 +177,26 @@ export const FRONT_PATHS: MusclePath[] = [
 
 // BACK VIEW paths
 export const BACK_PATHS: MusclePath[] = [
-  // ── Traps ──
-  { id: 'traps-back-l', muscle: 'back', d: 'M82,78 L100,78 L100,100 L88,98 C84,96 82,90 82,78Z' },
-  { id: 'traps-back-r', muscle: 'back', d: 'M100,78 L118,78 C118,90 116,96 112,98 L100,100Z' },
+  // ── Upper Back (traps, rhomboids, lats) ──
+  { id: 'upper-back', muscle: 'back', subgroup: 'upper_back', d: 'M72,68 L124,68 C130,80 132,95 126,110 L70,110 C64,95 66,80 72,68Z' },
 
-  // ── Upper Back / Rhomboids ──
-  { id: 'upper-back-l', muscle: 'back', d: 'M76,92 L88,98 L100,100 L100,120 L82,118 C78,114 76,106 76,92Z' },
-  { id: 'upper-back-r', muscle: 'back', d: 'M124,92 L112,98 L100,100 L100,120 L118,118 C122,114 124,106 124,92Z' },
-
-  // ── Lats (left) ──
-  { id: 'lats-l', muscle: 'back', d: 'M72,110 L82,118 L100,120 L100,160 L84,156 C78,150 74,138 72,124 C72,118 72,114 72,110Z' },
+  // ── Lats (left — vertical pill shape on side of torso) ──
+  { id: 'lats-l', muscle: 'back', subgroup: 'lats', d: 'M57,94 C55,94 53,98 53,104 L63,132 C63,138 64,142 65,142 L77,142 C78,142 79,138 79,132 L83,104 C83,98 81,94 79,94Z' },
   // ── Lats (right) ──
-  { id: 'lats-r', muscle: 'back', d: 'M128,110 L118,118 L100,120 L100,160 L116,156 C122,150 126,138 128,124 C128,118 128,114 128,110Z' },
+  { id: 'lats-r', muscle: 'back', subgroup: 'lats', d: 'M112,94 C110,94 108,98 108,104 L109,132 C109,138 110,142 111,142 L127,142 C128,142 129,138 129,132 L136,104 C136,98 134,94 132,94Z' },
 
-  // ── Lower Back / Erectors ──
-  { id: 'lower-back-l', muscle: 'back', d: 'M84,156 L100,160 L100,184 L88,182 C86,178 84,168 84,156Z' },
-  { id: 'lower-back-r', muscle: 'back', d: 'M116,156 L100,160 L100,184 L112,182 C114,178 116,168 116,156Z' },
+  // ── Lower Back ──
+  { id: 'lower-back', muscle: 'back', subgroup: 'lower_back', d: 'M76,126 L112,126 C116,141 114,156 110,171 L78,171 C74,156 72,141 76,126Z' },
 
   // ── Rear Delts (left) ──
-  { id: 'rear-delt-l', muscle: 'shoulders', d: 'M60,88 C58,82 62,76 68,74 C74,72 80,78 82,84 L82,94 C76,92 68,90 60,88Z' },
+  { id: 'rear-delt-l', muscle: 'shoulders', d: 'M43,76 C39,70 41,62 49,58 C55,54 63,56 67,62 L67,76 C63,80 51,80 43,76Z' },
   // ── Rear Delts (right) ──
-  { id: 'rear-delt-r', muscle: 'shoulders', d: 'M140,88 C142,82 138,76 132,74 C126,72 120,78 118,84 L118,94 C124,92 132,90 140,88Z' },
+  { id: 'rear-delt-r', muscle: 'shoulders', d: 'M150,76 C154,70 152,62 144,58 C138,54 130,56 126,62 L126,76 C130,80 140,80 150,76Z' },
 
-  // ── Triceps (left) ──
-  { id: 'triceps-l', muscle: 'triceps', d: 'M58,100 C56,96 54,92 56,88 L62,88 C64,92 66,100 66,108 L66,140 C64,140 60,138 58,134 C56,128 56,116 58,100Z' },
-  // ── Triceps (right) ──
-  { id: 'triceps-r', muscle: 'triceps', d: 'M142,100 C144,96 146,92 144,88 L138,88 C136,92 134,100 134,108 L134,140 C136,140 140,138 142,134 C144,128 144,116 142,100Z' },
+  // ── Triceps (left — horizontal, arm raised) ──
+  { id: 'triceps-l', muscle: 'triceps', d: 'M6,86 C6,82 12,79 20,79 L56,85 C62,85 66,88 66,92 C66,96 62,99 56,99 L20,93 C12,93 6,90 6,86Z' },
+  // ── Triceps (right — horizontal, arm raised) ──
+  { id: 'triceps-r', muscle: 'triceps', d: 'M134,92 C134,88 138,85 144,85 L180,79 C188,79 194,82 194,86 C194,90 188,93 180,93 L144,99 C138,99 134,96 134,92Z' },
 
   // ── Forearms back (left) ──
   { id: 'forearm-back-l', muscle: 'forearms', d: 'M56,142 C54,148 52,158 50,170 C48,180 48,190 50,196 L60,196 C62,190 64,178 64,168 C64,158 62,148 60,142Z' },
@@ -209,19 +204,19 @@ export const BACK_PATHS: MusclePath[] = [
   { id: 'forearm-back-r', muscle: 'forearms', d: 'M144,142 C146,148 148,158 150,170 C152,180 152,190 150,196 L140,196 C138,190 136,178 136,168 C136,158 138,148 140,142Z' },
 
   // ── Glutes (left) ──
-  { id: 'glutes-l', muscle: 'glutes', d: 'M78,184 C80,182 86,180 92,180 L100,180 L100,214 C94,218 88,218 84,214 C80,210 78,200 78,192 C78,188 78,186 78,184Z' },
+  { id: 'glutes-l', muscle: 'glutes', d: 'M64,201 C60,195 62,187 70,183 C76,179 84,181 88,187 L88,201 C84,205 72,205 64,201Z' },
   // ── Glutes (right) ──
-  { id: 'glutes-r', muscle: 'glutes', d: 'M100,180 L108,180 C114,180 120,182 122,184 C122,186 122,188 122,192 C122,200 120,210 116,214 C112,218 106,218 100,214Z' },
+  { id: 'glutes-r', muscle: 'glutes', d: 'M124,201 C128,195 126,187 118,183 C112,179 104,181 100,187 L100,201 C104,205 116,205 124,201Z' },
 
   // ── Hamstrings (left) ──
-  { id: 'hamstrings-l', muscle: 'hamstrings', d: 'M80,220 C82,218 88,218 94,220 L100,220 L100,286 L92,288 C86,286 82,278 80,268 C78,256 78,240 80,220Z' },
+  { id: 'hamstrings-l', muscle: 'hamstrings', d: 'M60,207 L86,207 L86,270 L72,272 C68,268 64,260 62,248 C60,236 60,224 60,207Z' },
   // ── Hamstrings (right) ──
-  { id: 'hamstrings-r', muscle: 'hamstrings', d: 'M100,220 L106,220 C112,218 118,218 120,220 C122,240 122,256 120,268 C118,278 114,286 108,288 L100,286Z' },
+  { id: 'hamstrings-r', muscle: 'hamstrings', d: 'M96,207 L122,207 C122,224 122,236 120,248 C118,260 114,268 110,272 L96,270Z' },
 
   // ── Calves back (left) ──
-  { id: 'calves-back-l', muscle: 'calves', d: 'M82,290 C84,288 88,286 92,286 L100,286 L100,350 L94,352 C88,350 84,340 82,328 C80,316 80,302 82,290Z' },
+  { id: 'calves-back-l', muscle: 'calves', d: 'M56,290 L74,290 L74,353 L66,355 C64,351 60,343 58,331 C56,319 56,307 56,290Z' },
   // ── Calves back (right) ──
-  { id: 'calves-back-r', muscle: 'calves', d: 'M100,286 L108,286 C112,286 116,288 118,290 C120,302 120,316 118,328 C116,340 112,350 106,352 L100,350Z' },
+  { id: 'calves-back-r', muscle: 'calves', d: 'M100,290 L118,290 C118,307 118,319 116,331 C114,343 110,351 108,355 L100,353Z' },
 ];
 
 // ── Body outline for visual context (not clickable) ──

@@ -6,15 +6,15 @@ import {
   SELECTED_STROKE,
   UNSELECTED_FILL,
   UNSELECTED_STROKE,
-  HOVER_FILL,
 } from './muscleData';
 
 interface AnatomyBackProps {
   selectedMuscles: Set<string>;
+  selectedSubgroups?: Map<string, Set<string>>;
   onMuscleClick: (muscle: string) => void;
 }
 
-export default function AnatomyBack({ selectedMuscles, onMuscleClick }: AnatomyBackProps) {
+export default function AnatomyBack({ selectedMuscles, selectedSubgroups, onMuscleClick }: AnatomyBackProps) {
   return (
     <svg
       viewBox="0 0 200 420"
@@ -24,39 +24,35 @@ export default function AnatomyBack({ selectedMuscles, onMuscleClick }: AnatomyB
       {/* Physique photo background */}
       <image
         href="/images/anatomy-back.png"
-        x="10"
-        y="-15"
-        width="180"
-        height="420"
-        preserveAspectRatio="xMidYMid slice"
+        x="-10"
+        y="10"
+        width="220"
+        height="680"
+        preserveAspectRatio="xMidYMin meet"
         style={{ opacity: 0.85 }}
       />
 
       {/* Clickable muscle regions */}
-      {BACK_PATHS.map((mp) => {
-        const isSelected = selectedMuscles.has(mp.muscle);
+      {BACK_PATHS.filter((mp) => ['triceps', 'back', 'shoulders', 'glutes', 'hamstrings', 'calves'].includes(mp.muscle)).map((mp) => {
+        const muscleSelected = selectedMuscles.has(mp.muscle);
+        // Check subgroup: if path has a subgroup, verify it's active
+        let isSelected = muscleSelected;
+        if (muscleSelected && mp.subgroup && selectedSubgroups) {
+          const subs = selectedSubgroups.get(mp.muscle);
+          isSelected = subs ? subs.has(mp.subgroup) : true;
+        }
         return (
           <path
             key={mp.id}
             d={mp.d}
-            fill={isSelected ? SELECTED_FILL : UNSELECTED_FILL}
-            stroke={isSelected ? SELECTED_STROKE : UNSELECTED_STROKE}
-            strokeWidth={isSelected ? 1.5 : 1.0}
-            className="cursor-pointer transition-all duration-200 hover:brightness-125"
             style={{
+              fill: isSelected ? SELECTED_FILL : UNSELECTED_FILL,
+              stroke: isSelected ? SELECTED_STROKE : UNSELECTED_STROKE,
+              strokeWidth: isSelected ? 1.5 : 1.0,
               transition: 'fill 200ms ease, stroke 200ms ease',
+              cursor: 'pointer',
             }}
             onClick={() => onMuscleClick(mp.muscle)}
-            onMouseEnter={(e) => {
-              if (!isSelected) {
-                e.currentTarget.style.fill = HOVER_FILL;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isSelected) {
-                e.currentTarget.style.fill = UNSELECTED_FILL;
-              }
-            }}
           />
         );
       })}
