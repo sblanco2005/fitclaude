@@ -63,9 +63,6 @@ function MealRow({
   const [fatG, setFatG] = useState(String(log.fatG ?? ''));
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const tapCount = useRef(0);
-  const tapResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const startEdit = () => {
     setRawInput(log.rawInput);
     setMealType(log.mealType ?? '');
@@ -225,43 +222,27 @@ function MealRow({
     );
   }
 
-  const handleTap = () => {
-    tapCount.current += 1;
-    if (tapCount.current >= 3) {
-      tapCount.current = 0;
-      if (tapResetTimer.current) clearTimeout(tapResetTimer.current);
-      tapResetTimer.current = null;
-      startEdit();
-      return;
-    }
-    // Reset tap count after 1s of no taps
-    if (tapResetTimer.current) clearTimeout(tapResetTimer.current);
-    tapResetTimer.current = setTimeout(() => {
-      tapCount.current = 0;
-    }, 1000);
-  };
-
   return (
-    <div
-      onClick={handleTap}
-      className="flex items-start justify-between py-2 min-h-[52px] border-b border-slate-800 last:border-0 group cursor-pointer"
-    >
+    <div className="flex items-start gap-2 py-2 min-h-[52px] border-b border-slate-800 last:border-0">
       <div className="min-w-0 flex-1">
         <p className="text-sm text-white">{cleanRawInput(log.rawInput)}</p>
-        <div className="flex items-center gap-2">
-          {log.mealType && (
-            <span className="text-xs text-muted capitalize">{log.mealType}</span>
-          )}
-          <span className="text-xs text-slate-600 flex items-center gap-0.5">
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><circle cx="4" cy="12" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="20" cy="12" r="2.5"/></svg>
-            tap 3x to edit
-          </span>
-        </div>
+        {log.mealType && (
+          <span className="text-xs text-muted capitalize">{log.mealType}</span>
+        )}
       </div>
-      <div className="text-right text-xs text-muted whitespace-nowrap shrink-0 ml-3">
+      <div className="text-right text-xs text-muted whitespace-nowrap shrink-0">
         {log.calories != null && <div>{Math.round(log.calories)} kcal</div>}
         {log.proteinG != null && <div>{Math.round(log.proteinG)}g protein</div>}
       </div>
+      <button
+        onClick={startEdit}
+        className="p-2 -mr-1 text-slate-600 hover:text-slate-300 active:text-primary transition-colors shrink-0"
+        aria-label="Edit meal"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -710,9 +691,10 @@ export default function NutritionPage() {
     if (tab === 'history') fetchHistory();
   }, [tab, fetchHistory]);
 
+  const [closeDayConfirm, setCloseDayConfirm] = useState(false);
+
   const handleCloseDay = async () => {
-    const ok = window.confirm('Close today and save to history? This cannot be undone.');
-    if (!ok) return;
+    setCloseDayConfirm(false);
     setClosing(true);
     try {
       const res = await fetch('/api/nutrition/close-day', {
@@ -770,7 +752,7 @@ export default function NutritionPage() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize ${
+            className={`flex-1 px-3 py-2.5 rounded-md text-xs font-medium transition-colors capitalize ${
               tab === t
                 ? 'bg-primary text-white'
                 : 'text-slate-400 hover:text-white'
@@ -827,7 +809,7 @@ export default function NutritionPage() {
             </div>
           ) : today?.logs && today.logs.length > 0 ? (
             <button
-              onClick={handleCloseDay}
+              onClick={() => setCloseDayConfirm(true)}
               disabled={closing}
               className="w-full py-3 bg-primary hover:bg-primary-dark disabled:opacity-50 text-white font-medium rounded-xl transition-colors text-sm"
             >
@@ -835,6 +817,40 @@ export default function NutritionPage() {
             </button>
           ) : null}
         </>
+      )}
+
+      {/* Close Day confirmation bottom-sheet */}
+      {closeDayConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 pb-20">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setCloseDayConfirm(false)} />
+          <div className="relative w-full max-w-sm glass rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+            <div className="p-5 text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary/20 flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-1">Close Day?</h3>
+              <p className="text-sm text-slate-400 mb-5">
+                This saves today&apos;s nutrition to history. You won&apos;t be able to edit these meals after closing.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setCloseDayConfirm(false)}
+                  className="flex-1 px-4 py-3 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm active:scale-95 transition-transform"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCloseDay}
+                  className="flex-1 px-4 py-3 rounded-xl bg-primary/20 text-primary font-medium text-sm active:scale-95 transition-transform"
+                >
+                  Close & Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* HISTORY TAB */}

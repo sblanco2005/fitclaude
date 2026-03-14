@@ -1381,10 +1381,10 @@ function RoutineDetail({
       </div>
 
       {/* Action bar */}
-      <div className="flex gap-1 px-4 py-2 shrink-0">
+      <div className="flex gap-2 px-4 py-2 shrink-0">
         <button
           onClick={onSpin}
-          className="py-2 px-3 rounded-lg text-xs font-bold tracking-wide uppercase bg-amber-400/15 text-amber-400 hover:bg-amber-400/25 transition-colors flex items-center gap-1.5"
+          className="py-2.5 px-4 rounded-lg text-xs font-bold tracking-wide uppercase bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-1.5"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1392,16 +1392,11 @@ function RoutineDetail({
           Swap
         </button>
         <button
-          className="flex-1 py-2 rounded-lg text-xs font-bold tracking-wide uppercase bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.25)]"
-        >
-          Routine
-        </button>
-        <button
           onClick={onHitIt}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold tracking-wide uppercase transition-all duration-200 ${
+          className={`flex-1 py-2.5 rounded-lg text-sm font-bold tracking-wide uppercase transition-all duration-200 ${
             isInHitIt
-              ? 'bg-amber-400 text-black shadow-[0_2px_12px_rgba(251,191,36,0.3)]'
-              : 'bg-amber-400/15 text-amber-400 hover:bg-amber-400 hover:text-black'
+              ? 'bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.3)]'
+              : 'bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.25)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.4)]'
           }`}
         >
           {isInHitIt ? 'Queued' : 'Hit It'}

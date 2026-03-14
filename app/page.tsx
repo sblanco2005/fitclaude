@@ -110,10 +110,14 @@ export default function DashboardPage() {
   const hasNutrition = totals && totals.calories > 0;
   const hasWorkouts = todayWorkouts.length > 0 || todayActivities.length > 0;
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Late night gains';
+  const firstName = session.user?.name?.split(' ')[0] || 'there';
+
   return (
     <div className="p-4 pb-1 space-y-3 max-w-lg mx-auto">
       <h2 className="text-xl font-bold text-white">
-        Hey, {session.user?.name?.split(' ')[0] || 'there'}
+        {greeting}, {firstName}
       </h2>
 
       {/* Today — tappable summary cards */}
