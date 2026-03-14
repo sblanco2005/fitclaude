@@ -7,7 +7,11 @@ TOOL_DEFINITIONS = [
             "Generate a workout routine for the user based on their equipment, goals, "
             "and history. Call this when the user wants a workout plan. "
             "IMPORTANT: You MUST include the 'exercises' array with every exercise "
-            "in the workout — name, muscle_group, sets, reps, and coaching notes/tips."
+            "in the workout — name, muscle_group, sets, reps, and coaching notes/tips. "
+            "CRITICAL: ONLY suggest exercises the user can perform with their listed equipment. "
+            "If the user has an own_gym with no machines/cables, NEVER include machine exercises, "
+            "cable exercises, or smith machine exercises. Use ONLY barbell, dumbbell, bodyweight, "
+            "and band exercises matching their equipment. Violating this is a critical error."
         ),
         "input_schema": {
             "type": "object",

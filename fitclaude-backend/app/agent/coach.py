@@ -553,6 +553,17 @@ async def _tool_generate_workout(
                     except Exception as e:
                         logger.warning(f"[Coach] Video auto-link failed for '{found_exercise.name}': {e}")
             else:
+                # Equipment check for unmatched exercises (name-based heuristic)
+                if user_equipment is not None:
+                    name_lower = ex_name.lower()
+                    _machine_keywords = ["machine", "cable", "smith", "leg press", "hack squat",
+                                         "pec deck", "lat pulldown", "seated row machine",
+                                         "chest press machine", "leg extension", "leg curl machine"]
+                    if any(kw in name_lower for kw in _machine_keywords) and "machine" not in user_equipment:
+                        rejected.append({"name": ex_name, "requires": "machine/cable"})
+                        logger.info(f"[Coach] REJECTED unmatched exercise '{ex_name}' — name implies machine but user has no machine")
+                        continue
+
                 # Auto-add to exercise library so Video Linker can find tutorials later
                 muscle_group = ex.get("muscle_group", "full_body")
                 new_exercise = Exercise(
