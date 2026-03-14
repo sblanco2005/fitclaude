@@ -2966,6 +2966,40 @@ function WorkoutsPageInner() {
           onSpin={() => requestSpin(selectedRoutine!)}
           weightUnit={weightUnit}
         />
+
+        {/* Spin confirmation overlay (must be inside detail view's return) */}
+        {spinTarget && (
+          <>
+            <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setSpinTarget(null)} />
+            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-full shadow-2xl">
+              <div className="text-center mb-1">
+                <span className="text-2xl">🎰</span>
+              </div>
+              <p className="text-sm font-bold text-white text-center">{spinTarget.confirm.title}</p>
+              <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">
+                {spinTarget.confirm.body}
+              </p>
+              <p className="text-xs text-slate-500 mt-2 text-center">
+                {spinTarget.muscles.join(' & ').toUpperCase()} · {spinTarget.exerciseCount} exercises
+              </p>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setSpinTarget(null)}
+                  className="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-colors"
+                >
+                  Nah, keep it
+                </button>
+                <button
+                  onClick={confirmSpin}
+                  disabled={spinning}
+                  className="flex-1 py-2 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-50"
+                >
+                  {spinning ? 'Spinning...' : 'Let\'s go!'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -3235,12 +3269,12 @@ function WorkoutsPageInner() {
             </div>
           ) : (
             <div className="space-y-4 mt-1">
-              {hitItQueue.map((name) => {
+              {hitItQueue.map((name, idx) => {
                 const group = routineGroups.find(([k]) => k === name)?.[1];
                 if (!group) return null;
                 return (
                   <ActiveWorkout
-                    key={name}
+                    key={`${name}-${idx}`}
                     routineName={name}
                     workouts={group}
                     allWorkouts={workouts}
