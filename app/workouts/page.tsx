@@ -2480,6 +2480,7 @@ function WorkoutsPageInner() {
   const [assignCollectionRoutine, setAssignCollectionRoutine] = useState<string | null>(null);
   const [editingCollection, setEditingCollection] = useState<WorkoutCollection | null>(null);
   const [deletingCollection, setDeletingCollection] = useState<WorkoutCollection | null>(null);
+  const [confirmDeleteActivity, setConfirmDeleteActivity] = useState<string | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFired = useRef(false);
   const [spunRoutineName, setSpunRoutineName] = useState<string | null>(null);
@@ -3347,20 +3348,42 @@ function WorkoutsPageInner() {
                           {item.data.durationMinutes && (
                             <span className="text-xs text-muted tabular-nums">{item.data.durationMinutes} min</span>
                           )}
-                          <button
-                            onClick={() => handleDeleteActivity(item.data.id)}
-                            className="p-1.5 text-slate-600 hover:text-red-400 active:text-red-500 transition-colors"
-                            aria-label="Delete activity"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          {confirmDeleteActivity !== item.data.id && (
+                            <button
+                              onClick={() => setConfirmDeleteActivity(item.data.id)}
+                              className="p-1.5 text-slate-600 hover:text-red-400 active:text-red-500 transition-colors"
+                              aria-label="Delete activity"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{formatDate(item.data.date)}</p>
                       {item.data.notes && (
                         <p className="text-xs text-slate-400 mt-1">{item.data.notes}</p>
+                      )}
+                      {confirmDeleteActivity === item.data.id && (
+                        <div className="flex items-center justify-end gap-1.5 mt-2">
+                          <span className="text-xs text-red-400 font-medium">Delete activity?</span>
+                          <button
+                            onClick={() => {
+                              handleDeleteActivity(item.data.id);
+                              setConfirmDeleteActivity(null);
+                            }}
+                            className="px-3 py-2 rounded-md bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 active:scale-[0.95] transition-colors"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteActivity(null)}
+                            className="px-3 py-2 rounded-md bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 active:scale-[0.95] transition-colors"
+                          >
+                            No
+                          </button>
+                        </div>
                       )}
                     </div>
                   )

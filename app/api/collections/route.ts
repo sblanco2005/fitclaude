@@ -10,6 +10,15 @@ export const GET = withAuth(async (_request, user) => {
       orderBy: { sortOrder: 'asc' },
     });
 
+    // Get actual routine names that still exist for this user
+    const existingWorkouts = await prisma.workout.findMany({
+      where: { userId: user.id },
+      select: { name: true, workoutType: true },
+    });
+    const existingRoutineNames = new Set(
+      existingWorkouts.map((w) => w.name || w.workoutType)
+    );
+
     return NextResponse.json(
       collections.map((c) => ({
         id: c.id,
@@ -18,7 +27,9 @@ export const GET = withAuth(async (_request, user) => {
         color: c.color,
         sortOrder: c.sortOrder,
         createdAt: c.createdAt.toISOString(),
-        routineNames: c.workouts.map((w) => w.routineName),
+        routineNames: c.workouts
+          .map((w) => w.routineName)
+          .filter((name) => existingRoutineNames.has(name)),
       }))
     );
   } catch (error) {
