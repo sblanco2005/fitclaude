@@ -2977,7 +2977,8 @@ export default function WorkoutsPage() {
                 All
               </button>
               {collections.map((col) => {
-                const count = col.routineNames.length;
+                const validNames = routineGroups.map(([k]) => k);
+                const count = col.routineNames.filter((n) => validNames.includes(n)).length;
                 const isActive = activeCollection === col.id;
                 return (
                   <button
