@@ -1324,8 +1324,11 @@ function RoutineDetail({
                       </button>
                       <button
                         onClick={() => { setMenuOpen(false); onSpin(); }}
-                        className="w-full text-left px-4 py-2 text-xs font-medium text-amber-400 hover:bg-slate-700 hover:text-amber-300 transition-colors"
+                        className="w-full text-left px-4 py-2.5 text-sm font-bold text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 hover:text-amber-300 transition-colors flex items-center gap-2"
                       >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
                         Swap / Regenerate
                       </button>
                       <button
@@ -1379,6 +1382,15 @@ function RoutineDetail({
 
       {/* Action bar */}
       <div className="flex gap-1 px-4 py-2 shrink-0">
+        <button
+          onClick={onSpin}
+          className="py-2 px-3 rounded-lg text-xs font-bold tracking-wide uppercase bg-amber-400/15 text-amber-400 hover:bg-amber-400/25 transition-colors flex items-center gap-1.5"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Swap
+        </button>
         <button
           className="flex-1 py-2 rounded-lg text-xs font-bold tracking-wide uppercase bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.25)]"
         >
