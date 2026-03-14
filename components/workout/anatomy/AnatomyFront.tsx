@@ -2,14 +2,11 @@
 
 import {
   FRONT_PATHS,
-  BODY_OUTLINE_FRONT,
-  HEAD_PATH,
   SELECTED_FILL,
   SELECTED_STROKE,
   UNSELECTED_FILL,
   UNSELECTED_STROKE,
   HOVER_FILL,
-  OUTLINE_STROKE,
 } from './muscleData';
 
 interface AnatomyFrontProps {
@@ -24,19 +21,15 @@ export default function AnatomyFront({ selectedMuscles, onMuscleClick }: Anatomy
       className="w-full h-full max-h-[340px] sm:max-h-[380px]"
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Body outline */}
-      <path
-        d={BODY_OUTLINE_FRONT}
-        fill="rgba(15, 23, 42, 0.4)"
-        stroke={OUTLINE_STROKE}
-        strokeWidth="1.5"
-      />
-      {/* Head */}
-      <path
-        d={HEAD_PATH}
-        fill="rgba(15, 23, 42, 0.4)"
-        stroke={OUTLINE_STROKE}
-        strokeWidth="1.5"
+      {/* Physique photo background */}
+      <image
+        href="/images/anatomy-front.png"
+        x="40"
+        y="5"
+        width="120"
+        height="405"
+        preserveAspectRatio="xMidYMid slice"
+        style={{ opacity: 0.85 }}
       />
 
       {/* Clickable muscle regions */}
