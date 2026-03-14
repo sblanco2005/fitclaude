@@ -340,7 +340,7 @@ _EQUIPMENT_ALIASES: dict[str, list[str]] = {
     "barbell": ["barbell", "barbells", "bar"],
     "dumbbells": ["dumbbell", "dumbbells", "dumbells", "db"],
     "bench": ["bench", "flat bench", "incline", "decline"],
-    "cables": ["cables", "cable", "cable machine"],
+    "cables": ["cables", "cable machine", "cable"],
     "pull-up bar": ["pullup", "pull-up", "pull up", "chin-up", "chinup"],
     "kettlebells": ["kettlebell", "kettlebells", "kb"],
     "rack": ["rack", "squat rack", "power rack"],
@@ -356,11 +356,21 @@ def _parse_user_equipment(equipment_text: str) -> set[str]:
     """Parse user's free-text equipment into normalized equipment keywords."""
     text_lower = equipment_text.lower()
     available = set()
-    for canonical, aliases in _EQUIPMENT_ALIASES.items():
-        for alias in aliases:
+    # Process longer aliases first to avoid false positives
+    # (e.g., "cable machine" should match cables, not machine)
+    for canonical, aliases in sorted(_EQUIPMENT_ALIASES.items(), key=lambda x: -max(len(a) for a in x[1])):
+        for alias in sorted(aliases, key=len, reverse=True):
             if alias in text_lower:
                 available.add(canonical)
                 break
+    # Remove "machine" if it was only matched via "cable machine" or similar compound terms
+    # Only keep "machine" if user explicitly mentions standalone machines (gym machine, weight machine, etc.)
+    if "machine" in available and "cables" in available:
+        # Check if "machine" appears outside of "cable machine"
+        import re
+        stripped = re.sub(r"cable\s+machine", "", text_lower)
+        if "machine" not in stripped and "machines" not in stripped:
+            available.discard("machine")
     return available
 
 
@@ -556,12 +566,23 @@ async def _tool_generate_workout(
                 # Equipment check for unmatched exercises (name-based heuristic)
                 if user_equipment is not None:
                     name_lower = ex_name.lower()
-                    _machine_keywords = ["machine", "cable", "smith", "leg press", "hack squat",
-                                         "pec deck", "lat pulldown", "seated row machine",
-                                         "chest press machine", "leg extension", "leg curl machine"]
-                    if any(kw in name_lower for kw in _machine_keywords) and "machine" not in user_equipment:
-                        rejected.append({"name": ex_name, "requires": "machine/cable"})
-                        logger.info(f"[Coach] REJECTED unmatched exercise '{ex_name}' — name implies machine but user has no machine")
+                    # Machine-requiring keywords — reject if user has no machine
+                    _machine_kw = ["machine", "smith", "leg press", "hack squat",
+                                   "pec deck", "leg extension", "leg curl",
+                                   "chest fly machine", "seated row machine",
+                                   "chest press", "shoulder press machine"]
+                    # Cable-requiring keywords — reject if user has no cables
+                    _cable_kw = ["cable", "lat pulldown", "cable crossover",
+                                 "cable fly", "face pull", "tricep pushdown",
+                                 "cable curl"]
+                    needs_machine = any(kw in name_lower for kw in _machine_kw)
+                    needs_cable = any(kw in name_lower for kw in _cable_kw)
+                    has_machine = "machine" in user_equipment
+                    has_cables = "cables" in user_equipment
+                    if (needs_machine and not has_machine) or (needs_cable and not has_cables):
+                        req = "machine" if needs_machine else "cables"
+                        rejected.append({"name": ex_name, "requires": req})
+                        logger.info(f"[Coach] REJECTED unmatched exercise '{ex_name}' — requires {req} but user doesn't have it")
                         continue
 
                 # Auto-add to exercise library so Video Linker can find tutorials later
