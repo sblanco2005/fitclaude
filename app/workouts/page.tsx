@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useFitClaude } from '@/context/FitClaudeContext';
@@ -238,13 +239,11 @@ function RoutineCard({
   name,
   workouts,
   onClick,
-  onToggleFavorite,
   onAddToCollection,
 }: {
   name: string;
   workouts: Workout[];
   onClick: () => void;
-  onToggleFavorite: (workoutId: string, current: boolean) => void;
   onAddToCollection?: (routineName: string) => void;
 }) {
   const latest = workouts[0];
@@ -252,7 +251,6 @@ function RoutineCard({
   const muscles = uniqueMuscles(latest);
   const routineNum = getRoutineDisplayId(workouts);
   const isLifting = (latest.category || 'lifting') === 'lifting';
-  const isFav = latest.isFavorite;
 
   return (
     <div className="flex items-center gap-1">
@@ -312,21 +310,6 @@ function RoutineCard({
           </svg>
         </button>
       )}
-      {/* Favorite heart */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggleFavorite(latest.id, isFav); }}
-        className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-slate-800/60"
-      >
-        <svg
-          className={`w-5 h-5 transition-colors ${isFav ? 'text-red-400 fill-red-400' : 'text-slate-600 hover:text-slate-400'}`}
-          viewBox="0 0 24 24"
-          fill={isFav ? 'currentColor' : 'none'}
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-        </svg>
-      </button>
     </div>
   );
 }
@@ -2434,6 +2417,7 @@ const SPIN_CONFIRMS = [
 
 export default function WorkoutsPage() {
   const { chatOpen, dataVersion, sendMessage, setChatOpen, setChatTopic, setCustomBack, profile } = useFitClaude();
+  const searchParams = useSearchParams();
   const weightUnit = (profile?.weightUnit === 'kg' ? 'kg' : 'lb') as 'lb' | 'kg';
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2462,17 +2446,19 @@ export default function WorkoutsPage() {
   const [routineSearch, setRoutineSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
+
   const [finishedWorkouts, setFinishedWorkouts] = useState<
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
   >([]);
   const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [collections, setCollections] = useState<WorkoutCollection[]>([]);
-  const [activeCollection, setActiveCollection] = useState<string | null>(null);
+  const [activeCollection, setActiveCollection] = useState<string | null>(searchParams.get('collection'));
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [assignCollectionRoutine, setAssignCollectionRoutine] = useState<string | null>(null);
   const [editingCollection, setEditingCollection] = useState<WorkoutCollection | null>(null);
+  const [spunRoutineName, setSpunRoutineName] = useState<string | null>(null);
+  const prevRoutineNamesRef = useRef<Set<string>>(new Set());
 
   // Persist Hit It queue and active tab to localStorage
   useEffect(() => {
@@ -2550,6 +2536,34 @@ export default function WorkoutsPage() {
     );
   }, [workouts]);
 
+  // Transfer collection membership when a spin creates a new routine
+  useEffect(() => {
+    if (!spunRoutineName || loading || routineGroups.length === 0) return;
+    const currentNames = new Set(routineGroups.map(([k]) => k));
+    const newNames = [...currentNames].filter((n) => !prevRoutineNamesRef.current.has(n));
+    // Update ref for next comparison
+    prevRoutineNamesRef.current = currentNames;
+    if (newNames.length === 0) return;
+    // Find which collections the old routine was in
+    const memberCollections = collections.filter((c) => c.routineNames.includes(spunRoutineName));
+    if (memberCollections.length === 0) { setSpunRoutineName(null); return; }
+    // Add the newest routine to those collections
+    const newRoutine = newNames[newNames.length - 1];
+    for (const col of memberCollections) {
+      if (!col.routineNames.includes(newRoutine)) {
+        toggleRoutineInCollection(col.id, newRoutine);
+      }
+    }
+    setSpunRoutineName(null);
+  }, [routineGroups, spunRoutineName, loading, collections]);
+
+  // Keep prevRoutineNamesRef in sync when not spinning
+  useEffect(() => {
+    if (!spunRoutineName) {
+      prevRoutineNamesRef.current = new Set(routineGroups.map(([k]) => k));
+    }
+  }, [routineGroups, spunRoutineName]);
+
   // Clean up stale Hit It queue entries (routine deleted/renamed while in queue)
   useEffect(() => {
     if (loading || hitItQueue.length === 0 || routineGroups.length === 0) return;
@@ -2591,9 +2605,6 @@ export default function WorkoutsPage() {
         return false;
       });
     }
-    if (favoritesOnly) {
-      filtered = filtered.filter(([, group]) => group[0].isFavorite);
-    }
     if (activeCollection) {
       const col = collections.find((c) => c.id === activeCollection);
       if (col) {
@@ -2602,7 +2613,7 @@ export default function WorkoutsPage() {
       }
     }
     return filtered;
-  }, [routineGroups, categoryFilter, muscleFilter, routineSearch, favoritesOnly, activeCollection, collections]);
+  }, [routineGroups, categoryFilter, muscleFilter, routineSearch, activeCollection, collections]);
 
   // Categories that actually have routines (for showing only relevant pills)
   const activeCategories = useMemo(() => {
@@ -2734,22 +2745,6 @@ export default function WorkoutsPage() {
 
     setSelectedRoutine(null);
     setTab('hit-it');
-  };
-
-  const toggleFavorite = async (workoutId: string, currentValue: boolean) => {
-    try {
-      await fetch(`/api/workouts/${workoutId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isFavorite: !currentValue }),
-      });
-      // Optimistic update
-      setWorkouts((prev) =>
-        prev.map((w) => w.id === workoutId ? { ...w, isFavorite: !currentValue } : w)
-      );
-    } catch (err) {
-      console.error('Failed to toggle favorite:', err);
-    }
   };
 
   const removeFromHitIt = (name: string) => {
@@ -2891,6 +2886,11 @@ export default function WorkoutsPage() {
       const muscleList = muscles.join(' & ');
       msg = `Generate a new ${muscleList} workout with ${exerciseCount} exercises. This replaces my "${name.replace(/_/g, ' ')}" routine — keep the same muscle focus but give me different exercises.`;
     }
+    // Remember which collections this routine belongs to so we can add the new one
+    const memberCollections = collections.filter((c) => c.routineNames.includes(name));
+    if (memberCollections.length > 0) {
+      setSpunRoutineName(name);
+    }
     setChatTopic('workout');
     setChatOpen(true);
     setSpinTarget(null);
@@ -2965,7 +2965,7 @@ export default function WorkoutsPage() {
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           {/* Collection strip */}
           {collections.length > 0 && (
-            <div className="flex items-center gap-1.5 px-4 pb-2 overflow-x-auto scrollbar-hide">
+            <div className="flex items-center gap-1.5 px-4 pb-2 flex-wrap">
               <button
                 onClick={() => setActiveCollection(null)}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all border ${
@@ -3042,23 +3042,6 @@ export default function WorkoutsPage() {
                 >
                   <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setFavoritesOnly((v) => !v)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    favoritesOnly ? 'text-red-400 bg-red-400/10' : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title="Show favorites only"
-                >
-                  <svg
-                    className="w-[18px] h-[18px]"
-                    viewBox="0 0 24 24"
-                    fill={favoritesOnly ? 'currentColor' : 'none'}
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
                   </svg>
                 </button>
                 {(activeCategories.size > 1 || activeMuscles.size > 1) && (
@@ -3138,13 +3121,11 @@ export default function WorkoutsPage() {
                 <p className="text-muted text-sm font-medium">
                   {routineGroups.length === 0
                     ? 'No routines yet. Chat with your coach to generate one!'
-                    : favoritesOnly
-                      ? 'No favorite routines yet. Tap the heart on a routine to save it.'
-                      : routineSearch
-                        ? `No routines match "${routineSearch}"`
-                        : muscleFilter
-                          ? `No ${muscleFilter} routines${categoryFilter !== 'all' ? ` in ${categoryFilter}` : ''}.`
-                          : `No ${categoryFilter} routines yet.`}
+                    : routineSearch
+                      ? `No routines match "${routineSearch}"`
+                      : muscleFilter
+                        ? `No ${muscleFilter} routines${categoryFilter !== 'all' ? ` in ${categoryFilter}` : ''}.`
+                        : `No ${categoryFilter} routines yet.`}
                 </p>
                 {routineGroups.length === 0 && (
                   <button
@@ -3163,7 +3144,6 @@ export default function WorkoutsPage() {
                 name={key}
                 workouts={group}
                 onClick={() => setSelectedRoutine(key)}
-                onToggleFavorite={toggleFavorite}
                 onAddToCollection={(routineName) => setAssignCollectionRoutine(routineName)}
               />
             ))

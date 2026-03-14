@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import type { Activity, DailyNutrition, Workout } from '@/types';
+import type { Activity, DailyNutrition, Workout, WorkoutCollection } from '@/types';
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const [nutrition, setNutrition] = useState<DailyNutrition | null>(null);
   const [todayWorkouts, setTodayWorkouts] = useState<Workout[]>([]);
   const [todayActivities, setTodayActivities] = useState<Activity[]>([]);
+  const [collections, setCollections] = useState<WorkoutCollection[]>([]);
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.isOnboarded === false) {
@@ -63,6 +64,11 @@ export default function DashboardPage() {
         setTodayActivities(acts.filter((a) => new Date(a.date).toDateString() === today));
       })
       .catch(() => {});
+
+    fetch('/api/collections')
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setCollections(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, [status]);
 
   if (status === 'loading') {
@@ -110,71 +116,57 @@ export default function DashboardPage() {
         Hey, {session.user?.name?.split(' ')[0] || 'there'}
       </h2>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link href="/workouts" className="block">
-          <Card className="text-center p-3" hover>
-            <div className="text-2xl mb-0.5">🏋️</div>
-            <span className="text-xs text-slate-300">Workouts</span>
-          </Card>
-        </Link>
-        <Link href="/nutrition" className="block">
-          <Card className="text-center p-3" hover>
-            <div className="text-2xl mb-0.5">🍽️</div>
-            <span className="text-xs text-slate-300">Nutrition</span>
-          </Card>
-        </Link>
-      </div>
-
-      {/* Today's Summary — two blocks */}
+      {/* Today — tappable summary cards */}
       <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Today</h3>
       <div className="grid grid-cols-2 gap-3">
-        {/* Nutrition block */}
-        <Card className="p-3">
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-base">🍽️</span>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Nutrition</h3>
-          </div>
-          {hasNutrition && totals ? (
-            <div className="space-y-1.5">
-              <div className="text-center">
-                <div className="text-lg font-bold text-primary">{Math.round(totals.calories)}</div>
-                <div className="text-xs text-muted">kcal</div>
-              </div>
-              <div className="grid grid-cols-3 gap-1 text-center">
-                <div>
-                  <div className="text-xs font-semibold text-blue-400">{Math.round(totals.proteinG)}g</div>
-                  <div className="text-xs text-muted">protein</div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-amber-400">{Math.round(totals.carbsG)}g</div>
-                  <div className="text-xs text-muted">carbs</div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-red-400">{Math.round(totals.fatG)}g</div>
-                  <div className="text-xs text-muted">fat</div>
-                </div>
-              </div>
-              <div className="text-xs text-muted text-center pt-0.5">
-                {mealCount} meal{mealCount !== 1 ? 's' : ''} logged
-              </div>
+        {/* Nutrition card — taps to /nutrition */}
+        <Link href="/nutrition" className="block">
+          <Card className="p-3" hover>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-base">🍽️</span>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Nutrition</h3>
             </div>
-          ) : (
-            <p className="text-muted text-xs text-center py-3">No meals logged</p>
-          )}
-        </Card>
+            {hasNutrition && totals ? (
+              <div className="space-y-1.5">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-primary">{Math.round(totals.calories)}</div>
+                  <div className="text-xs text-muted">kcal</div>
+                </div>
+                <div className="grid grid-cols-3 gap-1 text-center">
+                  <div>
+                    <div className="text-xs font-semibold text-blue-400">{Math.round(totals.proteinG)}g</div>
+                    <div className="text-xs text-muted">protein</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-amber-400">{Math.round(totals.carbsG)}g</div>
+                    <div className="text-xs text-muted">carbs</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-red-400">{Math.round(totals.fatG)}g</div>
+                    <div className="text-xs text-muted">fat</div>
+                  </div>
+                </div>
+                <div className="text-xs text-muted text-center pt-0.5">
+                  {mealCount} meal{mealCount !== 1 ? 's' : ''} logged
+                </div>
+              </div>
+            ) : (
+              <p className="text-muted text-xs text-center py-3">No meals logged</p>
+            )}
+          </Card>
+        </Link>
 
-        {/* Last Workout block */}
-        <Card className="p-3">
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-base">🏋️</span>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Workout</h3>
-          </div>
-          {hasWorkouts ? (
-            <div className="space-y-1.5">
-              {todayWorkouts.slice(0, 2).map((w) => (
-                <Link key={w.id} href={`/workouts?id=${w.id}`} className="block">
-                  <div className="py-2.5 px-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
+        {/* Workout card — taps to /workouts */}
+        <Link href="/workouts" className="block">
+          <Card className="p-3" hover>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-base">🏋️</span>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Workout</h3>
+            </div>
+            {hasWorkouts ? (
+              <div className="space-y-1.5">
+                {todayWorkouts.slice(0, 2).map((w) => (
+                  <div key={w.id} className="py-2 px-3 rounded-lg bg-slate-800/50">
                     <div className="text-xs font-medium text-white truncate">
                       {w.name || w.workoutType.replace('_', ' ')}
                     </div>
@@ -183,41 +175,53 @@ export default function DashboardPage() {
                       <span className="text-xs font-medium text-white bg-primary/30 px-1.5 py-0.5 rounded-full">Done</span>
                     </div>
                   </div>
-                </Link>
-              ))}
-              {todayActivities.slice(0, todayWorkouts.length >= 2 ? 0 : 2 - todayWorkouts.length).map((a) => (
-                <div key={a.id} className="py-2.5 px-3 rounded-lg bg-slate-800/50">
-                  <div className="text-xs font-medium text-white truncate capitalize">{a.name}</div>
-                  <div className="flex items-center justify-between mt-0.5">
-                    <span className="text-xs text-muted">{a.durationMinutes ? `${a.durationMinutes} min` : 'Activity'}</span>
-                    <span className="text-xs font-medium text-white bg-amber-500/30 px-1.5 py-0.5 rounded-full">Activity</span>
+                ))}
+                {todayActivities.slice(0, todayWorkouts.length >= 2 ? 0 : 2 - todayWorkouts.length).map((a) => (
+                  <div key={a.id} className="py-2 px-3 rounded-lg bg-slate-800/50">
+                    <div className="text-xs font-medium text-white truncate capitalize">{a.name}</div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="text-xs text-muted">{a.durationMinutes ? `${a.durationMinutes} min` : 'Activity'}</span>
+                      <span className="text-xs font-medium text-white bg-amber-500/30 px-1.5 py-0.5 rounded-full">Activity</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {(todayWorkouts.length + todayActivities.length) > 2 && (
-                <div className="text-xs text-muted text-center">+{todayWorkouts.length + todayActivities.length - 2} more</div>
-              )}
-            </div>
-          ) : (
-            <p className="text-muted text-xs text-center py-3">No workout today</p>
-          )}
-        </Card>
+                ))}
+                {(todayWorkouts.length + todayActivities.length) > 2 && (
+                  <div className="text-xs text-muted text-center">+{todayWorkouts.length + todayActivities.length - 2} more</div>
+                )}
+              </div>
+            ) : (
+              <p className="text-muted text-xs text-center py-3">No workout today</p>
+            )}
+          </Card>
+        </Link>
       </div>
 
-      {/* Exercise Library */}
-      <Link href="/exercises" className="block">
-        <Card hover>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-white">Exercise Library</h3>
-              <p className="text-sm text-muted">Browse exercises and spicy variations</p>
-            </div>
-            <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-            </svg>
+      {/* Collections / Routines */}
+      {collections.length > 0 && (
+        <>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Routines</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {collections.map((col) => (
+              <Link
+                key={col.id}
+                href={`/workouts?collection=${col.id}`}
+                className="block"
+              >
+                <Card className="p-3" hover>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">{col.emoji || '📁'}</span>
+                    <h4 className="text-sm font-semibold text-white truncate">{col.name}</h4>
+                  </div>
+                  <p className="text-xs text-muted">
+                    {col.routineNames.length} routine{col.routineNames.length !== 1 ? 's' : ''}
+                  </p>
+                </Card>
+              </Link>
+            ))}
           </div>
-        </Card>
-      </Link>
+        </>
+      )}
+
     </div>
   );
 }
