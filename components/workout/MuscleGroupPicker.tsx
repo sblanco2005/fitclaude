@@ -143,15 +143,15 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
   return (
     <div className="space-y-4">
       {/* Front/Back view toggle (mobile: tabs, desktop: both shown) */}
-      <div className="flex gap-1 sm:hidden bg-slate-800/50 rounded-lg p-1">
+      <div className="flex gap-1 sm:hidden bg-slate-800/60 rounded-lg p-0.5 backdrop-blur-sm">
         {(['front', 'back'] as const).map((view) => (
           <button
             key={view}
             onClick={() => setActiveView(view)}
-            className={`flex-1 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all ${
+            className={`flex-1 py-2 rounded-md text-xs font-bold uppercase tracking-widest transition-all duration-200 ${
               activeView === view
-                ? 'bg-blue-500/30 text-blue-200'
-                : 'text-slate-500 hover:text-slate-300'
+                ? 'bg-blue-500/25 text-blue-100 shadow-sm shadow-blue-500/10'
+                : 'text-slate-600 hover:text-slate-400'
             }`}
           >
             {view}
@@ -160,7 +160,7 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
       </div>
 
       {/* Body map */}
-      <div className="relative bg-slate-900/40 rounded-xl p-2 border border-slate-800/50">
+      <div className="relative bg-slate-950/50 rounded-2xl p-3 border border-slate-700/30 overflow-hidden">
         {/* Mobile: single view */}
         <div className="sm:hidden flex justify-center">
           {activeView === 'front' ? (
@@ -191,14 +191,14 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
             return (
               <span
                 key={key}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/20 border border-blue-400/30 text-blue-200"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-500/15 border border-blue-400/25 text-blue-200 backdrop-blur-sm"
               >
                 {region?.label ?? key}
                 <button
                   onClick={() => handleMuscleClick(key)}
                   className="ml-0.5 hover:text-white transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -217,10 +217,10 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
             <button
               key={p.label}
               onClick={() => applyPreset(p.keys)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
                 active
-                  ? 'bg-primary text-white'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                  ? 'bg-blue-500/25 text-blue-200 border border-blue-400/30'
+                  : 'bg-slate-800/50 text-slate-500 border border-slate-700/30 hover:text-slate-300 hover:border-slate-600/40'
               }`}
             >
               {p.label}
@@ -327,10 +327,10 @@ export default function MuscleGroupPicker({ onGenerate }: MuscleGroupPickerProps
       <button
         onClick={handleGenerate}
         disabled={selectedMuscles.size === 0}
-        className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${
+        className={`w-full py-3.5 rounded-xl text-sm font-bold tracking-wide transition-all duration-200 ${
           selectedMuscles.size > 0
-            ? 'bg-primary text-white hover:bg-primary/90 active:scale-[0.98]'
-            : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+            ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:from-blue-500 hover:to-blue-400 active:scale-[0.98]'
+            : 'bg-slate-800/60 text-slate-600 cursor-not-allowed'
         }`}
       >
         {selectedMuscles.size === 0
