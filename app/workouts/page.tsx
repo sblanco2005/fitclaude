@@ -2168,37 +2168,42 @@ function ActiveWorkout({
             </div>
           )}
 
-          {/* Confirmation prompt */}
+          {/* Confirmation popup */}
           {confirmAction && (
-            <div className={`px-3 py-3 rounded-lg border ${
-              confirmAction === 'save'
-                ? 'bg-emerald-500/10 border-emerald-500/30'
-                : 'bg-red-500/10 border-red-500/30'
-            }`}>
-              <p className="text-xs font-bold text-center mb-2.5 text-slate-300">
-                {confirmAction === 'save'
-                  ? `Save workout? (${Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged)`
-                  : 'Discard this workout? All logged sets will be lost.'}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={confirmAction === 'save' ? handleSave : handleDiscard}
-                  className={`flex-1 py-2 rounded-lg font-bold text-xs tracking-wide uppercase transition-all active:scale-[0.98] ${
-                    confirmAction === 'save'
-                      ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                      : 'bg-red-500 text-white hover:bg-red-600'
-                  }`}
-                >
-                  {confirmAction === 'save' ? 'Yes, Save' : 'Yes, Discard'}
-                </button>
-                <button
-                  onClick={() => setConfirmAction(null)}
-                  className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-400 font-bold text-xs tracking-wide uppercase transition-all hover:text-white active:scale-[0.98]"
-                >
-                  Cancel
-                </button>
+            <>
+              <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setConfirmAction(null)} />
+              <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-full shadow-2xl">
+                <div className="text-center mb-1">
+                  <span className="text-2xl">{confirmAction === 'save' ? '💾' : '🗑️'}</span>
+                </div>
+                <p className="text-sm font-bold text-white text-center">
+                  {confirmAction === 'save' ? 'Save Workout?' : 'Discard Workout?'}
+                </p>
+                <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">
+                  {confirmAction === 'save'
+                    ? `${Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged — save to your history.`
+                    : 'All logged sets will be lost.'}
+                </p>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => setConfirmAction(null)}
+                    className="flex-1 py-2.5 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-wide hover:bg-slate-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmAction === 'save' ? handleSave : handleDiscard}
+                    className={`flex-1 py-2.5 rounded-lg text-white text-xs font-bold uppercase tracking-wide transition-colors ${
+                      confirmAction === 'save'
+                        ? 'bg-emerald-500 hover:bg-emerald-600'
+                        : 'bg-red-500 hover:bg-red-600'
+                    }`}
+                  >
+                    {confirmAction === 'save' ? 'Save' : 'Discard'}
+                  </button>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* Save feedback banners */}
