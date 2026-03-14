@@ -2170,40 +2170,52 @@ function ActiveWorkout({
 
           {/* Confirmation popup */}
           {confirmAction && (
-            <>
-              <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setConfirmAction(null)} />
-              <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-full shadow-2xl">
-                <div className="text-center mb-1">
-                  <span className="text-2xl">{confirmAction === 'save' ? '💾' : '🗑️'}</span>
-                </div>
-                <p className="text-sm font-bold text-white text-center">
-                  {confirmAction === 'save' ? 'Save Workout?' : 'Discard Workout?'}
-                </p>
-                <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">
-                  {confirmAction === 'save'
-                    ? `${Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged — save to your history.`
-                    : 'All logged sets will be lost.'}
-                </p>
-                <div className="flex gap-2 mt-4">
-                  <button
-                    onClick={() => setConfirmAction(null)}
-                    className="flex-1 py-2.5 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-wide hover:bg-slate-600 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmAction === 'save' ? handleSave : handleDiscard}
-                    className={`flex-1 py-2.5 rounded-lg text-white text-xs font-bold uppercase tracking-wide transition-colors ${
-                      confirmAction === 'save'
-                        ? 'bg-emerald-500 hover:bg-emerald-600'
-                        : 'bg-red-500 hover:bg-red-600'
-                    }`}
-                  >
-                    {confirmAction === 'save' ? 'Save' : 'Discard'}
-                  </button>
+            <div className="fixed inset-0 z-50 flex items-end justify-center p-4 pb-20">
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmAction(null)} />
+              <div className="relative w-full max-w-sm glass rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+                <div className="p-5 text-center">
+                  <div className={`w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center ${
+                    confirmAction === 'save' ? 'bg-emerald-500/20' : 'bg-red-500/20'
+                  }`}>
+                    {confirmAction === 'save' ? (
+                      <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-1">
+                    {confirmAction === 'save' ? 'Save Workout?' : 'Discard Workout?'}
+                  </h3>
+                  <p className="text-sm text-slate-400 mb-5">
+                    {confirmAction === 'save'
+                      ? `${Array.from(exerciseLogs.values()).reduce((s, l) => s + l.length, 0)} sets logged — save to your history.`
+                      : 'All logged sets will be lost.'}
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setConfirmAction(null)}
+                      className="flex-1 px-4 py-3 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm active:scale-95 transition-transform"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmAction === 'save' ? handleSave : handleDiscard}
+                      className={`flex-1 px-4 py-3 rounded-xl font-medium text-sm active:scale-95 transition-transform ${
+                        confirmAction === 'save'
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}
+                    >
+                      {confirmAction === 'save' ? 'Save' : 'Discard'}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* Save feedback banners */}
