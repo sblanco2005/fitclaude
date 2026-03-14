@@ -63,6 +63,8 @@ function MealRow({
   const [fatG, setFatG] = useState(String(log.fatG ?? ''));
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const tapCount = useRef(0);
+  const tapResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startEdit = () => {
     setRawInput(log.rawInput);
@@ -222,9 +224,6 @@ function MealRow({
       </div>
     );
   }
-
-  const tapCount = useRef(0);
-  const tapResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTap = () => {
     tapCount.current += 1;
