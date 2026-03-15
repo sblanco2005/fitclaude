@@ -13,8 +13,6 @@ import { TextArea } from '@/components/ui/TextArea';
 interface OnboardingData {
   age: string;
   sex: string;
-  heightCm: string;
-  weightKg: string;
   fitnessGoal: string;
   experienceLevel: string;
   trainingFrequency: string;
@@ -26,8 +24,6 @@ interface OnboardingData {
 const INITIAL_DATA: OnboardingData = {
   age: '',
   sex: '',
-  heightCm: '',
-  weightKg: '',
   fitnessGoal: '',
   experienceLevel: '',
   trainingFrequency: '',
@@ -44,7 +40,7 @@ interface StepProps {
 // ─── Step config ─────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { id: 1, title: 'About You',        subtitle: 'Basic measurements' },
+  { id: 1, title: 'About You',        subtitle: 'Tell us a bit about yourself' },
   { id: 2, title: 'Your Goal',         subtitle: 'What are you training for?' },
   { id: 3, title: 'Your Experience',   subtitle: 'How long have you been training?' },
   { id: 4, title: 'Training Schedule', subtitle: 'How often do you train?' },
@@ -62,12 +58,6 @@ function validateStep(step: number, data: OnboardingData): string | null {
       if (!data.age || isNaN(age) || age < 13 || age > 100)
         return 'Please enter a valid age (13–100).';
       if (!data.sex) return 'Please select a sex.';
-      const height = parseFloat(data.heightCm);
-      if (!data.heightCm || isNaN(height) || height < 50)
-        return 'Please enter a valid height.';
-      const weight = parseFloat(data.weightKg);
-      if (!data.weightKg || isNaN(weight) || weight < 20)
-        return 'Please enter a valid weight.';
       return null;
     }
     case 2:
@@ -174,27 +164,6 @@ function StepOne({ data, onChange }: StepProps) {
         onChange={(e) => onChange('age', e.target.value)}
         placeholder="25"
       />
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          label="Height (cm)"
-          type="number"
-          inputMode="decimal"
-          min={50}
-          value={data.heightCm}
-          onChange={(e) => onChange('heightCm', e.target.value)}
-          placeholder="175"
-        />
-        <Input
-          label="Weight (kg)"
-          type="number"
-          inputMode="decimal"
-          step="0.1"
-          min={20}
-          value={data.weightKg}
-          onChange={(e) => onChange('weightKg', e.target.value)}
-          placeholder="75"
-        />
-      </div>
     </div>
   );
 }
@@ -368,8 +337,6 @@ export default function OnboardingPage() {
       const payload = {
         age: parseInt(data.age),
         sex: data.sex,
-        heightCm: parseFloat(data.heightCm),
-        weightKg: parseFloat(data.weightKg),
         fitnessGoal: data.fitnessGoal,
         experienceLevel: data.experienceLevel,
         trainingFrequency: parseInt(data.trainingFrequency),
