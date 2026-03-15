@@ -52,6 +52,27 @@ export default function ChatPage() {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64 = result.split(',')[1];
+          setImagePreview(result);
+          setImageData({ base64, mediaType: file.type });
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  };
+
   const topics: { key: ChatTopic; label: string }[] = [
     { key: 'workout', label: 'Workouts' },
     { key: 'nutrition', label: 'Nutrition' },
@@ -183,6 +204,7 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={placeholders[chatTopic]}
             rows={1}
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none text-base"
