@@ -255,6 +255,47 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "log_routine_done",
+        "description": (
+            "Log that the user completed an existing routine. Use this when:\n"
+            "1. User says 'I did routine X', 'finished my chest day', 'did Alpha Fit this morning'\n"
+            "2. User sends a PHOTO of a routine/whiteboard and asks to log it\n"
+            "This clones the routine to history as a completed session while keeping the "
+            "original routine template intact. The user does NOT need a workout ID — "
+            "just provide the routine name, exercises from a photo, or a partial match. "
+            "ALWAYS use this instead of mark_workout_complete when the user describes "
+            "having done a routine by name or shows a photo of one."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "routine_name": {
+                    "type": "string",
+                    "description": (
+                        "Name or partial name of the routine to match (e.g. 'chest day', "
+                        "'Alpha Fit', 'deadlifts'). If from a photo, extract the workout "
+                        "title or describe the exercises to find the best match."
+                    ),
+                },
+                "fatigue_rating": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "1=felt easy, 10=completely destroyed. If user doesn't mention, ask them.",
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "How long the workout took in minutes (optional)",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional notes — for photo-based logs, include extracted exercise details here",
+                },
+            },
+            "required": ["routine_name"],
+        },
+    },
+    {
         "name": "lookup_user_foods",
         "description": (
             "Search the user's personal food database for previously logged foods with "

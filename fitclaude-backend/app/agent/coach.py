@@ -121,6 +121,8 @@ async def _execute_tool(
         return await import_exercises_from_youtube(db, tool_input["youtube_url"])
     elif tool_name == "log_activity":
         return await _tool_log_activity(db, user_id, tool_input, user_tz=user_tz)
+    elif tool_name == "log_routine_done":
+        return await _tool_log_routine_done(db, user_id, tool_input, user_tz=user_tz)
     else:
         return {"error": f"Unknown tool: {tool_name}"}
 
@@ -905,6 +907,102 @@ async def _tool_log_activity(
         "name": activity.name,
         "duration_minutes": activity.duration_minutes,
         "message": f"Logged '{activity.name}'{duration_str}. This shows in the Activities tab.",
+    }
+
+
+async def _tool_log_routine_done(
+    db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
+) -> dict:
+    """Clone an existing routine to history as a completed session."""
+    routine_name = params["routine_name"].strip().lower()
+
+    # Find all uncompleted workouts for this user (routine templates)
+    result = await db.execute(
+        select(Workout)
+        .options(selectinload(Workout.exercises))
+        .where(Workout.user_id == user_id, Workout.completed == False)  # noqa: E712
+    )
+    templates = result.scalars().all()
+
+    if not templates:
+        return {"error": "No routines found. Create a routine first."}
+
+    # Try matching by display_id first (e.g. "routine 26" → display_id=26)
+    best = None
+    display_match = re.search(r'\b(\d+)\b', routine_name)
+    if display_match:
+        target_id = int(display_match.group(1))
+        for t in templates:
+            if t.display_id == target_id:
+                best = t
+                break
+
+    # Fallback: match by name (case-insensitive partial match)
+    if not best:
+        best_score = 0
+        for t in templates:
+            t_name = (t.name or t.workout_type or "").lower()
+            if routine_name in t_name or t_name in routine_name:
+                score = len(routine_name) / max(len(t_name), 1)
+                if score > best_score:
+                    best_score = score
+                    best = t
+            # Also try matching individual words
+            elif any(word in t_name for word in routine_name.split() if len(word) > 2):
+                if not best:
+                    best = t
+
+    if not best:
+        available = [t.name or t.workout_type for t in templates]
+        return {
+            "error": f"No routine matching '{params['routine_name']}' found.",
+            "available_routines": available,
+        }
+
+    # Clone the routine as a completed session
+    now = datetime.now(user_tz).astimezone(tz.utc).replace(tzinfo=None) if user_tz else datetime.utcnow()
+    new_id = cuid_generator.generate()
+    clone = Workout(
+        id=new_id,
+        user_id=user_id,
+        date=now,
+        name=best.name,
+        workout_type=best.workout_type,
+        category=best.category,
+        source=best.source,
+        duration_minutes=params.get("duration_minutes"),
+        notes=params.get("notes"),
+        fatigue_rating=params.get("fatigue_rating"),
+        completed=True,
+    )
+    db.add(clone)
+
+    # Clone exercises
+    for ex in best.exercises:
+        db.add(WorkoutExercise(
+            id=cuid_generator.generate(),
+            workout_id=new_id,
+            exercise_id=ex.exercise_id,
+            variation_id=ex.variation_id,
+            order=ex.order,
+            sets=ex.sets,
+            reps=ex.reps,
+            weight_kg=ex.weight_kg,
+            rest_seconds=ex.rest_seconds,
+            notes=ex.notes,
+            was_spicy=ex.was_spicy,
+            superset_group=ex.superset_group,
+        ))
+
+    await db.commit()
+    logger.info(f"[Coach] Routine '{best.name}' cloned to history as {new_id}")
+
+    return {
+        "workout_id": new_id,
+        "routine_name": best.name or best.workout_type,
+        "exercise_count": len(best.exercises),
+        "completed": True,
+        "message": f"Logged '{best.name or best.workout_type}' as done! It's now in your history.",
     }
 
 
