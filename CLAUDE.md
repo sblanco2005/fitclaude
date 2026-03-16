@@ -1,94 +1,122 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
 
 ## Project
 
-FitClaude — an AI-powered fitness assistant with conversational workout generation, nutrition tracking, and "spicy" exercise variation logic. Built with FastAPI + SQLAlchemy (async) backend, Anthropic Claude API for the agent, and Streamlit chat frontend.
+FitClaude — AI-powered fitness assistant with conversational workout generation, nutrition tracking, exercise variations, and activity logging. Next.js 16 + React 19 frontend, FastAPI + SQLAlchemy (async) backend, Anthropic Claude API for the AI agents.
 
 ## Commands
 
 ```bash
-# Setup (first time)
-python3 -m venv .venv
-source .venv/bin/activate
+# Frontend (Next.js)
+npm install
+npm run dev              # http://localhost:3000
+
+# Backend (FastAPI) — separate terminal
+cd fitclaude-backend
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env  # then add your ANTHROPIC_API_KEY
+uvicorn app.main:app --reload   # http://localhost:8000
 
-# Seed the exercise database (35 exercises, 105 variations)
-python -m backend.seed.seed_db
+# Seed exercises (35 exercises, 105 variations)
+npx prisma db seed
 
-# Run the FastAPI backend
-uvicorn backend.main:app --reload
+# Quick boot test
+python3 -c "from app.main import app; print('OK')"
 
-# Run the Streamlit frontend (separate terminal)
-streamlit run frontend/app.py
-
-# Quick import/boot test
-python -c "from backend.main import app; print('OK')"
+# Deploy backend to VPS
+# See .claude/skills/deploy-backend for full steps
 ```
 
 ## Architecture
 
 ```
-backend/
-  main.py              # FastAPI app, lifespan, CORS, router registration
-  config.py            # Pydantic Settings (reads .env)
-  database.py          # Async SQLAlchemy engine, session, Base, init_db()
-  models/              # SQLAlchemy ORM models (User, Equipment, Exercise, ExerciseVariation,
-                       #   Workout, WorkoutExercise, NutritionLog, ConversationHistory)
-  schemas/             # Pydantic request/response schemas
-  routers/             # FastAPI route modules: chat, users, equipment, workouts, nutrition, exercises
-  agent/               # AI agent core
-    coach.py           # Main orchestrator — handles Claude API tool-use loop
-    prompts.py         # System prompt + build_user_context() for context injection
-    tools.py           # Tool definitions (JSON schema for Claude tool_use)
-    spicy.py           # "Spicy" variation logic — DB lookup with rule-based fallback
-  services/            # Business logic layer (workout_service, nutrition_service, exercise_service)
-  seed/
-    exercises.json     # 35 exercises across 11 muscle groups with 3 variations each
-    seed_db.py         # Idempotent seed script
+app/                           # Next.js 16 frontend
+  page.tsx                     # Dashboard (greeting, quick stats)
+  chat/page.tsx                # Chat with Coach Fit
+  workouts/page.tsx            # Routines, Hit It, History
+  nutrition/page.tsx           # Meal logging, daily totals, history
+  analytics/page.tsx           # Training/Nutrition analytics, muscles worked
+  exercises/page.tsx           # Exercise library
+  settings/page.tsx            # Profile, targets, equipment
+  onboarding/page.tsx          # New user setup
+  api/                         # Next.js API routes (profile, workouts, nutrition, analytics, chat proxy)
 
-frontend/
-  app.py               # Streamlit chat UI with sidebar (profile, equipment, daily nutrition)
+components/
+  ui/                          # Design system (Card, Button, Badge, Modal, Input)
+  analytics/                   # SummaryCards, MusclesWorkedCard, charts
+  workout/anatomy/             # Arnold SVG anatomy (AnatomyFront, AnatomyBack, muscleData)
+
+fitclaude-backend/app/
+  main.py                      # FastAPI app, CORS, router registration
+  config.py                    # Pydantic Settings (.env)
+  database.py                  # Async SQLAlchemy engine (Neon PostgreSQL)
+  agents/                      # AI agents
+    __init__.py                # Agent registry (instantiates agents)
+    base.py                    # BaseAgent ABC
+    coach.py                   # Main orchestrator — Claude tool-use loop
+    prompts.py                 # Coach system prompt + build_user_context()
+    tools.py                   # Tool definitions (JSON schema for Claude)
+    spicy.py                   # "Spicy" variation logic
+    minimax_fallback.py        # MiniMax fallback for API errors
+    nutrition/                 # Dedicated nutrition agent
+      agent.py                 # NutritionAgent — extraction-only prompt
+      prompts.py               # NUTRITION_SYSTEM_PROMPT
+      schemas.py               # FoodItem Pydantic model
+      known_foods.py           # Known foods dictionary + lookup
+    workout/                   # Workout agent (placeholder, handled by coach)
+  router/                      # Intent routing
+    intent.py                  # detect_food_logging_intent()
+    dispatcher.py              # route_message() → agent or general
+  routers/                     # FastAPI route handlers
+  models/                      # SQLAlchemy ORM models
+  schemas/                     # Pydantic request/response schemas
+  services/                    # Business logic (usage, youtube, etc.)
+  jobs/                        # Background jobs (video linker)
 ```
 
 ## Key Design Decisions
 
-- **Agent pattern**: Tool-use loop in `backend/agent/coach.py`. Claude calls tools (generate_workout, log_nutrition, get_spicy_variation, etc.), results are sent back, loop continues until text response.
-- **Spicy variations**: Two-level system in `backend/agent/spicy.py` — database-defined variations first (fast, no API call), rule-based fallback from `MODIFICATION_TYPES` dict if none found.
-- **Nutrition parsing**: The agent itself estimates macros via tool_use (calories, protein, carbs, fat are required tool params), then the tool stores them directly. No separate LLM call needed.
-- **Database**: SQLite via aiosqlite for dev. Change `DATABASE_URL` in `.env` for PostgreSQL. All async with SQLAlchemy 2.0 mapped_column style.
-- **Conversation history**: Stored in `conversation_history` table, last 20 messages loaded per chat request for context.
+- **Agent pattern**: Tool-use loop in `agents/coach.py`. Claude calls tools, results sent back, loop until text response. Dedicated nutrition agent fast-path for simple food logging (bypasses full tool-use loop).
+- **Intent router**: `router/intent.py` detects food-logging messages and routes to the nutrition agent. Everything else goes through the general coach.
+- **Spicy variations**: Two-level system — DB-defined variations first, rule-based fallback if none found.
+- **Database**: Neon PostgreSQL via Prisma (frontend) and SQLAlchemy+asyncpg (backend). NEVER use SQLite. Python models must match Prisma schema exactly (CUID IDs, camelCase columns).
+- **Auth**: NextAuth v5 beta with Google OAuth + database sessions.
+- **Deployment**: Frontend on Vercel (auto-deploy on push). Backend on Hostinger VPS via systemd.
 
 ## Conventions
 
-- All SQLAlchemy models use `Mapped[]` annotations with explicit SQL types for `date`/`datetime` columns (`Date`, `DateTime`) to avoid type inference issues.
-- Pydantic schemas use `model_config = {"from_attributes": True}` for ORM compatibility.
-- The agent model is configurable via `AGENT_MODEL` env var (defaults to `claude-sonnet-4-20250514`).
+- SQLAlchemy models use `Mapped[]` with `mapped_column(name="camelCase")` to match Prisma column names.
+- Pydantic schemas use `model_config = {"from_attributes": True}`.
+- Agent model configurable via `AGENT_MODEL` env var (defaults to `claude-sonnet-4-20250514`).
+- Tailwind v4: `@import "tailwindcss"` + `@theme inline` in CSS, `@utility` for custom utilities.
+- Mobile-first design with bottom tab nav, glassmorphism cards, emerald primary color.
 
+## UI Interactions
 
-## UI Interactions (Sign-Up Process)
-- On detecting a new user, prompt the following onboarding flow:
-  1. Enter age, sex, height, and weight
-  2. Select primary goal (fat loss / muscle gain / maintenance / recomp)
-  3. Select training experience level (beginner / intermediate / advanced)
-  4. Select training frequency (days per week)
-  5. Select gym type (home gym / public gym)
-     - 5a. If home gym → enter available equipment (barbell, dumbbells, pull-up bar, bench, rack, cables, bands, etc.)
-  6. Any injuries or limitations (optional, free text)
+### Onboarding
+1. Age, sex
+2. Primary goal (fat loss / muscle gain / maintenance / recomp)
+3. Experience level (beginner / intermediate / advanced)
+4. Training frequency (days per week)
+5. Gym type (home gym / public gym)
+   - If home gym → enter available equipment
+6. Injuries or limitations (optional)
 
-## Global components
-- The chat should be always present whether is workouts or nutrition you interact with everything in the app via the chat
-- There needs to a very quickly way to log the routine that i just finished. i thinking like putting in the chat something quickly like DL (deadlifts) 295lb 3 reps 2 sets and then we store this information in the database with the timestamp then we will see that in the log when we check the same routine. 
-## Workout page
-- For the workout page, i need to see a list on the left scrollable of all the routines i created, i should be able to quicly chek the whole rutine. maybe you click on the routine and tells you what muscles they work and the detail of the workout and another section (like 3 sections) with the past workouts logs
-When you select the routine you should have exactly the information that you suggested,I want to see all of it. Then additional called Hit It with i should be able to move the button from routine to hit it to indicate that the workout has started. then the routine will have a stop button that will indicate when  i finish the workout. while the routine is in Hit it, we will give the user 2 hours for them to move it to complete or back to routine or the app will automatically move it back 
+### Workouts
+- Routines list with collection groups, Hit It flow (start → 2hr auto-stop), history tab
+- Quick routine logging via chat ("I did routine 26 this morning")
+- Swap/Regenerate button on routine cards
+- Delete activity history with confirmation popup
 
-## 
--ok let's crete an additional section/button to see all my single exercies and othe section to see videos (in general for back, biceps etc.. from you tube). When i import videos, you will be able to determine if it's a single exercise video or a video in general for a specific mucle group. The keys to determine that is in the title of the vidoe if it says the word "Exercises in plural" or "a number more than 1" or a generic word, "legs,chest etc..) then you will know are videos for a muscle grouo (back etc..)
+### Nutrition
+- Chat-based food logging (dedicated nutrition agent for accuracy)
+- Pencil icon to edit meals (no accidental edits)
+- Close Day with confirmation popup
+- Daily totals with macro breakdown
 
--another feature in the videos section is to either approve, reject/ dismi. If i approve or Reject idon't want you to fetch it again, if i dismish we can fetch it again. 
-
-
-lastly i want to be able to add an exercise manually and then run the video search to look for that especific scenario so i can add it to the list manually 
+### Analytics
+- Training/Nutrition tabs with period selector (7d, 30d, 90d, All)
+- Muscles Worked card with Arnold anatomy (green=worked, red=missed)
+- Personal records, volume tracking
