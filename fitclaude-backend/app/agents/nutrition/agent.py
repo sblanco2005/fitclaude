@@ -124,12 +124,20 @@ class NutritionAgent(BaseAgent):
         total_fat = 0.0
 
         for item in items:
-            qty_str = f"{int(item.quantity)}x" if item.quantity == int(item.quantity) else f"{item.quantity}x"
-            parts.append(f"{qty_str} {item.name}")
-            total_cal += (item.calories or 0) * item.quantity
-            total_pro += (item.protein_g or 0) * item.quantity
-            total_carb += (item.carbs_g or 0) * item.quantity
-            total_fat += (item.fat_g or 0) * item.quantity
+            # Build display string
+            if item.unit and item.unit.endswith("g") and item.unit[:-1].isdigit():
+                # Gram-based: "Chicken Breast (200g)"
+                parts.append(f"{item.name} ({item.unit})")
+            else:
+                qty_str = f"{int(item.quantity)}x" if item.quantity == int(item.quantity) else f"{item.quantity}x"
+                parts.append(f"{qty_str} {item.name}")
+            # Macros from the AI are already the TOTAL for the full amount
+            # (prompt instructs: "macros are always for the total amount")
+            # Do NOT multiply by quantity — that would double-count
+            total_cal += (item.calories or 0)
+            total_pro += (item.protein_g or 0)
+            total_carb += (item.carbs_g or 0)
+            total_fat += (item.fat_g or 0)
 
         return {
             "items": [item.model_dump() for item in items],
