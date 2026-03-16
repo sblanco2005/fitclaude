@@ -2473,6 +2473,7 @@ function WorkoutsPageInner() {
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
   >([]);
   const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
+  const [hitItReplaceConfirm, setHitItReplaceConfirm] = useState<string | null>(null); // name of routine trying to start
   const [activities, setActivities] = useState<Activity[]>([]);
   const [collections, setCollections] = useState<WorkoutCollection[]>([]);
   const [activeCollection, setActiveCollection] = useState<string | null>(searchParams.get('collection'));
@@ -2754,39 +2755,51 @@ function WorkoutsPageInner() {
     ? routineGroups.find(([k]) => k === selectedRoutine)?.[1] ?? null
     : null;
 
-  const addToHitIt = async (name: string) => {
-    const alreadyQueued = hitItQueue.includes(name);
-
-    if (!alreadyQueued) {
-      // Find the latest workout for this routine and duplicate it for a fresh session
-      const group = routineGroups.find(([k]) => k === name)?.[1];
-      const latestWorkout = group?.[0];
-      if (latestWorkout) {
-        try {
-          const res = await fetch(`/api/workouts/${latestWorkout.id}/duplicate`, { method: 'POST' });
-          if (res.ok) {
-            // Refresh workouts so the new copy appears as workouts[0] in the group
-            await new Promise<void>((resolve) => {
-              fetch('/api/workouts?daysBack=90')
-                .then((r) => r.ok ? r.json() : [])
-                .then((data) => {
-                  setWorkouts(Array.isArray(data) ? data : []);
-                  resolve();
-                })
-                .catch(() => resolve());
-            });
-          } else {
-            console.error('[hitIt] Failed to duplicate workout:', await res.text().catch(() => ''));
-          }
-        } catch (err) {
-          console.error('[hitIt] Error duplicating workout:', err);
+  const _startHitIt = async (name: string) => {
+    // Find the latest workout for this routine and duplicate it for a fresh session
+    const group = routineGroups.find(([k]) => k === name)?.[1];
+    const latestWorkout = group?.[0];
+    if (latestWorkout) {
+      try {
+        const res = await fetch(`/api/workouts/${latestWorkout.id}/duplicate`, { method: 'POST' });
+        if (res.ok) {
+          await new Promise<void>((resolve) => {
+            fetch('/api/workouts?daysBack=90')
+              .then((r) => r.ok ? r.json() : [])
+              .then((data) => {
+                setWorkouts(Array.isArray(data) ? data : []);
+                resolve();
+              })
+              .catch(() => resolve());
+          });
+        } else {
+          console.error('[hitIt] Failed to duplicate workout:', await res.text().catch(() => ''));
         }
+      } catch (err) {
+        console.error('[hitIt] Error duplicating workout:', err);
       }
-      setHitItQueue((prev) => [...prev, name]);
     }
-
+    // Replace queue with only this routine (max 1)
+    setHitItQueue([name]);
     setSelectedRoutine(null);
     setTab('hit-it');
+  };
+
+  const addToHitIt = async (name: string) => {
+    if (hitItQueue.includes(name)) {
+      // Already active — just switch to Hit It tab
+      setSelectedRoutine(null);
+      setTab('hit-it');
+      return;
+    }
+
+    if (hitItQueue.length > 0) {
+      // Another routine is active — ask for confirmation
+      setHitItReplaceConfirm(name);
+      return;
+    }
+
+    await _startHitIt(name);
   };
 
   const removeFromHitIt = (name: string) => {
@@ -2999,6 +3012,37 @@ function WorkoutsPageInner() {
                   className="flex-1 py-2 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-50"
                 >
                   {spinning ? 'Spinning...' : 'Let\'s go!'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Hit It replace confirmation */}
+        {hitItReplaceConfirm && (
+          <>
+            <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setHitItReplaceConfirm(null)} />
+            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-full shadow-2xl">
+              <p className="text-sm font-bold text-white text-center">Workout in progress</p>
+              <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">
+                You already have <span className="text-white font-semibold">{hitItQueue[0]?.replace(/_/g, ' ')}</span> active. Stop it and start <span className="text-white font-semibold">{hitItReplaceConfirm.replace(/_/g, ' ')}</span>?
+              </p>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setHitItReplaceConfirm(null)}
+                  className="flex-1 py-2.5 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-colors"
+                >
+                  Keep current
+                </button>
+                <button
+                  onClick={async () => {
+                    const name = hitItReplaceConfirm;
+                    setHitItReplaceConfirm(null);
+                    await _startHitIt(name);
+                  }}
+                  className="flex-1 py-2.5 rounded-lg bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-400 transition-colors"
+                >
+                  Switch
                 </button>
               </div>
             </div>
@@ -3604,6 +3648,37 @@ function WorkoutsPageInner() {
                 className="flex-1 py-2 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-50"
               >
                 {spinning ? 'Spinning...' : 'Let\'s go!'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Hit It replace confirmation */}
+      {hitItReplaceConfirm && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setHitItReplaceConfirm(null)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-full shadow-2xl">
+            <p className="text-sm font-bold text-white text-center">Workout in progress</p>
+            <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">
+              You already have <span className="text-white font-semibold">{hitItQueue[0]?.replace(/_/g, ' ')}</span> active. Stop it and start <span className="text-white font-semibold">{hitItReplaceConfirm.replace(/_/g, ' ')}</span>?
+            </p>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setHitItReplaceConfirm(null)}
+                className="flex-1 py-2.5 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-colors"
+              >
+                Keep current
+              </button>
+              <button
+                onClick={async () => {
+                  const name = hitItReplaceConfirm;
+                  setHitItReplaceConfirm(null);
+                  await _startHitIt(name);
+                }}
+                className="flex-1 py-2.5 rounded-lg bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-400 transition-colors"
+              >
+                Switch
               </button>
             </div>
           </div>
