@@ -684,7 +684,11 @@ def _sanitize_raw_text(text: str) -> str:
 async def _tool_log_nutrition(
     db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
-    """Log a nutrition entry using the user's local date."""
+    """Log a nutrition entry using the user's local date.
+
+    Uses the dedicated nutrition agent for macro extraction when possible,
+    falling back to Claude's estimates if the agent fails.
+    """
     # Use user's timezone to determine the correct "now" and "today"
     if user_tz:
         user_now = datetime.now(user_tz)
@@ -694,6 +698,23 @@ async def _tool_log_nutrition(
     # Sanitize raw_text — Claude sometimes injects XML parameter tags
     raw_text = _sanitize_raw_text(params["raw_text"])
 
+    # Try nutrition agent for more accurate macro extraction
+    calories = params.get("calories")
+    protein_g = params.get("protein_g")
+    carbs_g = params.get("carbs_g")
+    fat_g = params.get("fat_g")
+
+    try:
+        agent_result = await nutrition_agent.extract_and_validate(raw_text)
+        if "error" not in agent_result:
+            calories = agent_result["total_calories"]
+            protein_g = agent_result["total_protein_g"]
+            carbs_g = agent_result["total_carbs_g"]
+            fat_g = agent_result["total_fat_g"]
+            logger.info(f"[Coach] Nutrition agent override: {calories} cal, {protein_g}g pro, {carbs_g}g carb, {fat_g}g fat")
+    except Exception as e:
+        logger.warning(f"[Coach] Nutrition agent failed in tool handler, using Claude estimates: {e}")
+
     # Store as UTC but ensure the date component matches the user's local date
     log = NutritionLog(
         id=cuid_generator.generate(),
@@ -701,10 +722,10 @@ async def _tool_log_nutrition(
         date=user_now.astimezone(tz.utc).replace(tzinfo=None),
         meal_type=params.get("meal_type"),
         raw_input=raw_text,
-        calories=params.get("calories"),
-        protein_g=params.get("protein_g"),
-        carbs_g=params.get("carbs_g"),
-        fat_g=params.get("fat_g"),
+        calories=calories,
+        protein_g=protein_g,
+        carbs_g=carbs_g,
+        fat_g=fat_g,
         fiber_g=params.get("fiber_g"),
     )
     db.add(log)
