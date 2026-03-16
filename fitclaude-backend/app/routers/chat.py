@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent.coach import handle_chat
+from app.agents.coach import handle_chat
 from app.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
 

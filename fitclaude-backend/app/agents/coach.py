@@ -15,14 +15,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.agent.prompts import COACH_SYSTEM_PROMPT, build_user_context
+from app.agents.prompts import COACH_SYSTEM_PROMPT, build_user_context
 from app.agents import nutrition_agent
 from app.router import detect_food_logging_intent
-from app.agent.spicy import get_spicy_variation
+from app.agents.spicy import get_spicy_variation
 from app.services.youtube_service import import_exercises_from_youtube
 from app.jobs.video_linker import _link_best_video
-from app.agent.tools import TOOL_DEFINITIONS
-from app.agent.minimax_fallback import handle_chat_minimax
+from app.agents.tools import TOOL_DEFINITIONS
+from app.agents.minimax_fallback import handle_chat_minimax
 from app.config import settings
 from app.services.usage_service import check_rate_limit, get_model_for_tier, log_token_usage
 from app.models import (
