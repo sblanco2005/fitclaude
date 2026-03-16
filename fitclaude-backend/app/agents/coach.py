@@ -1084,8 +1084,10 @@ async def handle_chat(
 
         logger.info("[Coach] Routing to vision nutrition agent")
         try:
+            # Use the user's weight unit preference (lb → oz, kg → grams)
+            weight_unit = user.weight_unit or "kg"
             result = await vision_nutrition_agent.extract_and_validate(
-                image_base64, image_media_type, user_text=user_message
+                image_base64, image_media_type, user_text=user_message, weight_unit=weight_unit
             )
             if "error" not in result:
                 # Log token usage for vision call

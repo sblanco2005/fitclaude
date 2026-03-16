@@ -13,7 +13,7 @@ from anthropic import AsyncAnthropic
 from app.agents.base import BaseAgent
 from app.agents.nutrition.known_foods import lookup_known_food
 from app.agents.nutrition.schemas import FoodItem
-from app.agents.nutrition.vision_prompts import VISION_NUTRITION_PROMPT
+from app.agents.nutrition.vision_prompts import get_vision_nutrition_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +26,17 @@ class VisionNutritionAgent(BaseAgent):
         """Main entry point."""
         image_base64 = kwargs.get("image_base64")
         image_media_type = kwargs.get("image_media_type")
+        weight_unit = kwargs.get("weight_unit", "kg")
         if not image_base64 or not image_media_type:
             return {"error": "No image provided for vision analysis."}
-        return await self.extract_and_validate(image_base64, image_media_type, user_text=user_message)
+        return await self.extract_and_validate(image_base64, image_media_type, user_text=user_message, weight_unit=weight_unit)
 
     async def extract_food_items_from_image(
         self,
         image_base64: str,
         image_media_type: str,
         user_text: str = "",
+        weight_unit: str = "kg",
     ) -> tuple[list[FoodItem], dict | None]:
         """
         Call Sonnet with the food photo to extract food items.
@@ -54,11 +56,13 @@ class VisionNutritionAgent(BaseAgent):
         if user_text:
             content.append({"type": "text", "text": user_text})
 
+        prompt = get_vision_nutrition_prompt(weight_unit)
+
         try:
             response = await self.client.messages.create(
                 model=self.model,
                 max_tokens=1024,
-                system=VISION_NUTRITION_PROMPT,
+                system=prompt,
                 messages=[{"role": "user", "content": content}],
             )
         except Exception as e:
@@ -110,6 +114,7 @@ class VisionNutritionAgent(BaseAgent):
         image_base64: str,
         image_media_type: str,
         user_text: str = "",
+        weight_unit: str = "kg",
     ) -> dict:
         """
         Extract food items from photo, apply known-foods overrides, build confirmation.
@@ -118,7 +123,7 @@ class VisionNutritionAgent(BaseAgent):
         usage = None
         try:
             items, usage = await self.extract_food_items_from_image(
-                image_base64, image_media_type, user_text
+                image_base64, image_media_type, user_text, weight_unit
             )
         except (ValueError, Exception) as e:
             # Retry once with simplified text instruction
@@ -126,7 +131,8 @@ class VisionNutritionAgent(BaseAgent):
             try:
                 items, usage = await self.extract_food_items_from_image(
                     image_base64, image_media_type,
-                    user_text="Identify each food in this photo and estimate macros."
+                    user_text="Identify each food in this photo and estimate macros.",
+                    weight_unit=weight_unit,
                 )
             except Exception:
                 return {
