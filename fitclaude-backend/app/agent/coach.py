@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.agent.prompts import COACH_SYSTEM_PROMPT, build_user_context
+from app.agents import nutrition_agent
+from app.router import detect_food_logging_intent
 from app.agent.spicy import get_spicy_variation
 from app.services.youtube_service import import_exercises_from_youtube
 from app.jobs.video_linker import _link_best_video
@@ -1029,6 +1031,53 @@ async def handle_chat(
             user_tz = ZoneInfo(timezone)
         except (KeyError, ValueError):
             logger.warning(f"Invalid timezone '{timezone}', falling back to UTC")
+
+    # ── Fast path: dedicated nutrition agent for simple food logging ──
+    if (
+        topic == "nutrition"
+        and not image_base64
+        and user_message
+        and detect_food_logging_intent(user_message)
+    ):
+        logger.info("[Coach] Routing to dedicated nutrition agent")
+        try:
+            result = await nutrition_agent.extract_and_validate(user_message)
+            if "error" not in result:
+                # Log to DB using the existing _tool_log_nutrition
+                log_result = await _tool_log_nutrition(
+                    db, user_id,
+                    {
+                        "raw_text": result["raw_text"],
+                        "meal_type": "snack",  # default; coach would infer better
+                        "calories": result["total_calories"],
+                        "protein_g": result["total_protein_g"],
+                        "carbs_g": result["total_carbs_g"],
+                        "fat_g": result["total_fat_g"],
+                    },
+                    user_tz=user_tz,
+                )
+                daily = log_result.get("daily_totals", {})
+                # Build friendly confirmation
+                conf = result["confirmation"]
+                cal = result["total_calories"]
+                pro = result["total_protein_g"]
+                carb = result["total_carbs_g"]
+                fat = result["total_fat_g"]
+                daily_cal = daily.get("total_calories", 0)
+                daily_pro = daily.get("total_protein_g", 0)
+                resp_text = (
+                    f"Logged {conf} — {cal} cal | {pro}g protein | {carb}g carbs | {fat}g fat.\n"
+                    f"Daily total: {daily_cal} cal, {daily_pro}g protein."
+                )
+                return {
+                    "response": resp_text,
+                    "workout_id": None,
+                    "nutrition_log_id": log_result.get("nutrition_log_id"),
+                    "model_used": settings.haiku_model,
+                }
+        except Exception as e:
+            logger.warning(f"[Coach] Nutrition agent failed ({e}), falling through to general handler")
+            # Fall through to general coach
 
     # Load context
     user_data = await _load_user_context(db, user_id)
