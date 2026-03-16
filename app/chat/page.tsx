@@ -5,12 +5,16 @@ import { useFitClaude } from '@/context/FitClaudeContext';
 import type { ChatTopic } from '@/context/FitClaudeContext';
 
 export default function ChatPage() {
-  const { messages, chatLoading, sendMessage, chatTopic, setChatTopic } = useFitClaude();
+  const { messages, chatLoading, sendMessage, chatTopic, setChatTopic, profile } = useFitClaude();
   const [input, setInput] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageData, setImageData] = useState<{ base64: string; mediaType: string } | null>(null);
+  const [showVisionConfirm, setShowVisionConfirm] = useState(false);
+  const pendingText = useRef('');
+  const pendingImage = useRef<{ base64: string; mediaType: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const userTier = profile?.tier || 'free';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,12 +41,33 @@ export default function ChatPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSend = async () => {
+  const handleSend = async (forceVision?: boolean) => {
     if (!input.trim() && !imageData) return;
+
+    // If sending an image in nutrition topic, show vision confirmation popup
+    if (imageData && chatTopic === 'nutrition' && forceVision === undefined) {
+      pendingText.current = input;
+      pendingImage.current = imageData;
+      setShowVisionConfirm(true);
+      return;
+    }
+
     const text = input;
+    const img = imageData;
     setInput('');
     clearImage();
-    await sendMessage(text, imageData?.base64, imageData?.mediaType);
+    await sendMessage(text, img?.base64, img?.mediaType, forceVision || false);
+  };
+
+  const handleVisionConfirm = async (useVision: boolean) => {
+    const text = pendingText.current;
+    const img = pendingImage.current;
+    setShowVisionConfirm(false);
+    setInput('');
+    clearImage();
+    pendingText.current = '';
+    pendingImage.current = null;
+    await sendMessage(text, img?.base64, img?.mediaType, useVision);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -210,7 +235,7 @@ export default function ChatPage() {
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none text-base"
           />
           <button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={chatLoading || (!input.trim() && !imageData)}
             className="p-2 bg-primary rounded-xl text-white disabled:opacity-50 transition-colors hover:bg-primary-dark flex-shrink-0"
             aria-label="Send message"
@@ -221,6 +246,58 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+      {/* Vision confirmation popup */}
+      {showVisionConfirm && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setShowVisionConfirm(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-full shadow-2xl">
+            {pendingImage.current && (
+              <div className="flex justify-center mb-3">
+                <img
+                  src={`data:${pendingImage.current.mediaType};base64,${pendingImage.current.base64}`}
+                  alt="Food photo"
+                  className="h-28 rounded-lg object-cover"
+                />
+              </div>
+            )}
+            {userTier === 'free' ? (
+              <>
+                <p className="text-sm font-bold text-white text-center">Vision Analysis</p>
+                <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">
+                  AI food photo analysis is available on <span className="text-primary font-semibold">Pro</span> and <span className="text-primary font-semibold">Unlimited</span> plans.
+                </p>
+                <button
+                  onClick={() => handleVisionConfirm(false)}
+                  className="w-full mt-4 py-2.5 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-colors"
+                >
+                  Send normally
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-white text-center">Analyze food photo?</p>
+                <p className="text-xs text-slate-400 mt-2 text-center leading-relaxed">
+                  AI Vision will identify each food item and estimate macros. Uses your <span className="text-primary font-semibold capitalize">{userTier}</span> credits.
+                </p>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => handleVisionConfirm(false)}
+                    className="flex-1 py-2.5 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-colors"
+                  >
+                    Send normally
+                  </button>
+                  <button
+                    onClick={() => handleVisionConfirm(true)}
+                    className="flex-1 py-2.5 rounded-lg bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-400 transition-colors"
+                  >
+                    Analyze Food
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

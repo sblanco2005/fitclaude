@@ -28,6 +28,7 @@ export const GET = withAuth(async (_request, user) => {
       weightUnit: true,
       isOnboarded: true,
       isAdmin: true,
+      tier: true,
     },
   });
 

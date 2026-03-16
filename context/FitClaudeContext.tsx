@@ -22,7 +22,7 @@ interface FitClaudeState {
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   fetchTodayNutrition: () => Promise<void>;
   fetchWorkouts: (daysBack?: number) => Promise<Workout[]>;
-  sendMessage: (text: string, imageBase64?: string, imageMediaType?: string) => Promise<string>;
+  sendMessage: (text: string, imageBase64?: string, imageMediaType?: string, useVision?: boolean) => Promise<string>;
   loadChatHistory: (topic?: ChatTopic) => Promise<void>;
   setChatOpen: (open: boolean) => void;
   setChatTopic: (topic: ChatTopic) => void;
@@ -171,7 +171,8 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
   const sendMessage = useCallback(async (
     text: string,
     imageBase64?: string,
-    imageMediaType?: string
+    imageMediaType?: string,
+    useVision?: boolean,
   ): Promise<string> => {
     const userMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
@@ -195,6 +196,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
           image_base64: imageBase64,
           image_media_type: imageMediaType,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          use_vision: useVision || false,
         }),
       });
 

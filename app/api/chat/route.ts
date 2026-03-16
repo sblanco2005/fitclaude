@@ -16,7 +16,7 @@ export const POST = withAuth(async (request, user) => {
     );
   }
 
-  const { message, image_base64, image_media_type, topic = 'workout', timezone } = body;
+  const { message, image_base64, image_media_type, topic = 'workout', timezone, use_vision } = body;
 
   if (!message && !image_base64) {
     return NextResponse.json(
@@ -52,6 +52,7 @@ export const POST = withAuth(async (request, user) => {
         image_base64,
         image_media_type,
         timezone: timezone || null,
+        use_vision: use_vision || false,
       }),
       signal: controller.signal,
     });

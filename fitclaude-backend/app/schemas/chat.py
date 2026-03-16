@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     image_base64: Optional[str] = None
     image_media_type: Optional[str] = None
     timezone: Optional[str] = None  # e.g. "America/New_York"
+    use_vision: bool = False  # Pro/Unlimited only — triggers vision nutrition agent for food photos
 
 
 class ChatResponse(BaseModel):

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.agents.workout.prompts import COACH_SYSTEM_PROMPT, build_user_context
-from app.agents import nutrition_agent
+from app.agents import nutrition_agent, vision_nutrition_agent
 from app.router import detect_food_logging_intent
 from app.agents.workout.spicy import get_spicy_variation
 from app.services.youtube_service import import_exercises_from_youtube
@@ -1037,6 +1037,7 @@ async def handle_chat(
     image_base64: str | None = None,
     image_media_type: str | None = None,
     timezone: str | None = None,
+    use_vision: bool = False,
 ) -> dict:
     """
     Main agent entry point.
@@ -1052,6 +1053,88 @@ async def handle_chat(
             user_tz = ZoneInfo(timezone)
         except (KeyError, ValueError):
             logger.warning(f"Invalid timezone '{timezone}', falling back to UTC")
+
+    # ── Fast path: vision nutrition agent for food photos (Pro/Unlimited only) ──
+    if (
+        use_vision
+        and image_base64
+        and image_media_type
+        and topic == "nutrition"
+    ):
+        # Tier gate — Pro/Unlimited only
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if not user or user.tier == "free":
+            return {
+                "response": "Vision food analysis is available on Pro and Unlimited plans. Upgrade to analyze food photos with AI.",
+                "workout_id": None,
+                "nutrition_log_id": None,
+                "model_used": None,
+            }
+
+        # Rate limit check
+        allowed, limit_reason = await check_rate_limit(db, user_id)
+        if not allowed:
+            return {
+                "response": f"I can't process your request right now. {limit_reason}",
+                "workout_id": None,
+                "nutrition_log_id": None,
+                "model_used": None,
+            }
+
+        logger.info("[Coach] Routing to vision nutrition agent")
+        try:
+            result = await vision_nutrition_agent.extract_and_validate(
+                image_base64, image_media_type, user_text=user_message
+            )
+            if "error" not in result:
+                # Log token usage for vision call
+                usage = result.pop("_usage", None)
+                if usage:
+                    request_id = str(uuid.uuid4())[:8]
+                    await log_token_usage(db, user_id, "vision_nutrition", settings.agent_model, usage, request_id=request_id)
+
+                # Log nutrition via existing tool handler
+                log_result = await _tool_log_nutrition(
+                    db, user_id,
+                    {
+                        "raw_text": result["raw_text"],
+                        "meal_type": "snack",
+                        "calories": result["total_calories"],
+                        "protein_g": result["total_protein_g"],
+                        "carbs_g": result["total_carbs_g"],
+                        "fat_g": result["total_fat_g"],
+                    },
+                    user_tz=user_tz,
+                )
+                daily = log_result.get("daily_totals", {})
+                conf = result["confirmation"]
+                cal = result["total_calories"]
+                pro = result["total_protein_g"]
+                carb = result["total_carbs_g"]
+                fat = result["total_fat_g"]
+                daily_cal = daily.get("total_calories", 0)
+                daily_pro = daily.get("total_protein_g", 0)
+                resp_text = (
+                    f"Logged {conf} — {cal} cal | {pro}g protein | {carb}g carbs | {fat}g fat.\n"
+                    f"Daily total: {daily_cal} cal, {daily_pro}g protein."
+                )
+                return {
+                    "response": resp_text,
+                    "workout_id": None,
+                    "nutrition_log_id": log_result.get("nutrition_log_id"),
+                    "model_used": settings.agent_model,
+                }
+            else:
+                return {
+                    "response": result["error"],
+                    "workout_id": None,
+                    "nutrition_log_id": None,
+                    "model_used": settings.agent_model,
+                }
+        except Exception as e:
+            logger.warning(f"[Coach] Vision nutrition agent failed ({e}), falling through to general handler")
+            # Fall through to general coach with image
 
     # ── Fast path: dedicated nutrition agent for simple food logging ──
     if (

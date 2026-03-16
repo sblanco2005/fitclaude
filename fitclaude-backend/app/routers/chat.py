@@ -23,6 +23,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
             image_base64=request.image_base64,
             image_media_type=request.image_media_type,
             timezone=request.timezone,
+            use_vision=request.use_vision,
         )
         return ChatResponse(**result)
     except Exception as e:

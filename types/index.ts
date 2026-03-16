@@ -21,6 +21,7 @@ export interface UserProfile {
   weightUnit: string; // "lb" or "kg"
   isOnboarded: boolean;
   isAdmin: boolean;
+  tier: string; // "free" | "pro" | "unlimited"
 }
 
 // Exercise
