@@ -11,7 +11,6 @@ import { TextArea } from '@/components/ui/TextArea';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface OnboardingData {
-  age: string;
   sex: string;
   fitnessGoal: string;
   experienceLevel: string;
@@ -22,7 +21,6 @@ interface OnboardingData {
 }
 
 const INITIAL_DATA: OnboardingData = {
-  age: '',
   sex: '',
   fitnessGoal: '',
   experienceLevel: '',
@@ -54,10 +52,7 @@ const TOTAL_STEPS = STEPS.length;
 function validateStep(step: number, data: OnboardingData): string | null {
   switch (step) {
     case 1: {
-      const age = parseInt(data.age);
-      if (!data.age || isNaN(age) || age < 13 || age > 100)
-        return 'Please enter a valid age (13–100).';
-      if (!data.sex) return 'Please select a sex.';
+      if (!data.sex) return 'Please select your sex.';
       return null;
     }
     case 2:
@@ -154,16 +149,6 @@ function StepOne({ data, onChange }: StepProps) {
           ))}
         </div>
       </div>
-      <Input
-        label="Age"
-        type="number"
-        inputMode="numeric"
-        min={13}
-        max={100}
-        value={data.age}
-        onChange={(e) => onChange('age', e.target.value)}
-        placeholder="25"
-      />
     </div>
   );
 }
@@ -335,7 +320,6 @@ export default function OnboardingPage() {
     setError(null);
     try {
       const payload = {
-        age: parseInt(data.age),
         sex: data.sex,
         fitnessGoal: data.fitnessGoal,
         experienceLevel: data.experienceLevel,

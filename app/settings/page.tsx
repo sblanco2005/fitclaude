@@ -116,27 +116,6 @@ export default function SettingsPage() {
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <Input
-              label="Age"
-              type="number"
-              value={profile.age ?? ''}
-              onChange={(e) => updateField('age', e.target.value ? parseInt(e.target.value) : null)}
-            />
-            <Input
-              label="Weight (kg)"
-              type="number"
-              step="0.1"
-              value={profile.weightKg ?? ''}
-              onChange={(e) => updateField('weightKg', e.target.value ? parseFloat(e.target.value) : null)}
-            />
-            <Input
-              label="Height (cm)"
-              type="number"
-              value={profile.heightCm ?? ''}
-              onChange={(e) => updateField('heightCm', e.target.value ? parseFloat(e.target.value) : null)}
-            />
-          </div>
         </div>
       </Card>
 

@@ -10,9 +10,6 @@ export const GET = withAuth(async (_request, user) => {
       name: true,
       email: true,
       image: true,
-      age: true,
-      weightKg: true,
-      heightCm: true,
       fitnessGoal: true,
       experienceLevel: true,
       gymType: true,
@@ -39,8 +36,7 @@ export const PATCH = withAuth(async (request, user) => {
   const body = await request.json();
 
   const allowedFields = [
-    'name', 'age', 'weightKg', 'heightCm',
-    'fitnessGoal', 'experienceLevel', 'gymType',
+    'name', 'fitnessGoal', 'experienceLevel', 'gymType',
     'injuriesNotes', 'equipmentText',
     'dailyCalorieTarget', 'dailyProteinTarget',
     'carbsPercent', 'fatPercent',
@@ -60,9 +56,6 @@ export const PATCH = withAuth(async (request, user) => {
     select: {
       id: true,
       name: true,
-      age: true,
-      weightKg: true,
-      heightCm: true,
       fitnessGoal: true,
       experienceLevel: true,
       gymType: true,

@@ -4,9 +4,6 @@ export interface UserProfile {
   name: string | null;
   email: string | null;
   image: string | null;
-  age: number | null;
-  weightKg: number | null;
-  heightCm: number | null;
   fitnessGoal: string | null;
   experienceLevel: string | null;
   gymType: string | null;

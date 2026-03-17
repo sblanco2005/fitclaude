@@ -99,8 +99,6 @@ def build_user_context(user_data: dict, user_tz=None) -> str:
         parts.append(f"- Gym type: {user_data['gym_type']}")
     if user_data.get("injuries_notes"):
         parts.append(f"- Injuries/Notes: {user_data['injuries_notes']}")
-    if user_data.get("weight_kg"):
-        parts.append(f"- Weight: {user_data['weight_kg']} kg")
 
     # Nutrition targets — always include (show "not set" when missing so AI doesn't invent)
     cal = user_data.get("daily_calorie_target")
