@@ -1283,6 +1283,42 @@ async def handle_chat(
                     request_id = str(uuid.uuid4())[:8]
                     await log_token_usage(db, user_id, "vision_nutrition", settings.agent_model, usage, request_id=request_id)
 
+                # Check barcodes — override AI macros with stored values if found
+                items = result.get("items", [])
+                barcode_matched = False
+                for item in items:
+                    bc = item.get("barcode")
+                    if bc:
+                        bc_result = await db.execute(
+                            select(UserFood).where(
+                                UserFood.user_id == user_id,
+                                UserFood.barcode == bc,
+                            )
+                        )
+                        known = bc_result.scalar_one_or_none()
+                        if known:
+                            # Override with stored macros
+                            qty = item.get("quantity", 1) or 1
+                            item["calories"] = round(known.calories * qty, 1)
+                            item["protein_g"] = round(known.protein_g * qty, 1)
+                            item["carbs_g"] = round(known.carbs_g * qty, 1)
+                            item["fat_g"] = round(known.fat_g * qty, 1)
+                            item["name"] = known.name
+                            item["estimated"] = False
+                            barcode_matched = True
+                            logger.info(f"[Coach] Barcode {bc} matched to '{known.name}'")
+
+                # Recalculate totals if barcode overrode any items
+                if barcode_matched:
+                    total_cal = sum(i.get("calories") or 0 for i in items)
+                    total_pro = sum(i.get("protein_g") or 0 for i in items)
+                    total_carb = sum(i.get("carbs_g") or 0 for i in items)
+                    total_fat = sum(i.get("fat_g") or 0 for i in items)
+                    result["total_calories"] = round(total_cal)
+                    result["total_protein_g"] = round(total_pro, 1)
+                    result["total_carbs_g"] = round(total_carb, 1)
+                    result["total_fat_g"] = round(total_fat, 1)
+
                 # Log nutrition via existing tool handler
                 log_result = await _tool_log_nutrition(
                     db, user_id,
@@ -1296,6 +1332,38 @@ async def handle_chat(
                     },
                     user_tz=user_tz,
                 )
+
+                # Save barcodes to UserFood for future lookups
+                for item in items:
+                    bc = item.get("barcode")
+                    if bc:
+                        try:
+                            # Check if this food already has a UserFood entry
+                            qty = item.get("quantity", 1) or 1
+                            per_cal = (item.get("calories") or 0) / qty
+                            per_pro = (item.get("protein_g") or 0) / qty
+                            per_carb = (item.get("carbs_g") or 0) / qty
+                            per_fat = (item.get("fat_g") or 0) / qty
+                            sc = await _upsert_user_food(
+                                db, user_id, item["name"],
+                                serving_amount=1, serving_unit=item.get("unit", "serving"),
+                                calories=per_cal, protein_g=per_pro, carbs_g=per_carb, fat_g=per_fat,
+                            )
+                            # Save barcode on the UserFood
+                            if sc:
+                                uf_result = await db.execute(
+                                    select(UserFood).where(
+                                        UserFood.user_id == user_id,
+                                        func.lower(UserFood.shortcode) == sc,
+                                    )
+                                )
+                                uf = uf_result.scalar_one_or_none()
+                                if uf and not uf.barcode:
+                                    uf.barcode = bc
+                            await db.commit()
+                        except Exception as e:
+                            logger.warning(f"[Coach] Failed to save barcode {bc}: {e}")
+
                 daily = log_result.get("daily_totals", {})
                 conf = result["confirmation"]
                 cal = result["total_calories"]
@@ -1308,6 +1376,8 @@ async def handle_chat(
                     f"Logged {conf} — {cal} cal | {pro}g protein | {carb}g carbs | {fat}g fat.\n"
                     f"Daily total: {daily_cal} cal, {daily_pro}g protein."
                 )
+                if barcode_matched:
+                    resp_text += "\n(Barcode matched — used stored macros)"
                 return {
                     "response": resp_text,
                     "workout_id": None,

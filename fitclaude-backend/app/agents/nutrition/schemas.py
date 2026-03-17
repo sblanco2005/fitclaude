@@ -15,6 +15,7 @@ class FoodItem(BaseModel):
     carbs_g: Optional[float] = None
     fat_g: Optional[float] = None
     estimated: bool = True
+    barcode: Optional[str] = None
 
     @field_validator("name")
     @classmethod

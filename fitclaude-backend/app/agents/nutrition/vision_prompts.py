@@ -30,9 +30,10 @@ RULES:
 11. Sauces, dressings, and toppings count as separate items if clearly visible.
 12. Beverages in the photo should be identified too.
 13. The user prefers {weight_examples} for weight-based portions. Always use this unit system.
+14. **BARCODES:** If a barcode (UPC, EAN, QR code with product info) is visible in the photo, include it as the "barcode" field (string of digits). This helps match the product to our database for exact macros next time. If no barcode is visible, omit the field.
 
 Output schema per item:
-{{"name": "string", "quantity": number, "unit": "string", "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "estimated": boolean}}
+{{"name": "string", "quantity": number, "unit": "string", "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "estimated": boolean, "barcode": "string (optional, only if visible)"}}
 
 EXAMPLES:
 
