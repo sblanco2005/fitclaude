@@ -18,6 +18,8 @@ from sqlalchemy.orm import selectinload
 from app.agents.workout.prompts import COACH_SYSTEM_PROMPT, build_user_context
 from app.agents import nutrition_agent, vision_nutrition_agent
 from app.router import detect_food_logging_intent
+from app.router.intent import detect_shortcode_intent
+from app.agents.nutrition.shortcodes import resolve_shortcode
 from app.agents.workout.spicy import get_spicy_variation
 from app.services.youtube_service import import_exercises_from_youtube
 from app.jobs.video_linker import _link_best_video
@@ -119,6 +121,8 @@ async def _execute_tool(
         return await _tool_mark_workout_complete(db, tool_input)
     elif tool_name == "lookup_user_foods":
         return await _tool_lookup_user_foods(db, user_id, tool_input)
+    elif tool_name == "update_user_food":
+        return await _tool_update_user_food(db, user_id, tool_input)
     elif tool_name == "parse_youtube_video":
         return await import_exercises_from_youtube(db, tool_input["youtube_url"])
     elif tool_name == "log_activity":
@@ -681,6 +685,82 @@ def _sanitize_raw_text(text: str) -> str:
     return cleaned
 
 
+async def _upsert_user_food(
+    db: AsyncSession, user_id: str, name: str,
+    serving_amount: float, serving_unit: str,
+    calories: float, protein_g: float, carbs_g: float, fat_g: float,
+) -> str | None:
+    """Create or update a UserFood entry and return its shortcode.
+
+    If the food already exists (by name), increments times_used and returns
+    the existing shortcode — does NOT overwrite macros (user may have corrected them).
+    """
+    try:
+        result = await db.execute(
+            select(UserFood).where(
+                UserFood.user_id == user_id,
+                func.lower(UserFood.name) == name.strip().lower(),
+            )
+        )
+        existing = result.scalar_one_or_none()
+
+        if existing:
+            existing.times_used = (existing.times_used or 0) + 1
+            if not existing.shortcode:
+                existing.shortcode = await resolve_shortcode(db, user_id, name)
+            await db.flush()
+            return existing.shortcode
+
+        # New food — create with shortcode
+        shortcode = await resolve_shortcode(db, user_id, name)
+        food = UserFood(
+            id=cuid_generator.generate(),
+            user_id=user_id,
+            name=name.strip(),
+            serving_amount=serving_amount,
+            serving_unit=serving_unit,
+            calories=round(calories, 1),
+            protein_g=round(protein_g, 1),
+            carbs_g=round(carbs_g, 1),
+            fat_g=round(fat_g, 1),
+            shortcode=shortcode,
+            times_used=1,
+        )
+        db.add(food)
+        await db.flush()
+        return shortcode
+    except Exception as e:
+        logger.warning(f"[Coach] Failed to upsert UserFood '{name}': {e}")
+        return None
+
+
+async def _upsert_foods_from_items(
+    db: AsyncSession, user_id: str, items: list[dict]
+) -> list[dict]:
+    """Upsert each food item and return shortcode info.
+
+    Items should have: name, quantity, unit, calories, protein_g, carbs_g, fat_g
+    (macros are totals for the full quantity).
+    """
+    shortcodes = []
+    for item in items:
+        qty = item.get("quantity", 1) or 1
+        # Per-serving macros = total / quantity
+        per_cal = (item.get("calories") or 0) / qty
+        per_pro = (item.get("protein_g") or 0) / qty
+        per_carb = (item.get("carbs_g") or 0) / qty
+        per_fat = (item.get("fat_g") or 0) / qty
+
+        sc = await _upsert_user_food(
+            db, user_id, item["name"],
+            serving_amount=1, serving_unit=item.get("unit", "serving"),
+            calories=per_cal, protein_g=per_pro, carbs_g=per_carb, fat_g=per_fat,
+        )
+        if sc:
+            shortcodes.append({"name": item["name"], "shortcode": sc})
+    return shortcodes
+
+
 async def _tool_log_nutrition(
     db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
@@ -746,6 +826,26 @@ async def _tool_log_nutrition(
         logger.error(f"[Coach] Failed to get daily totals after logging: {e}")
         daily = {"date": str(user_today), "total_calories": 0, "total_protein_g": 0, "total_carbs_g": 0, "total_fat_g": 0, "meal_count": 0}
 
+    # Upsert food items to UserFood table with shortcodes
+    shortcodes = []
+    try:
+        # If nutrition agent returned individual items, upsert each
+        if "error" not in (agent_result if 'agent_result' in dir() else {"error": True}):
+            pass  # items handled below
+        # Fallback: upsert the single combined food entry
+        if not shortcodes:
+            sc = await _upsert_user_food(
+                db, user_id, raw_text,
+                serving_amount=1, serving_unit="serving",
+                calories=calories or 0, protein_g=protein_g or 0,
+                carbs_g=carbs_g or 0, fat_g=fat_g or 0,
+            )
+            if sc:
+                shortcodes.append({"name": raw_text, "shortcode": sc})
+            await db.commit()
+    except Exception as e:
+        logger.warning(f"[Coach] Failed to upsert food shortcodes: {e}")
+
     return {
         "nutrition_log_id": log.id,
         "logged": {
@@ -756,6 +856,7 @@ async def _tool_log_nutrition(
             "fat_g": log.fat_g,
         },
         "daily_totals": daily,
+        "shortcodes": shortcodes,
     }
 
 
@@ -893,6 +994,7 @@ async def _tool_lookup_user_foods(
         "found": [
             {
                 "name": f.name,
+                "shortcode": f.shortcode,
                 "serving_amount": f.serving_amount,
                 "serving_unit": f.serving_unit,
                 "per_serving": {
@@ -905,6 +1007,44 @@ async def _tool_lookup_user_foods(
             for f in foods
         ],
         "not_found": [n for n in names if n not in found_names],
+    }
+
+
+async def _tool_update_user_food(
+    db: AsyncSession, user_id: str, params: dict
+) -> dict:
+    """Update macros for a food in the user's personal food database."""
+    shortcode = params.get("shortcode", "").lower().strip()
+    if not shortcode:
+        return {"error": "No shortcode provided"}
+
+    result = await db.execute(
+        select(UserFood).where(
+            UserFood.user_id == user_id,
+            func.lower(UserFood.shortcode) == shortcode,
+        )
+    )
+    food = result.scalar_one_or_none()
+    if not food:
+        return {"error": f"No food found with shortcode #{shortcode}"}
+
+    food.calories = params["calories"]
+    food.protein_g = params["protein_g"]
+    food.carbs_g = params.get("carbs_g", food.carbs_g)
+    food.fat_g = params["fat_g"]
+    if params.get("fiber_g") is not None:
+        food.fiber_g = params["fiber_g"]
+    await db.commit()
+
+    return {
+        "name": food.name,
+        "shortcode": food.shortcode,
+        "updated": {
+            "calories": food.calories,
+            "protein_g": food.protein_g,
+            "carbs_g": food.carbs_g,
+            "fat_g": food.fat_g,
+        },
     }
 
 
@@ -1054,6 +1194,53 @@ async def handle_chat(
         except (KeyError, ValueError):
             logger.warning(f"Invalid timezone '{timezone}', falling back to UTC")
 
+    # ── Fast path: shortcode logging (#fieldtrip 3) — zero AI cost ──
+    shortcode_match = detect_shortcode_intent(user_message) if user_message else None
+    if shortcode_match:
+        result = await db.execute(
+            select(UserFood).where(
+                UserFood.user_id == user_id,
+                func.lower(UserFood.shortcode) == shortcode_match["shortcode"],
+            )
+        )
+        food = result.scalar_one_or_none()
+        if food:
+            qty = shortcode_match["quantity"]
+            cal = round(food.calories * qty, 1)
+            pro = round(food.protein_g * qty, 1)
+            carb = round(food.carbs_g * qty, 1)
+            fat = round(food.fat_g * qty, 1)
+
+            if user_tz:
+                user_now = datetime.now(user_tz)
+            else:
+                user_now = datetime.now(tz.utc)
+
+            log = NutritionLog(
+                id=cuid_generator.generate(),
+                user_id=user_id,
+                date=user_now.astimezone(tz.utc).replace(tzinfo=None),
+                raw_input=f"{int(qty) if qty == int(qty) else qty}x {food.name}",
+                calories=cal, protein_g=pro, carbs_g=carb, fat_g=fat,
+            )
+            db.add(log)
+            food.times_used = (food.times_used or 0) + 1
+            await db.commit()
+
+            daily = await _get_daily_totals(db, user_id, user_now.date(), user_tz=user_tz)
+            qty_str = int(qty) if qty == int(qty) else qty
+            resp = (
+                f"Logged {qty_str}x {food.name} — {cal} cal | {pro}g protein | {carb}g carbs | {fat}g fat.\n"
+                f"Daily total: {daily.get('total_calories', 0)} cal, {daily.get('total_protein_g', 0)}g protein."
+            )
+            return {
+                "response": resp,
+                "workout_id": None,
+                "nutrition_log_id": log.id,
+                "model_used": None,  # No AI call
+            }
+        # Shortcode not found — fall through to general coach
+
     # ── Fast path: vision nutrition agent for food photos (Pro/Unlimited only) ──
     if (
         use_vision
@@ -1163,6 +1350,17 @@ async def handle_chat(
                     user_tz=user_tz,
                 )
                 daily = log_result.get("daily_totals", {})
+
+                # Upsert food items for shortcodes
+                shortcodes = []
+                try:
+                    items = result.get("items", [])
+                    if items:
+                        shortcodes = await _upsert_foods_from_items(db, user_id, items)
+                        await db.commit()
+                except Exception as e:
+                    logger.warning(f"[Coach] Failed to upsert shortcodes in fast-path: {e}")
+
                 # Build friendly confirmation
                 conf = result["confirmation"]
                 cal = result["total_calories"]
@@ -1175,6 +1373,11 @@ async def handle_chat(
                     f"Logged {conf} — {cal} cal | {pro}g protein | {carb}g carbs | {fat}g fat.\n"
                     f"Daily total: {daily_cal} cal, {daily_pro}g protein."
                 )
+                # Append shortcode hints
+                if shortcodes:
+                    hints = ", ".join(f"`#{s['shortcode']}`" for s in shortcodes)
+                    resp_text += f"\nShortcode: {hints}"
+
                 return {
                     "response": resp_text,
                     "workout_id": None,

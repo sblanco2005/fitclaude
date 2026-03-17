@@ -316,6 +316,29 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "update_user_food",
+        "description": (
+            "Update the macros for a food in the user's personal food database. "
+            "Use when the user says 'Update #shortcode to X cal Y protein Z fat' or "
+            "wants to correct stored nutrition values. The shortcode is without the # prefix."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "shortcode": {
+                    "type": "string",
+                    "description": "The shortcode (without #) to update, e.g. 'fieldtrip'",
+                },
+                "calories": {"type": "number", "description": "New calories per serving"},
+                "protein_g": {"type": "number", "description": "New protein grams per serving"},
+                "carbs_g": {"type": "number", "description": "New carbs grams per serving"},
+                "fat_g": {"type": "number", "description": "New fat grams per serving"},
+                "fiber_g": {"type": "number", "description": "New fiber grams per serving (optional)"},
+            },
+            "required": ["shortcode", "calories", "protein_g", "carbs_g", "fat_g"],
+        },
+    },
+    {
         "name": "parse_youtube_video",
         "description": (
             "Extract exercises from a YouTube video transcript and add them to the "

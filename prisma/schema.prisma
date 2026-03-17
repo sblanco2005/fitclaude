@@ -342,6 +342,8 @@ model UserFood {
   carbsG        Float
   fatG          Float
   fiberG        Float?
+  shortcode     String?
+  barcode       String?
   timesUsed     Int      @default(1)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -349,6 +351,7 @@ model UserFood {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
+  @@unique([userId, shortcode])
   @@index([userId])
   @@map("user_foods")
 }
