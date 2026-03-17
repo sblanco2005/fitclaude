@@ -319,15 +319,14 @@ TOOL_DEFINITIONS = [
         "name": "update_user_food",
         "description": (
             "Update the macros for a food in the user's personal food database. "
-            "Use when the user says 'Update #shortcode to X cal Y protein Z fat' or "
-            "wants to correct stored nutrition values. The shortcode is without the # prefix."
+            "Use when the user wants to correct stored nutrition values for a food."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "shortcode": {
+                "food_name": {
                     "type": "string",
-                    "description": "The shortcode (without #) to update, e.g. 'fieldtrip'",
+                    "description": "The food name to update, e.g. 'Field Trip Chicken Stick'",
                 },
                 "calories": {"type": "number", "description": "New calories per serving"},
                 "protein_g": {"type": "number", "description": "New protein grams per serving"},
@@ -335,7 +334,7 @@ TOOL_DEFINITIONS = [
                 "fat_g": {"type": "number", "description": "New fat grams per serving"},
                 "fiber_g": {"type": "number", "description": "New fiber grams per serving (optional)"},
             },
-            "required": ["shortcode", "calories", "protein_g", "carbs_g", "fat_g"],
+            "required": ["food_name", "calories", "protein_g", "carbs_g", "fat_g"],
         },
     },
     {

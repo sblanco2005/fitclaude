@@ -20,7 +20,6 @@ class UserFood(Base):
     carbs_g: Mapped[float] = mapped_column("carbsG", Float, nullable=False)
     fat_g: Mapped[float] = mapped_column("fatG", Float, nullable=False)
     fiber_g: Mapped[Optional[float]] = mapped_column("fiberG", Float, nullable=True)
-    shortcode: Mapped[Optional[str]] = mapped_column("shortcode", String, nullable=True)
     barcode: Mapped[Optional[str]] = mapped_column("barcode", String, nullable=True)
     times_used: Mapped[int] = mapped_column("timesUsed", Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(
@@ -32,5 +31,5 @@ class UserFood(Base):
 
     __table_args__ = (
         UniqueConstraint("userId", "name", name="user_foods_userId_name_key"),
-        UniqueConstraint("userId", "shortcode", name="user_foods_userId_shortcode_key"),
+        UniqueConstraint("userId", "barcode", name="user_foods_userId_barcode_key"),
     )

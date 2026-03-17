@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/Toast';
 import { useFitClaude } from '@/context/FitClaudeContext';
+import { BarcodeScanner } from '@/components/nutrition/BarcodeScanner';
 import type { DailyNutrition, DailyNutritionSummary, NutritionLog } from '@/types';
 
 /** Strip XML parameter tags that Claude sometimes injects into raw_text */
@@ -692,6 +693,7 @@ export default function NutritionPage() {
   }, [tab, fetchHistory]);
 
   const [closeDayConfirm, setCloseDayConfirm] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const handleCloseDay = async () => {
     setCloseDayConfirm(false);
@@ -744,7 +746,27 @@ export default function NutritionPage() {
 
   return (
     <div className="p-4 space-y-4 max-w-lg mx-auto">
-      <h2 className="text-xl font-bold text-white">Nutrition</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-white">Nutrition</h2>
+        <button
+          onClick={() => setScannerOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/15 text-primary text-xs font-medium hover:bg-primary/25 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h4V3H2v5h1V4zm14-1v1h4v4h1V3h-5zM3 20v-4H2v5h5v-1H3zm18-4v4h-4v1h5v-5h-1z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h10M7 16h6" />
+          </svg>
+          Scan
+        </button>
+      </div>
+
+      {/* Barcode Scanner Overlay */}
+      {scannerOpen && (
+        <BarcodeScanner
+          onLogged={fetchToday}
+          onClose={() => setScannerOpen(false)}
+        />
+      )}
 
       {/* Tab toggle */}
       <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">

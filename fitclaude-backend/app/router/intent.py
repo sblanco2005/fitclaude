@@ -46,24 +46,3 @@ def detect_food_logging_intent(message: str) -> bool:
             return True
 
     return False
-
-
-# ─── Shortcode intent ────────────────────────────────────────────────────────
-
-_SHORTCODE_RE = re.compile(
-    r"^(?:log\s+)?#(\w+)(?:\s+(\d+(?:\.\d+)?))?$", re.IGNORECASE
-)
-
-
-def detect_shortcode_intent(message: str) -> dict | None:
-    """Detect shortcode logging like '#fieldtrip 3' or 'Log #nurri'.
-
-    Returns {"shortcode": "fieldtrip", "quantity": 3.0} or None.
-    """
-    m = _SHORTCODE_RE.match(message.strip())
-    if m:
-        return {
-            "shortcode": m.group(1).lower(),
-            "quantity": float(m.group(2)) if m.group(2) else 1.0,
-        }
-    return None
