@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import NumericStepper from './NumericStepper';
 
 const LB_PER_KG = 2.20462;
@@ -95,22 +95,32 @@ export default function SetRow({
   // Report current draft values to parent (for auto-save on navigate)
   const onValueChangeRef = useRef(onValueChange);
   onValueChangeRef.current = onValueChange;
-  useEffect(() => {
-    if (!isLogged && onValueChangeRef.current) {
-      onValueChangeRef.current(setNumber, toLbs(weight), reps);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weight, reps, isLogged, setNumber]);
+  const toLbsRef = useRef(toLbs);
+  toLbsRef.current = toLbs;
 
-  // Wrap setters to track user edits
-  const setWeightEdited = (v: number) => { setWeight(v); setUserEdited(true); };
-  const setRepsEdited = (v: number) => { setReps(v); setUserEdited(true); };
+  // Report draft immediately (synchronously) whenever weight or reps change
+  const reportDraft = useCallback((w: number, r: number) => {
+    if (!isLogged && onValueChangeRef.current) {
+      onValueChangeRef.current(setNumber, toLbsRef.current(w), r);
+    }
+  }, [isLogged, setNumber]);
+
+  // Also fire on initial mount / default changes so drafts are populated
+  useEffect(() => {
+    reportDraft(weight, reps);
+  }, [weight, reps, unit, reportDraft]);
+
+  // Wrap setters to track user edits AND report drafts synchronously
+  const setWeightEdited = (v: number) => { setWeight(v); setUserEdited(true); reportDraft(v, reps); };
+  const setRepsEdited = (v: number) => { setReps(v); setUserEdited(true); reportDraft(weight, v); };
 
   const handlePerSideChange = (v: number) => {
     setPerSide(v);
     setUserEdited(true);
     const barDisplay = toDisplay(barWeight);
-    setWeight(Math.round((v * 2 + barDisplay) * 10) / 10);
+    const newWeight = Math.round((v * 2 + barDisplay) * 10) / 10;
+    setWeight(newWeight);
+    reportDraft(newWeight, reps);
   };
 
   const handleConfirm = () => {

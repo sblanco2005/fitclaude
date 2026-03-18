@@ -234,32 +234,61 @@ export default function FocusedExerciseView({
     });
   };
 
-  // Navigation by group (auto-save drafts before moving)
-  const goNext = () => {
-    if (currentGroupIndex < totalGroups - 1) {
-      autoSaveCurrent();
+  // ── Confirmation modal for unlogged sets ──
+  const [pendingNav, setPendingNav] = useState<'next' | 'prev' | number | null>(null);
+
+  const hasUnloggedSets = useCallback(() => {
+    const curGroup = groups[currentGroupIndex];
+    if (!curGroup) return false;
+    return curGroup.exercises.some((e) => {
+      const logs = exerciseLogs.get(e.id) ?? [];
+      const totalSets = e.sets || 3;
+      return logs.length < totalSets;
+    });
+  }, [currentGroupIndex, groups, exerciseLogs]);
+
+  const executeNav = useCallback((direction: 'next' | 'prev' | number) => {
+    if (typeof direction === 'number') {
+      setCurrentGroupIndex(direction);
+      setShowVideo(null);
+      setShowGif(null);
+      setPlateMode(isBarbellInGroup(direction));
+    } else if (direction === 'next' && currentGroupIndex < totalGroups - 1) {
       setCurrentGroupIndex(currentGroupIndex + 1);
       setShowVideo(null);
       setShowGif(null);
       setPlateMode(isBarbellInGroup(currentGroupIndex + 1));
-    }
-  };
-  const goPrev = () => {
-    if (currentGroupIndex > 0) {
-      autoSaveCurrent();
+    } else if (direction === 'prev' && currentGroupIndex > 0) {
       setCurrentGroupIndex(currentGroupIndex - 1);
       setShowVideo(null);
       setShowGif(null);
       setPlateMode(isBarbellInGroup(currentGroupIndex - 1));
     }
+    setPendingNav(null);
+  }, [currentGroupIndex, totalGroups, isBarbellInGroup]);
+
+  const navigateWithCheck = useCallback((direction: 'next' | 'prev' | number) => {
+    if (hasUnloggedSets()) {
+      setPendingNav(direction);
+    } else {
+      executeNav(direction);
+    }
+  }, [hasUnloggedSets, executeNav]);
+
+  // Navigation by group
+  const goNext = () => {
+    if (currentGroupIndex < totalGroups - 1) {
+      navigateWithCheck('next');
+    }
+  };
+  const goPrev = () => {
+    if (currentGroupIndex > 0) {
+      navigateWithCheck('prev');
+    }
   };
   const goToGroup = (gi: number) => {
     if (gi !== currentGroupIndex && gi >= 0 && gi < totalGroups) {
-      autoSaveCurrent();
-      setCurrentGroupIndex(gi);
-      setShowVideo(null);
-      setShowGif(null);
-      setPlateMode(isBarbellInGroup(gi));
+      navigateWithCheck(gi);
     }
   };
   // Map flat exercise index to group index for ExerciseListSheet
@@ -790,6 +819,49 @@ export default function FocusedExerciseView({
           </svg>
         </button>
       </div>
+
+      {/* ─── Unlogged sets confirmation ─── */}
+      {pendingNav !== null && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 pb-20">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setPendingNav(null)} />
+          <div className="relative w-full max-w-sm glass rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+            <div className="p-5 text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-amber-400/20 flex items-center justify-center">
+                <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-1">Unlogged Sets</h3>
+              <p className="text-sm text-slate-400 mb-5">
+                You have sets that haven&apos;t been logged yet. What would you like to do?
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    autoSaveCurrent();
+                    executeNav(pendingNav);
+                  }}
+                  className="w-full px-4 py-3 rounded-xl bg-primary/20 text-primary font-medium text-sm active:scale-95 transition-transform"
+                >
+                  Auto-Log Remaining Sets
+                </button>
+                <button
+                  onClick={() => executeNav(pendingNav)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm active:scale-95 transition-transform"
+                >
+                  Discard & Move On
+                </button>
+                <button
+                  onClick={() => setPendingNav(null)}
+                  className="w-full px-4 py-3 rounded-xl text-slate-500 font-medium text-sm active:scale-95 transition-transform"
+                >
+                  Stay Here
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Exercise list sheet ─── */}
       {showExerciseList && (
