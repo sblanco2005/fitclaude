@@ -962,36 +962,93 @@ async def _tool_mark_workout_complete(db: AsyncSession, params: dict) -> dict:
 async def _tool_lookup_user_foods(
     db: AsyncSession, user_id: str, params: dict
 ) -> dict:
-    """Look up foods in the user's personal food database."""
+    """Look up foods in the user's personal food database with fuzzy matching.
+
+    First tries exact match, then substring match (any search word found in DB name
+    or any DB name word found in search term). Returns exact matches as 'found' and
+    close matches as 'similar' so the coach can use them or ask the user.
+    """
     names = [n.lower().strip() for n in params.get("food_names", [])]
     if not names:
-        return {"found": [], "not_found": []}
+        return {"found": [], "similar": [], "not_found": []}
 
-    result = await db.execute(
-        select(UserFood).where(
-            UserFood.user_id == user_id,
-            func.lower(UserFood.name).in_(names),
-        )
+    # Load all user foods once (typically <50 items)
+    all_result = await db.execute(
+        select(UserFood).where(UserFood.user_id == user_id)
     )
-    foods = result.scalars().all()
-    found_names = {f.name.lower() for f in foods}
+    all_foods = all_result.scalars().all()
+
+    found = []
+    similar = []
+    not_found = []
+
+    for search_name in names:
+        search_words = set(search_name.split())
+
+        # 1. Exact match
+        exact = next((f for f in all_foods if f.name.lower() == search_name), None)
+        if exact:
+            found.append(exact)
+            continue
+
+        # 2. Fuzzy match — check if search words overlap with food name words
+        matches = []
+        for f in all_foods:
+            db_name = f.name.lower()
+            db_words = set(db_name.split())
+
+            # Substring match: search term in DB name or DB name contains search term
+            if search_name in db_name or db_name in search_name:
+                matches.append((f, 3))  # high confidence
+                continue
+
+            # Word overlap: any meaningful word (>2 chars) shared
+            overlap = search_words & db_words
+            meaningful_overlap = {w for w in overlap if len(w) > 2}
+            if meaningful_overlap:
+                matches.append((f, len(meaningful_overlap)))
+
+        if matches:
+            # Sort by confidence score descending
+            matches.sort(key=lambda x: x[1], reverse=True)
+            best = matches[0]
+            if best[1] >= 3:
+                # High confidence — treat as found
+                found.append(best[0])
+            else:
+                # Partial match — suggest
+                for m, _ in matches[:3]:
+                    similar.append(m)
+                not_found.append(search_name)
+        else:
+            not_found.append(search_name)
+
+    def food_dict(f: UserFood) -> dict:
+        return {
+            "name": f.name,
+            "serving_amount": f.serving_amount,
+            "serving_unit": f.serving_unit,
+            "per_serving": {
+                "calories": round(f.calories, 2),
+                "protein_g": round(f.protein_g, 2),
+                "carbs_g": round(f.carbs_g, 2),
+                "fat_g": round(f.fat_g, 2),
+            },
+        }
+
+    # Deduplicate similar (exclude already-found)
+    found_ids = {f.id for f in found}
+    seen_similar = set()
+    unique_similar = []
+    for f in similar:
+        if f.id not in found_ids and f.id not in seen_similar:
+            unique_similar.append(f)
+            seen_similar.add(f.id)
 
     return {
-        "found": [
-            {
-                "name": f.name,
-                "serving_amount": f.serving_amount,
-                "serving_unit": f.serving_unit,
-                "per_serving": {
-                    "calories": round(f.calories, 2),
-                    "protein_g": round(f.protein_g, 2),
-                    "carbs_g": round(f.carbs_g, 2),
-                    "fat_g": round(f.fat_g, 2),
-                },
-            }
-            for f in foods
-        ],
-        "not_found": [n for n in names if n not in found_names],
+        "found": [food_dict(f) for f in found],
+        "similar": [food_dict(f) for f in unique_similar],
+        "not_found": not_found,
     }
 
 

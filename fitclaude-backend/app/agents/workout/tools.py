@@ -300,8 +300,9 @@ TOOL_DEFINITIONS = [
         "description": (
             "Search the user's personal food database for previously logged foods with "
             "verified macros. ALWAYS call this before log_nutrition to check if the food "
-            "has known macros. Returns macros per base serving unit — multiply by the "
-            "user's requested quantity to get final values."
+            "has known macros. Uses fuzzy matching — returns 'found' (exact matches), "
+            "'similar' (close matches like 'tuna' matching 'tuna can albacore'), and "
+            "'not_found'. Use similar matches if they're clearly the same food."
         ),
         "input_schema": {
             "type": "object",
