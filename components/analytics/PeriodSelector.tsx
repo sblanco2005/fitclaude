@@ -1,6 +1,7 @@
 'use client';
 
 const periods = [
+  { value: 'week', label: 'Week' },
   { value: '7d', label: '7D' },
   { value: '30d', label: '30D' },
   { value: '90d', label: '90D' },

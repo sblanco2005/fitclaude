@@ -51,8 +51,6 @@ export const GET = withAuth(async (request, user) => {
     // Compute "since" date
     let since: Date | undefined;
     if (period !== 'all') {
-      const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 };
-      const days = daysMap[period] || 30;
       const now = new Date();
       let todayLocal: string;
       try {
@@ -60,10 +58,24 @@ export const GET = withAuth(async (request, user) => {
       } catch {
         todayLocal = now.toISOString().split('T')[0];
       }
-      const sinceDate = new Date(todayLocal + 'T00:00:00Z');
-      sinceDate.setDate(sinceDate.getDate() - days);
-      const sinceStr = sinceDate.toISOString().split('T')[0];
-      since = getUserDayBounds(timezone, sinceStr).start;
+
+      if (period === 'week') {
+        // This week: Monday to today
+        const today = new Date(todayLocal + 'T12:00:00Z');
+        const dayOfWeek = today.getUTCDay(); // 0=Sun, 1=Mon
+        const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const monday = new Date(today);
+        monday.setUTCDate(today.getUTCDate() - daysSinceMonday);
+        const sinceStr = monday.toISOString().split('T')[0];
+        since = getUserDayBounds(timezone, sinceStr).start;
+      } else {
+        const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 };
+        const days = daysMap[period] || 30;
+        const sinceDate = new Date(todayLocal + 'T00:00:00Z');
+        sinceDate.setDate(sinceDate.getDate() - days);
+        const sinceStr = sinceDate.toISOString().split('T')[0];
+        since = getUserDayBounds(timezone, sinceStr).start;
+      }
     }
 
     // Query completed workouts within period
