@@ -8,7 +8,21 @@ import type { ExerciseVideoLink, UsageResponse, UserUsageDetail, UserUsageSummar
 import { TIER_CONFIGS } from '@/types';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected';
-type AdminTab = 'tutorials' | 'reference' | 'usage';
+type AdminTab = 'tutorials' | 'reference' | 'usage' | 'foods';
+
+interface UserFoodItem {
+  id: string;
+  name: string;
+  servingAmount: number;
+  servingUnit: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  fiberG: number | null;
+  barcode: string | null;
+  timesUsed: number;
+}
 
 interface UnlinkedExercise {
   id: string | null;
@@ -54,6 +68,14 @@ export default function AdminPage() {
   const [savingLimits, setSavingLimits] = useState(false);
   const [savingTier, setSavingTier] = useState(false);
 
+  // Foods state
+  const [foods, setFoods] = useState<UserFoodItem[]>([]);
+  const [loadingFoods, setLoadingFoods] = useState(false);
+  const [editingFoodId, setEditingFoodId] = useState<string | null>(null);
+  const [editingFood, setEditingFood] = useState<Partial<UserFoodItem>>({});
+  const [savingFood, setSavingFood] = useState(false);
+  const [foodSearch, setFoodSearch] = useState('');
+
   // Auth check
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') router.push('/auth/signin');
@@ -95,6 +117,40 @@ export default function AdminPage() {
     setLoadingDetail(false);
   }, [usagePeriod]);
 
+  // Fetch foods
+  const fetchFoods = useCallback(async () => {
+    setLoadingFoods(true);
+    try {
+      const res = await fetch('/api/nutrition/foods');
+      if (res.ok) setFoods(await res.json());
+    } catch { /* ignore */ }
+    setLoadingFoods(false);
+  }, []);
+
+  const saveFood = async (id: string) => {
+    setSavingFood(true);
+    try {
+      const res = await fetch('/api/nutrition/foods', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...editingFood }),
+      });
+      if (res.ok) {
+        setEditingFoodId(null);
+        setEditingFood({});
+        await fetchFoods();
+      }
+    } catch { /* ignore */ }
+    setSavingFood(false);
+  };
+
+  const deleteFood = async (id: string) => {
+    try {
+      const res = await fetch(`/api/nutrition/foods?id=${id}`, { method: 'DELETE' });
+      if (res.ok) setFoods((prev) => prev.filter((f) => f.id !== id));
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     fetchVideos();
     fetchUnlinked();
@@ -102,7 +158,8 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (activeTab === 'usage') fetchUsage();
-  }, [activeTab, fetchUsage]);
+    if (activeTab === 'foods') fetchFoods();
+  }, [activeTab, fetchUsage, fetchFoods]);
 
   // Filter videos by tab (tutorial vs reference) and search query
   const filteredVideos = useMemo(() => {
@@ -352,6 +409,16 @@ export default function AdminPage() {
             }`}
           >
             Usage
+          </button>
+          <button
+            onClick={() => { setActiveTab('foods'); }}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+              activeTab === 'foods'
+                ? 'bg-red-500/15 text-red-400 shadow-sm'
+                : 'text-muted hover:text-slate-300'
+            }`}
+          >
+            Foods
           </button>
         </div>
 
@@ -635,8 +702,168 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ─── Foods Tab Content ─── */}
+        {activeTab === 'foods' && (
+          <div className="space-y-3">
+            {/* Search */}
+            <input
+              value={foodSearch}
+              onChange={(e) => setFoodSearch(e.target.value)}
+              placeholder="Search foods..."
+              className="w-full bg-card border border-border-dark rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+
+            {loadingFoods ? (
+              <div className="text-center text-muted py-8 text-sm">Loading foods...</div>
+            ) : foods.length === 0 ? (
+              <div className="text-center text-muted py-8 text-sm">No foods in database</div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-xs text-slate-600 px-1">{foods.length} foods</div>
+                {foods
+                  .filter((f) => !foodSearch || f.name.toLowerCase().includes(foodSearch.toLowerCase()) || f.barcode?.includes(foodSearch))
+                  .map((food) => {
+                    const isEditing = editingFoodId === food.id;
+
+                    if (isEditing) {
+                      return (
+                        <div key={food.id} className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+                          <div>
+                            <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Name</label>
+                            <input
+                              value={editingFood.name ?? food.name}
+                              onChange={(e) => setEditingFood({ ...editingFood, name: e.target.value })}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Serving</label>
+                              <input
+                                value={editingFood.servingUnit ?? food.servingUnit}
+                                onChange={(e) => setEditingFood({ ...editingFood, servingUnit: e.target.value })}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">Barcode</label>
+                              <input
+                                value={editingFood.barcode ?? food.barcode ?? ''}
+                                onChange={(e) => setEditingFood({ ...editingFood, barcode: e.target.value })}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white mt-1 font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                                placeholder="No barcode"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-4 gap-2">
+                            <div>
+                              <label className="text-xs text-primary font-bold uppercase tracking-wider">Cal</label>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                value={editingFood.calories ?? food.calories}
+                                onChange={(e) => setEditingFood({ ...editingFood, calories: Number(e.target.value) })}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white mt-1 tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-blue-400 font-bold uppercase tracking-wider">Prot</label>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                value={editingFood.proteinG ?? food.proteinG}
+                                onChange={(e) => setEditingFood({ ...editingFood, proteinG: Number(e.target.value) })}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white mt-1 tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-amber-400 font-bold uppercase tracking-wider">Carbs</label>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                value={editingFood.carbsG ?? food.carbsG}
+                                onChange={(e) => setEditingFood({ ...editingFood, carbsG: Number(e.target.value) })}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white mt-1 tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-red-400 font-bold uppercase tracking-wider">Fat</label>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                value={editingFood.fatG ?? food.fatG}
+                                onChange={(e) => setEditingFood({ ...editingFood, fatG: Number(e.target.value) })}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white mt-1 tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => saveFood(food.id)}
+                              disabled={savingFood}
+                              className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+                            >
+                              {savingFood ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              onClick={() => { setEditingFoodId(null); setEditingFood({}); }}
+                              className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold uppercase tracking-wider"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={food.id} className="rounded-xl border border-border-dark bg-card p-3">
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-white truncate">{food.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-slate-500">{food.servingUnit}</span>
+                              {food.barcode && (
+                                <span className="text-xs text-slate-600 font-mono">{food.barcode}</span>
+                              )}
+                              <span className="text-xs text-slate-700">used {food.timesUsed}x</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => { setEditingFoodId(food.id); setEditingFood({}); }}
+                              className="p-1.5 text-slate-600 hover:text-slate-300 transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => { if (confirm(`Delete "${food.name}"?`)) deleteFood(food.id); }}
+                              className="p-1.5 text-slate-700 hover:text-red-400 transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs tabular-nums">
+                          <span className="text-primary font-semibold">{Math.round(food.calories)} cal</span>
+                          <span className="text-blue-400">{Math.round(food.proteinG)}p</span>
+                          <span className="text-amber-400">{Math.round(food.carbsG)}c</span>
+                          <span className="text-red-400">{Math.round(food.fatG)}f</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ─── Video Tabs Content ─── */}
-        {activeTab !== 'usage' && (
+        {activeTab !== 'usage' && activeTab !== 'foods' && (
         <>
         {/* ─── Job Button (contextual per tab) ─── */}
         <button
