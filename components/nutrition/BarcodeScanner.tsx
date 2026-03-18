@@ -255,20 +255,23 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         const response: string = data.response || '';
         console.log('[BarcodeScanner] Vision response:', response);
 
-        // Parse macros — very permissive regexes to handle various AI response formats
-        // Matches: "200 cal", "200cal", "200 calories", "calories: 200", etc.
-        const calMatch = response.match(/(\d+(?:\.\d+)?)\s*(?:cal|kcal)/i)
-          || response.match(/cal(?:ories?)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
-        const proMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*prot/i)
-          || response.match(/prot(?:ein)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
-        const carbMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*carb/i)
-          || response.match(/carb(?:s|ohydrates?)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
-        const fatMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*fat/i)
-          || response.match(/fat\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
+        // Strip markdown bold markers for easier parsing
+        const clean = response.replace(/\*\*/g, '');
 
-        // Extract food name — try "Logged X —" then "Logged X \n" then first line
-        const nameMatch = response.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)\s*[\u2014\u2013\-—–]/)
-          || response.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)(?:\s*\d+\s*cal|\n)/i);
+        // Parse macros — very permissive regexes
+        // Handles: "Calories: 150", "150 cal", "calories 150", "150g protein", etc.
+        const calMatch = clean.match(/calorie[s]?\s*[:=]?\s*(\d+(?:\.\d+)?)/i)
+          || clean.match(/(\d+(?:\.\d+)?)\s*(?:cal|kcal)/i);
+        const proMatch = clean.match(/protein\s*[:=]?\s*(\d+(?:\.\d+)?)/i)
+          || clean.match(/(\d+(?:\.\d+)?)\s*g?\s*prot/i);
+        const carbMatch = clean.match(/(?:total\s+)?carb[s]?\s*[:=]?\s*(\d+(?:\.\d+)?)/i)
+          || clean.match(/(\d+(?:\.\d+)?)\s*g?\s*carb/i);
+        const fatMatch = clean.match(/(?:total\s+)?fat\s*[:=]?\s*(\d+(?:\.\d+)?)/i)
+          || clean.match(/(\d+(?:\.\d+)?)\s*g?\s*fat/i);
+
+        // Extract food name — try "Logged X —" or first line as fallback
+        const nameMatch = clean.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)\s*[\u2014\u2013\-—–]/)
+          || clean.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)(?:\s*\d+\s*cal|\n)/i);
 
         if (calMatch) setRegCal(calMatch[1]);
         if (proMatch) setRegPro(proMatch[1]);
