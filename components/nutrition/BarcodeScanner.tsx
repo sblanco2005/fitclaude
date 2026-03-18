@@ -201,26 +201,40 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
     }
   };
 
+  // Resize image to max 800px wide and compress as JPEG for smaller payload
+  const resizeImage = (file: File, maxWidth = 800): Promise<{ base64: string; mediaType: string }> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = Math.round(h * (maxWidth / w));
+          w = maxWidth;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('No canvas context')); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const b64 = dataUrl.split(',')[1];
+        if (b64) resolve({ base64: b64, mediaType: 'image/jpeg' });
+        else reject(new Error('Failed to encode'));
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   // Take a photo of the nutrition label and extract macros via vision agent
   const handlePhotoCapture = async (barcode: string, file: File) => {
     setState({ step: 'photo_analyzing', barcode });
 
     try {
-      // Convert file to base64 using FileReader (reliable on all browsers)
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUrl = reader.result as string;
-          // Strip the "data:image/jpeg;base64," prefix
-          const b64 = dataUrl.split(',')[1];
-          if (b64) resolve(b64);
-          else reject(new Error('Failed to read file'));
-        };
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-
-      const mediaType = file.type || 'image/jpeg';
+      // Resize and compress image before sending
+      const { base64, mediaType } = await resizeImage(file);
 
       // Send to chat API with vision agent
       const res = await fetch('/api/chat', {
