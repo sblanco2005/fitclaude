@@ -283,12 +283,18 @@ export default function FocusedExerciseView({
   };
   const goPrev = () => {
     if (currentGroupIndex > 0) {
-      navigateWithCheck('prev');
+      autoSaveCurrent();
+      executeNav('prev');
     }
   };
   const goToGroup = (gi: number) => {
     if (gi !== currentGroupIndex && gi >= 0 && gi < totalGroups) {
-      navigateWithCheck(gi);
+      if (gi > currentGroupIndex) {
+        navigateWithCheck(gi);
+      } else {
+        autoSaveCurrent();
+        executeNav(gi);
+      }
     }
   };
   // Map flat exercise index to group index for ExerciseListSheet
@@ -329,8 +335,8 @@ export default function FocusedExerciseView({
     const dy = Math.abs(e.clientY - swipeStartRef.current.y);
     if (dy > Math.abs(dx)) { swipeStartRef.current = null; return; }
     if (Math.abs(dx) > 50) {
-      if (dx < 0) goNext();
-      else goPrev();
+      if (dx < 0) goNext(); // swipe left = forward → checks unlogged
+      else goPrev();        // swipe right = back → auto-saves silently
     }
     swipeStartRef.current = null;
   };
