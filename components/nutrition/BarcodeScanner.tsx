@@ -38,6 +38,8 @@ type ScanState =
   | { step: 'logged'; result: LogResult }
   | { step: 'not_found'; barcode: string }
   | { step: 'register'; barcode: string; saving: boolean }
+  | { step: 'photo_capture'; barcode: string }
+  | { step: 'photo_analyzing'; barcode: string }
   | { step: 'error'; message: string };
 
 export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
@@ -54,6 +56,7 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
   const [regFat, setRegFat] = useState('');
   const [regUnit, setRegUnit] = useState('serving');
 
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   // Stop camera
@@ -196,6 +199,63 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
     }
   };
 
+  // Take a photo of the nutrition label and extract macros via vision agent
+  const handlePhotoCapture = async (barcode: string, file: File) => {
+    setState({ step: 'photo_analyzing', barcode });
+
+    try {
+      // Convert file to base64
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+      const mediaType = file.type || 'image/jpeg';
+
+      // Send to chat API with vision agent
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Read the nutrition label and extract the macros. Just extract, do not log.',
+          topic: 'nutrition',
+          image_base64: base64,
+          image_media_type: mediaType,
+          timezone,
+          use_vision: true,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const response = data.response || '';
+
+        // Parse macros from the vision agent response
+        const calMatch = response.match(/(\d+(?:\.\d+)?)\s*cal/i);
+        const proMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*protein/i);
+        const carbMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*carb/i);
+        const fatMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*fat/i);
+
+        // Also try to extract the food name from "Logged X —" pattern
+        const nameMatch = response.match(/(?:Logged\s+(?:\d+x\s+)?)?([^—\n]+?)(?:\s*—|\s*\d+\s*cal)/i);
+
+        if (calMatch) setRegCal(calMatch[1]);
+        if (proMatch) setRegPro(proMatch[1]);
+        if (carbMatch) setRegCarbs(carbMatch[1]);
+        if (fatMatch) setRegFat(fatMatch[1]);
+        if (nameMatch) {
+          const extracted = nameMatch[1].replace(/^(Logged|logged)\s+/, '').trim();
+          if (extracted && extracted.length > 2) setRegName(extracted);
+        }
+      }
+
+      // Go to registration form with pre-filled values
+      setState({ step: 'not_found', barcode });
+    } catch {
+      setState({ step: 'error', message: 'Failed to analyze photo' });
+    }
+  };
+
   const handleScanAgain = () => {
     setState({ step: 'scanning' });
   };
@@ -298,12 +358,43 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
       {/* Not found — register new food */}
       {(state.step === 'not_found' || (state.step === 'register' && !state.saving)) && (
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Hidden file input for photo capture */}
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              const bc = state.step === 'not_found' ? state.barcode : (state as { barcode: string }).barcode;
+              if (file && bc) handlePhotoCapture(bc, file);
+              e.target.value = '';
+            }}
+          />
           <Card className="w-full max-w-sm mx-auto !p-5">
             <h3 className="text-base font-bold text-white mb-1">New Product</h3>
-            <p className="text-xs text-muted mb-4">
+            <p className="text-xs text-muted mb-3">
               Barcode <span className="text-slate-400 font-mono">{state.step === 'not_found' ? state.barcode : state.barcode}</span> not in your database.
-              Enter the nutrition info from the label.
             </p>
+
+            {/* Snap label button */}
+            <button
+              onClick={() => photoInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-xl bg-blue-500/15 text-blue-400 font-medium text-sm hover:bg-blue-500/25 active:scale-[0.98] transition-all border border-blue-500/20"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <circle cx="12" cy="13" r="3" />
+              </svg>
+              Snap Nutrition Label
+            </button>
+
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex-1 h-px bg-slate-700" />
+              <span className="text-xs text-slate-600 uppercase tracking-widest">or enter manually</span>
+              <div className="flex-1 h-px bg-slate-700" />
+            </div>
 
             <div className="space-y-3">
               <div>
@@ -400,6 +491,22 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
       {state.step === 'register' && state.saving && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-muted">Saving...</div>
+        </div>
+      )}
+
+      {/* Photo analyzing */}
+      {state.step === 'photo_analyzing' && (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <Card className="w-full max-w-sm text-center !p-6">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <svg className="w-7 h-7 text-blue-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <circle cx="12" cy="13" r="3" />
+              </svg>
+            </div>
+            <h3 className="text-base font-semibold text-white mb-1">Reading Label...</h3>
+            <p className="text-xs text-slate-400">AI is extracting nutrition info from your photo</p>
+          </Card>
         </div>
       )}
 
