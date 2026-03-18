@@ -239,16 +239,22 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
       if (res.ok) {
         const data = await res.json();
         const response: string = data.response || '';
+        console.log('[BarcodeScanner] Vision response:', response);
 
-        // Parse macros from the vision agent response
-        // Response format: "Logged X — Y cal | Zg protein | Wg carbs | Vg fat."
-        const calMatch = response.match(/(\d+(?:\.\d+)?)\s*cal/i);
-        const proMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*protein/i);
-        const carbMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*carb/i);
-        const fatMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*fat/i);
+        // Parse macros — very permissive regexes to handle various AI response formats
+        // Matches: "200 cal", "200cal", "200 calories", "calories: 200", etc.
+        const calMatch = response.match(/(\d+(?:\.\d+)?)\s*(?:cal|kcal)/i)
+          || response.match(/cal(?:ories?)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
+        const proMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*prot/i)
+          || response.match(/prot(?:ein)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
+        const carbMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*carb/i)
+          || response.match(/carb(?:s|ohydrates?)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
+        const fatMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*fat/i)
+          || response.match(/fat\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
 
-        // Extract food name from "Logged [qty] FoodName —" pattern
-        const nameMatch = response.match(/Logged\s+(?:\d+x?\s+)?(.+?)\s*—/i);
+        // Extract food name — try "Logged X —" then "Logged X \n" then first line
+        const nameMatch = response.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)\s*[\u2014\u2013\-—–]/)
+          || response.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)(?:\s*\d+\s*cal|\n)/i);
 
         if (calMatch) setRegCal(calMatch[1]);
         if (proMatch) setRegPro(proMatch[1]);
@@ -258,9 +264,15 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
           const extracted = nameMatch[1].trim();
           if (extracted.length > 1) setRegName(extracted);
         }
+
+        console.log('[BarcodeScanner] Parsed:', {
+          cal: calMatch?.[1], pro: proMatch?.[1],
+          carbs: carbMatch?.[1], fat: fatMatch?.[1],
+          name: nameMatch?.[1],
+        });
       } else {
         const errData = await res.json().catch(() => null);
-        console.error('[BarcodeScanner] Vision API error:', errData);
+        console.error('[BarcodeScanner] Vision API error:', res.status, errData);
       }
 
       // Go to registration form with pre-filled values
