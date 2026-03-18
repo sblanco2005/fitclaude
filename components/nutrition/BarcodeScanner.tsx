@@ -296,6 +296,13 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         const nameMatch = clean.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)\s*[\u2014\u2013\-—–]/)
           || clean.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)(?:\s*\d+\s*cal|\n)/i);
 
+        // Extract serving size — "Serving Size: 1/2 cup (36g)" → "1/2 cup"
+        const servingMatch = clean.match(/serving\s*size\s*[:=]?\s*(.+?)(?:\s*\(|$)/im);
+        if (servingMatch) {
+          const sv = servingMatch[1].trim();
+          if (sv.length > 0) setRegUnit(sv);
+        }
+
         if (calMatch) setRegCal(calMatch[1]);
         if (proMatch) setRegPro(proMatch[1]);
         if (carbMatch) setRegCarbs(carbMatch[1]);
@@ -490,23 +497,13 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 uppercase tracking-widest font-bold">Serving Unit</label>
-                <div className="grid grid-cols-3 gap-1.5 mt-1">
-                  {['serving', 'bar', 'can', 'bottle', 'cup', 'piece'].map((u) => (
-                    <button
-                      key={u}
-                      type="button"
-                      onClick={() => setRegUnit(u)}
-                      className={`py-2.5 rounded-lg text-xs font-medium transition-colors ${
-                        regUnit === u
-                          ? 'bg-primary/20 text-primary border border-primary/30'
-                          : 'bg-slate-800 text-slate-500 border border-transparent'
-                      }`}
-                    >
-                      {u}
-                    </button>
-                  ))}
-                </div>
+                <label className="text-xs text-slate-400 uppercase tracking-widest font-bold">Serving Size</label>
+                <input
+                  value={regUnit}
+                  onChange={(e) => setRegUnit(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-base text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary mt-1"
+                  placeholder="e.g. 1/2 cup, 1 bar, 2 pieces"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
