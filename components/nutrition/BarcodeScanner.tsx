@@ -408,6 +408,7 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         ref={photoInputRef}
         type="file"
         accept="image/*"
+        capture="environment"
         style={{ position: 'absolute', left: '-9999px', opacity: 0 }}
         onChange={(e) => {
           const file = e.target.files?.[0];
