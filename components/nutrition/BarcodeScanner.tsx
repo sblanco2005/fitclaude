@@ -202,14 +202,14 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-black/60">
+      {/* Header — safe area padding for iOS notch/dynamic island */}
+      <div className="flex items-center justify-between px-4 pb-3 pt-[env(safe-area-inset-top,48px)] bg-black/60">
         <h3 className="text-white font-semibold text-sm">Scan Barcode</h3>
         <button
           onClick={() => { stopCamera(); onClose(); }}
-          className="text-slate-400 hover:text-white p-1"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white active:bg-white/20"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
