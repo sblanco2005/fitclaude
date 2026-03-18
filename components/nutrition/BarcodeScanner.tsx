@@ -410,13 +410,13 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
 
               <div>
                 <label className="text-xs text-slate-400 uppercase tracking-widest font-bold">Serving Unit</label>
-                <div className="flex gap-1.5 mt-1">
+                <div className="grid grid-cols-3 gap-1.5 mt-1">
                   {['serving', 'bar', 'can', 'bottle', 'cup', 'piece'].map((u) => (
                     <button
                       key={u}
                       type="button"
                       onClick={() => setRegUnit(u)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      className={`py-2.5 rounded-lg text-xs font-medium transition-colors ${
                         regUnit === u
                           ? 'bg-primary/20 text-primary border border-primary/30'
                           : 'bg-slate-800 text-slate-500 border border-transparent'

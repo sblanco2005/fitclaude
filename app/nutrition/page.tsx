@@ -16,40 +16,93 @@ function cleanRawInput(text: string): string {
     .trim();
 }
 
-function ProgressBar({ current, target, label, color }: {
+// ─── Calorie Ring ───────────────────────────────────────────────────────────
+
+function CalorieRing({ current, target, animate }: {
   current: number;
   target: number;
-  label: string;
-  color: string;
+  animate: boolean;
 }) {
-  const percentage = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+  const pct = target > 0 ? Math.min(current / target, 1) : 0;
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - (animate ? pct : 0));
+  const over = current > target;
 
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm gap-2">
-        <span className="text-slate-300 whitespace-nowrap">{label}</span>
-        <span className="text-muted shrink-0">{Math.round(current)} / {target}</span>
+    <div className="relative w-36 h-36 mx-auto">
+      <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+        {/* Track */}
+        <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(30,41,59,0.6)" strokeWidth="8" />
+        {/* Progress */}
+        <circle
+          cx="60" cy="60" r={radius}
+          fill="none"
+          stroke={over ? 'var(--warning)' : 'var(--primary)'}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      {/* Center text */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-3xl font-bold text-white tabular-nums leading-none">
+          {Math.round(current)}
+        </span>
+        <span className="text-xs text-muted mt-0.5">/ {target} cal</span>
       </div>
-      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+    </div>
+  );
+}
+
+// ─── Macro Pill ─────────────────────────────────────────────────────────────
+
+function MacroPill({ label, current, target, color, animate }: {
+  label: string;
+  current: number;
+  target: number;
+  color: string;
+  animate: boolean;
+}) {
+  const pct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-baseline justify-between mb-1">
+        <span className={`text-xs font-bold ${color}`}>{label}</span>
+        <span className="text-xs text-muted tabular-nums">{Math.round(current)}/{target}g</span>
+      </div>
+      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-500 ${color}`}
-          style={{ width: `${percentage}%` }}
+          className={`h-full rounded-full transition-all duration-1000 ease-out ${color.replace('text-', 'bg-')}`}
+          style={{ width: `${animate ? pct : 0}%` }}
         />
       </div>
     </div>
   );
 }
 
-// ─── MealRow ──────────────────────────────────────────────────────────────────
+// ─── MealRow ────────────────────────────────────────────────────────────────
+
+const mealIcons: Record<string, string> = {
+  breakfast: '\u2600\uFE0F',
+  lunch: '\u{1F32E}',
+  dinner: '\u{1F37D}\uFE0F',
+  snack: '\u{1F36A}',
+};
 
 function MealRow({
   log,
   onUpdate,
   onDelete,
+  index,
 }: {
   log: NutritionLog;
   onUpdate: () => void;
   onDelete: () => void;
+  index: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -117,7 +170,6 @@ function MealRow({
   if (editing) {
     return (
       <div className="py-3 border-b border-slate-800 last:border-0 space-y-2.5">
-        {/* Food description */}
         <input
           ref={inputRef}
           value={rawInput}
@@ -125,8 +177,6 @@ function MealRow({
           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-base text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-primary"
           placeholder="What did you eat?"
         />
-
-        {/* Meal type selector */}
         <div className="flex gap-1.5">
           {['breakfast', 'lunch', 'dinner', 'snack'].map((type) => (
             <button
@@ -143,78 +193,48 @@ function MealRow({
             </button>
           ))}
         </div>
-
-        {/* Macros grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div>
             <label className="text-xs text-muted uppercase tracking-widest font-bold">Cal</label>
-            <input
-              value={calories}
-              onChange={(e) => setCalories(e.target.value)}
-              type="number"
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-base text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+            <input value={calories} onChange={(e) => setCalories(e.target.value)} type="number"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-base text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
           <div>
             <label className="text-xs text-blue-400 uppercase tracking-widest font-bold">Protein</label>
-            <input
-              value={proteinG}
-              onChange={(e) => setProteinG(e.target.value)}
-              type="number"
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-base text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+            <input value={proteinG} onChange={(e) => setProteinG(e.target.value)} type="number"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-base text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
           <div>
             <label className="text-xs text-amber-400 uppercase tracking-widest font-bold">Carbs</label>
-            <input
-              value={carbsG}
-              onChange={(e) => setCarbsG(e.target.value)}
-              type="number"
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-base text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+            <input value={carbsG} onChange={(e) => setCarbsG(e.target.value)} type="number"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-base text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
           <div>
             <label className="text-xs text-red-400 uppercase tracking-widest font-bold">Fat</label>
-            <input
-              value={fatG}
-              onChange={(e) => setFatG(e.target.value)}
-              type="number"
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-base text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+            <input value={fatG} onChange={(e) => setFatG(e.target.value)} type="number"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-base text-white tabular-nums focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
         </div>
-
-        {/* Action buttons */}
         <div className="flex gap-1.5">
-          <button
-            onClick={submitEdit}
-            disabled={saving}
-            className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50"
-          >
+          <button onClick={submitEdit} disabled={saving}
+            className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold uppercase tracking-wider disabled:opacity-50">
             {saving ? 'Saving...' : 'Save'}
           </button>
-          <button
-            onClick={cancelEdit}
-            className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold uppercase tracking-wider"
-          >
+          <button onClick={cancelEdit}
+            className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold uppercase tracking-wider">
             Cancel
           </button>
           {!confirmDelete ? (
-            <button
-              onClick={() => setConfirmDelete(true)}
+            <button onClick={() => setConfirmDelete(true)}
               className="px-3 py-2 rounded-lg bg-slate-800 text-slate-500 hover:text-red-400 text-xs font-bold transition-colors"
-              aria-label="Delete meal"
-            >
+              aria-label="Delete meal">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
           ) : (
-            <button
-              onClick={handleDelete}
-              disabled={saving}
-              className="px-3 py-2 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold uppercase tracking-wider disabled:opacity-50"
-            >
+            <button onClick={handleDelete} disabled={saving}
+              className="px-3 py-2 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
               Confirm Delete
             </button>
           )}
@@ -224,23 +244,37 @@ function MealRow({
   }
 
   return (
-    <div className="flex items-start gap-2 py-2 min-h-[52px] border-b border-slate-800 last:border-0">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm text-white">{cleanRawInput(log.rawInput)}</p>
-        {log.mealType && (
-          <span className="text-xs text-muted capitalize">{log.mealType}</span>
-        )}
+    <div
+      className="flex items-center gap-2.5 py-2.5 border-b border-slate-800/50 last:border-0 animate-in fade-in slide-in-from-bottom-1"
+      style={{ animationDelay: `${index * 30}ms`, animationFillMode: 'backwards' }}
+    >
+      {/* Meal type icon */}
+      {log.mealType && (
+        <span className="text-sm shrink-0 w-5 text-center" aria-hidden>
+          {mealIcons[log.mealType] || ''}
+        </span>
+      )}
+      {/* Food name — truncated */}
+      <p className="text-sm text-white flex-1 min-w-0 truncate">
+        {cleanRawInput(log.rawInput)}
+      </p>
+      {/* All 4 macros inline */}
+      <div className="flex items-center gap-1.5 shrink-0 text-xs tabular-nums">
+        <span className="text-primary font-medium">{Math.round(log.calories || 0)}</span>
+        <span className="text-slate-700">|</span>
+        <span className="text-blue-400">{Math.round(log.proteinG || 0)}</span>
+        <span className="text-slate-700">|</span>
+        <span className="text-amber-400">{Math.round(log.carbsG || 0)}</span>
+        <span className="text-slate-700">|</span>
+        <span className="text-red-400">{Math.round(log.fatG || 0)}</span>
       </div>
-      <div className="text-right text-xs text-muted whitespace-nowrap shrink-0">
-        {log.calories != null && <div>{Math.round(log.calories)} kcal</div>}
-        {log.proteinG != null && <div>{Math.round(log.proteinG)}g protein</div>}
-      </div>
+      {/* Edit */}
       <button
         onClick={startEdit}
-        className="p-2 -mr-1 text-slate-600 hover:text-slate-300 active:text-primary transition-colors shrink-0"
+        className="p-1.5 -mr-1 text-slate-700 hover:text-slate-400 active:text-primary transition-colors shrink-0"
         aria-label="Edit meal"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
         </svg>
       </button>
@@ -248,7 +282,7 @@ function MealRow({
   );
 }
 
-// ─── HistoryDayCard ──────────────────────────────────────────────────────────
+// ─── HistoryDayCard ─────────────────────────────────────────────────────────
 
 function HistoryDayCard({
   summary,
@@ -271,7 +305,7 @@ function HistoryDayCard({
   const [copied, setCopied] = useState(false);
   const [showCopyOptions, setShowCopyOptions] = useState(false);
 
-  const dateKey = summary.date.split('T')[0]; // "2025-02-20"
+  const dateKey = summary.date.split('T')[0];
 
   const toggleExpand = async () => {
     if (!expanded && meals.length === 0) {
@@ -315,73 +349,42 @@ function HistoryDayCard({
   };
 
   return (
-    <Card className="!p-4">
-      {/* Header — tap to expand */}
-      <button
-        onClick={toggleExpand}
-        className="w-full flex items-center justify-between mb-3"
-      >
-        <span className="text-sm font-semibold text-white">
-          {formatDate(summary.date)}
-        </span>
+    <div className="rounded-xl bg-slate-800/30 border border-slate-800/50 p-3">
+      <button onClick={toggleExpand} className="w-full flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-slate-300">{formatDate(summary.date)}</span>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted">
-            {summary.mealCount} meal{summary.mealCount !== 1 ? 's' : ''}
-          </span>
-          <svg
-            className={`w-4 h-4 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-          >
+          <span className="text-xs text-slate-600">{summary.mealCount} meal{summary.mealCount !== 1 ? 's' : ''}</span>
+          <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </div>
       </button>
-
-      {/* Macro summary */}
-      <div className="grid grid-cols-4 gap-2 text-center">
-        <div>
-          <div className="text-sm font-semibold text-primary">{Math.round(summary.calories)}</div>
-          <div className="text-xs text-muted">kcal</div>
-        </div>
-        <div>
-          <div className="text-sm font-semibold text-blue-400">{Math.round(summary.proteinG)}g</div>
-          <div className="text-xs text-muted">protein</div>
-        </div>
-        <div>
-          <div className="text-sm font-semibold text-amber-400">{Math.round(summary.carbsG)}g</div>
-          <div className="text-xs text-muted">carbs</div>
-        </div>
-        <div>
-          <div className="text-sm font-semibold text-red-400">{Math.round(summary.fatG)}g</div>
-          <div className="text-xs text-muted">fat</div>
-        </div>
+      <div className="flex items-center gap-3 text-xs tabular-nums">
+        <span className="text-primary font-semibold">{Math.round(summary.calories)} cal</span>
+        <span className="text-blue-400">{Math.round(summary.proteinG)}p</span>
+        <span className="text-amber-400">{Math.round(summary.carbsG)}c</span>
+        <span className="text-red-400">{Math.round(summary.fatG)}f</span>
       </div>
 
-      {/* Expanded: individual meals + copy button */}
       {expanded && (
-        <div className="mt-3 pt-3 border-t border-slate-800">
+        <div className="mt-3 pt-3 border-t border-slate-800/50">
           {loadingMeals ? (
             <div className="text-xs text-muted text-center py-2">Loading meals...</div>
           ) : meals.length === 0 ? (
             <div className="text-xs text-muted text-center py-2">No individual meals found</div>
           ) : (
-            <div className="space-y-2 mb-3">
+            <div className="space-y-1.5 mb-3">
               {meals.map((m) => (
-                <div key={m.id} className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-white truncate">{cleanRawInput(m.rawInput)}</p>
-                    {m.mealType && (
-                      <span className="text-xs text-slate-500 capitalize">{m.mealType}</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted whitespace-nowrap">
-                    {Math.round(m.calories || 0)} cal · {Math.round(m.proteinG || 0)}p
-                  </div>
+                <div key={m.id} className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-slate-400 truncate flex-1 min-w-0">{cleanRawInput(m.rawInput)}</p>
+                  <span className="text-xs text-slate-600 tabular-nums whitespace-nowrap">
+                    {Math.round(m.calories || 0)} · {Math.round(m.proteinG || 0)}p
+                  </span>
                 </div>
               ))}
             </div>
           )}
-
           <div className="flex gap-2">
             {copied ? (
               <div className="flex-1 py-2 rounded-lg text-xs font-medium text-center bg-green-600/20 text-green-400">
@@ -392,65 +395,52 @@ function HistoryDayCard({
                 Copying...
               </div>
             ) : !showCopyOptions ? (
-              <button
-                onClick={() => setShowCopyOptions(true)}
-                className="flex-1 py-2 rounded-lg text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
-              >
+              <button onClick={() => setShowCopyOptions(true)}
+                className="flex-1 py-2 rounded-lg text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors">
                 Copy All to Today
               </button>
             ) : (
               <>
-                <button
-                  onClick={() => handleCopy('append')}
-                  className="flex-1 py-2 rounded-lg text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
-                >
+                <button onClick={() => handleCopy('append')}
+                  className="flex-1 py-2 rounded-lg text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors">
                   Add to Today
                 </button>
-                <button
-                  onClick={() => handleCopy('replace')}
-                  className="flex-1 py-2 rounded-lg text-xs font-medium bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors"
-                >
+                <button onClick={() => handleCopy('replace')}
+                  className="flex-1 py-2 rounded-lg text-xs font-medium bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors">
                   Replace Today
                 </button>
               </>
             )}
             {!confirmDelete ? (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="px-3 py-2 rounded-lg text-xs font-medium bg-slate-800 text-slate-400 hover:bg-red-500/15 hover:text-red-400 transition-colors"
-              >
+              <button onClick={() => setConfirmDelete(true)}
+                className="px-3 py-2 rounded-lg text-xs font-medium bg-slate-800 text-slate-500 hover:bg-red-500/15 hover:text-red-400 transition-colors">
                 Delete
               </button>
             ) : (
-              <button
-                onClick={handleDelete}
-                className="px-3 py-2 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-              >
+              <button onClick={handleDelete}
+                className="px-3 py-2 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">
                 Confirm?
               </button>
             )}
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
-// ─── Week grouping helpers ────────────────────────────────────────────────────
+// ─── Week grouping helpers ──────────────────────────────────────────────────
 
 function getWeekKey(dateStr: string): string {
-  // Returns "YYYY-WNN" ISO week key from a date string
   const d = new Date(dateStr.split('T')[0] + 'T12:00:00Z');
-  // ISO week: Monday is first day
-  const dayOfWeek = d.getUTCDay() || 7; // Sun=7, Mon=1
-  d.setUTCDate(d.getUTCDate() + 4 - dayOfWeek); // Thursday of this week
+  const dayOfWeek = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayOfWeek);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
 }
 
 function getWeekRange(dateStr: string): string {
-  // Returns "Mon Feb 17 – Sun Feb 23" style label from any date in that week
   const d = new Date(dateStr.split('T')[0] + 'T12:00:00Z');
   const dayOfWeek = d.getUTCDay() || 7;
   const monday = new Date(d);
@@ -480,7 +470,7 @@ function groupByWeek(summaries: DailyNutritionSummary[]): WeekData[] {
     groups[wk].push(s);
   }
   return Object.entries(groups)
-    .sort(([a], [b]) => b.localeCompare(a)) // newest first
+    .sort(([a], [b]) => b.localeCompare(a))
     .map(([key, days]) => {
       const n = days.length;
       return {
@@ -513,46 +503,40 @@ function WeekGroup({
 
   return (
     <div>
-      {/* Week header */}
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full"
-      >
-        <Card className="!p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-white">{week.label}</span>
+      {/* Week header — bolder, distinct from day cards */}
+      <button onClick={() => setExpanded((v) => !v)} className="w-full">
+        <Card className="!p-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-base font-bold text-white tracking-tight">{week.label}</span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted">{week.totalDays} day{week.totalDays !== 1 ? 's' : ''}</span>
-              <svg
-                className={`w-4 h-4 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-              >
+              <span className="text-xs text-slate-500 font-medium">{week.totalDays} day{week.totalDays !== 1 ? 's' : ''}</span>
+              <svg className={`w-4 h-4 text-slate-600 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-2 text-center">
+          <div className="flex items-center gap-4 text-xs tabular-nums">
             <div>
-              <div className="text-xs font-semibold text-primary">{Math.round(week.avgCalories)}</div>
-              <div className="text-xs text-muted">avg kcal</div>
+              <span className="text-primary font-bold text-sm">{Math.round(week.avgCalories)}</span>
+              <span className="text-slate-600 ml-1">avg cal</span>
             </div>
             <div>
-              <div className="text-xs font-semibold text-blue-400">{Math.round(week.avgProteinG)}g</div>
-              <div className="text-xs text-muted">avg prot</div>
+              <span className="text-blue-400 font-semibold">{Math.round(week.avgProteinG)}g</span>
+              <span className="text-slate-600 ml-0.5">p</span>
             </div>
             <div>
-              <div className="text-xs font-semibold text-amber-400">{Math.round(week.avgCarbsG)}g</div>
-              <div className="text-xs text-muted">avg carbs</div>
+              <span className="text-amber-400 font-semibold">{Math.round(week.avgCarbsG)}g</span>
+              <span className="text-slate-600 ml-0.5">c</span>
             </div>
             <div>
-              <div className="text-xs font-semibold text-red-400">{Math.round(week.avgFatG)}g</div>
-              <div className="text-xs text-muted">avg fat</div>
+              <span className="text-red-400 font-semibold">{Math.round(week.avgFatG)}g</span>
+              <span className="text-slate-600 ml-0.5">f</span>
             </div>
           </div>
         </Card>
       </button>
 
-      {/* Expanded: individual day cards */}
       {expanded && (
         <div className="ml-3 mt-2 space-y-2 border-l-2 border-slate-800 pl-3">
           {week.summaries.map((s) => (
@@ -571,7 +555,7 @@ function WeekGroup({
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Page ───────────────────────────────────────────────────────────────────
 
 type Tab = 'today' | 'history';
 
@@ -593,8 +577,15 @@ export default function NutritionPage() {
   const [closing, setClosing] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [targets, setTargets] = useState<MacroTargets>({ calories: 2000, proteinG: 150, carbsG: 200, fatG: 65 });
+  const [mounted, setMounted] = useState(false);
 
   const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  // Trigger mount animation after first render
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(t);
+  }, []);
 
   // Fetch user profile targets
   useEffect(() => {
@@ -618,7 +609,6 @@ export default function NutritionPage() {
       .catch(() => {});
   }, []);
 
-  // Fetch today's data (timezone-aware)
   const fetchToday = useCallback(() => {
     fetch(`/api/nutrition/today?tz=${encodeURIComponent(userTz)}`)
       .then((res) => res.json())
@@ -629,9 +619,7 @@ export default function NutritionPage() {
       .catch(() => setLoading(false));
   }, [userTz]);
 
-  // Auto-close stale days from previous dates + fetch today on load
   useEffect(() => {
-    // Auto-close any unclosed previous days first, then fetch today
     fetch('/api/nutrition/auto-close', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -641,12 +629,10 @@ export default function NutritionPage() {
       .catch(() => fetchToday());
   }, [fetchToday, userTz]);
 
-  // Re-fetch when chat creates/modifies data
   useEffect(() => {
     fetchToday();
   }, [fetchToday, dataVersion]);
 
-  // Auto-close day at 23:00 (belt-and-suspenders with the auto-close on load)
   useEffect(() => {
     const checkAutoClose = () => {
       const now = new Date();
@@ -664,13 +650,11 @@ export default function NutritionPage() {
         }
       }
     };
-
     checkAutoClose();
     const interval = setInterval(checkAutoClose, 60_000);
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch history when tab switches
   const fetchHistory = useCallback(async () => {
     if (historyLoaded) return;
     setHistoryLoading(true);
@@ -721,7 +705,6 @@ export default function NutritionPage() {
   const totals = today?.totals || { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 };
 
   const formatDate = (dateStr: string) => {
-    // Summary dates are stored as "YYYY-MM-DDT00:00:00Z" — extract the date part
     const dStr = dateStr.split('T')[0];
     const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: userTz });
     const yestDate = new Date();
@@ -730,7 +713,7 @@ export default function NutritionPage() {
 
     if (dStr === todayStr) return 'Today';
     if (dStr === yesterdayStr) return 'Yesterday';
-    const d = new Date(dStr + 'T12:00:00Z'); // noon UTC to avoid DST issues
+    const d = new Date(dStr + 'T12:00:00Z');
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
   };
 
@@ -738,14 +721,15 @@ export default function NutritionPage() {
     return (
       <div className="p-4 space-y-4 max-w-lg mx-auto">
         <div className="h-6 w-24 bg-slate-800 rounded animate-pulse" />
+        <div className="h-48 bg-slate-800/60 rounded-xl animate-pulse" />
         <div className="h-32 bg-slate-800/60 rounded-xl animate-pulse" />
-        <div className="h-40 bg-slate-800/60 rounded-xl animate-pulse" />
       </div>
     );
   }
 
   return (
     <div className="p-4 space-y-4 max-w-lg mx-auto">
+      {/* Header with barcode scanner */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">Nutrition</h2>
         <button
@@ -754,9 +738,7 @@ export default function NutritionPage() {
           aria-label="Scan barcode"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-            {/* Scanner corners */}
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2" />
-            {/* Barcode lines */}
             <line x1="7" y1="7" x2="7" y2="17" strokeWidth={2} />
             <line x1="10" y1="7" x2="10" y2="17" strokeWidth={1} />
             <line x1="12" y1="7" x2="12" y2="17" strokeWidth={2} />
@@ -766,24 +748,20 @@ export default function NutritionPage() {
         </button>
       </div>
 
-      {/* Barcode Scanner Overlay */}
       {scannerOpen && (
-        <BarcodeScanner
-          onLogged={fetchToday}
-          onClose={() => setScannerOpen(false)}
-        />
+        <BarcodeScanner onLogged={fetchToday} onClose={() => setScannerOpen(false)} />
       )}
 
-      {/* Tab toggle */}
-      <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">
+      {/* Tab toggle — larger, more prominent (#5) */}
+      <div className="flex bg-slate-800/40 rounded-xl p-1 border border-slate-800/60">
         {(['today', 'history'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 px-3 py-2.5 rounded-md text-xs font-medium transition-colors capitalize ${
+            className={`flex-1 px-4 py-3 rounded-lg text-sm font-semibold transition-all capitalize ${
               tab === t
-                ? 'bg-primary text-white'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'text-slate-500 hover:text-white'
             }`}
           >
             {t}
@@ -794,43 +772,60 @@ export default function NutritionPage() {
       {/* TODAY TAB */}
       {tab === 'today' && (
         <>
-          {/* Daily Totals */}
-          <Card>
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">
-              Today&apos;s Macros
-            </h3>
-            <div className="space-y-3">
-              <ProgressBar current={totals.calories} target={targets.calories} label="Calories" color="bg-primary" />
-              <ProgressBar current={totals.proteinG} target={targets.proteinG} label="Protein (g)" color="bg-blue-500" />
-              <ProgressBar current={totals.carbsG} target={targets.carbsG} label="Carbs (g)" color="bg-amber-500" />
-              <ProgressBar current={totals.fatG} target={targets.fatG} label="Fat (g)" color="bg-red-500" />
+          {/* Calorie Ring Hero + Macro Pills (#1, #2, #7) */}
+          <Card className="!p-5">
+            <CalorieRing current={totals.calories} target={targets.calories} animate={mounted} />
+            <div className="flex gap-3 mt-5">
+              <MacroPill label="Protein" current={totals.proteinG} target={targets.proteinG} color="text-blue-400" animate={mounted} />
+              <MacroPill label="Carbs" current={totals.carbsG} target={targets.carbsG} color="text-amber-400" animate={mounted} />
+              <MacroPill label="Fat" current={totals.fatG} target={targets.fatG} color="text-red-400" animate={mounted} />
             </div>
           </Card>
 
-          {/* Meal Log */}
-          <Card>
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
-              Meals Today
-            </h3>
+          {/* Meal Log — lighter card, secondary feel (#2, #3, #4) */}
+          <div className="rounded-xl bg-slate-800/20 border border-slate-800/40 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Meals
+              </h3>
+              {today?.logs && today.logs.length > 0 && (
+                <span className="text-xs text-slate-600 tabular-nums">
+                  cal | p | c | f
+                </span>
+              )}
+            </div>
             {(!today?.logs || today.logs.length === 0) ? (
-              <p className="text-muted text-sm">
-                No meals logged yet. Tell your coach what you ate or snap a photo!
-              </p>
+              <div className="py-6 text-center">
+                <p className="text-sm text-slate-500 mb-3">No meals logged yet</p>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => setScannerOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2" />
+                    </svg>
+                    Scan barcode
+                  </button>
+                  <span className="text-slate-700 text-xs">or chat with coach</span>
+                </div>
+              </div>
             ) : (
               <div className="max-h-[40vh] overflow-y-auto -mr-2 pr-2">
-                {today.logs.map((log: NutritionLog) => (
+                {today.logs.map((log: NutritionLog, i: number) => (
                   <MealRow
                     key={log.id}
                     log={log}
                     onUpdate={fetchToday}
                     onDelete={fetchToday}
+                    index={i}
                   />
                 ))}
               </div>
             )}
-          </Card>
+          </div>
 
-          {/* Close Day button or closed banner */}
+          {/* Close Day */}
           {today?.closed ? (
             <div className="w-full py-3 px-4 bg-green-500/10 border border-green-500/30 text-green-400 font-medium rounded-xl text-sm text-center">
               Day closed — saved to history
@@ -847,7 +842,7 @@ export default function NutritionPage() {
         </>
       )}
 
-      {/* Close Day confirmation bottom-sheet */}
+      {/* Close Day confirmation */}
       {closeDayConfirm && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-4 pb-20">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setCloseDayConfirm(false)} />
@@ -863,16 +858,12 @@ export default function NutritionPage() {
                 This saves today&apos;s nutrition to history. You won&apos;t be able to edit these meals after closing.
               </p>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setCloseDayConfirm(false)}
-                  className="flex-1 px-4 py-3 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm active:scale-95 transition-transform"
-                >
+                <button onClick={() => setCloseDayConfirm(false)}
+                  className="flex-1 px-4 py-3 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm active:scale-95 transition-transform">
                   Cancel
                 </button>
-                <button
-                  onClick={handleCloseDay}
-                  className="flex-1 px-4 py-3 rounded-xl bg-primary/20 text-primary font-medium text-sm active:scale-95 transition-transform"
-                >
+                <button onClick={handleCloseDay}
+                  className="flex-1 px-4 py-3 rounded-xl bg-primary/20 text-primary font-medium text-sm active:scale-95 transition-transform">
                   Close & Save
                 </button>
               </div>
