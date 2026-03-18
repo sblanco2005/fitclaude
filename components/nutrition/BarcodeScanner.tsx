@@ -57,6 +57,7 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
   const [regUnit, setRegUnit] = useState('serving');
 
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const currentBarcodeRef = useRef<string>('');
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   // Stop camera
@@ -141,6 +142,7 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
       } else if (res.status === 404) {
         // New barcode — ask for macro info
         stopCamera();
+        currentBarcodeRef.current = code;
         setState({ step: 'not_found', barcode: code });
       }
     } catch {
@@ -368,22 +370,23 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         </div>
       )}
 
+      {/* Hidden file input — always mounted (iOS Safari fails if inside conditional render) */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        style={{ position: 'absolute', left: '-9999px', opacity: 0 }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          const bc = currentBarcodeRef.current;
+          if (file && bc) handlePhotoCapture(bc, file);
+          if (e.target) e.target.value = '';
+        }}
+      />
+
       {/* Not found — register new food */}
       {(state.step === 'not_found' || (state.step === 'register' && !state.saving)) && (
         <div className="flex-1 overflow-y-auto p-4">
-          {/* Hidden file input for photo capture */}
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              const bc = state.step === 'not_found' ? state.barcode : (state as { barcode: string }).barcode;
-              if (file && bc) handlePhotoCapture(bc, file);
-              e.target.value = '';
-            }}
-          />
           <Card className="w-full max-w-sm mx-auto !p-5">
             <h3 className="text-base font-bold text-white mb-1">New Product</h3>
             <p className="text-xs text-muted mb-3">
