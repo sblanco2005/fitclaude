@@ -56,11 +56,19 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
   const [regFat, setRegFat] = useState('');
   const [regUnit, setRegUnit] = useState('serving');
 
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const currentBarcodeRef = useRef<string>('');
+  const labelVideoRef = useRef<HTMLVideoElement>(null);
+  const labelStreamRef = useRef<MediaStream | null>(null);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  // Stop camera
+  // Stop cameras
+  const stopLabelCamera = useCallback(() => {
+    if (labelStreamRef.current) {
+      labelStreamRef.current.getTracks().forEach((t) => t.stop());
+      labelStreamRef.current = null;
+    }
+  }, []);
+
   const stopCamera = useCallback(() => {
     scanningRef.current = false;
     if (streamRef.current) {
@@ -71,8 +79,8 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => stopCamera();
-  }, [stopCamera]);
+    return () => { stopCamera(); stopLabelCamera(); };
+  }, [stopCamera, stopLabelCamera]);
 
   // Start camera and scan loop
   useEffect(() => {
@@ -201,40 +209,55 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
     }
   };
 
-  // Resize image to max 800px wide and compress as JPEG for smaller payload
-  const resizeImage = (file: File, maxWidth = 800): Promise<{ base64: string; mediaType: string }> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let w = img.width;
-        let h = img.height;
-        if (w > maxWidth) {
-          h = Math.round(h * (maxWidth / w));
-          w = maxWidth;
-        }
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('No canvas context')); return; }
-        ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        const b64 = dataUrl.split(',')[1];
-        if (b64) resolve({ base64: b64, mediaType: 'image/jpeg' });
-        else reject(new Error('Failed to encode'));
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = URL.createObjectURL(file);
-    });
+  // Capture a frame from video element as compressed JPEG base64
+  const captureFrame = (video: HTMLVideoElement, maxWidth = 800): { base64: string; mediaType: string } => {
+    const canvas = document.createElement('canvas');
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > maxWidth) {
+      h = Math.round(h * (maxWidth / w));
+      w = maxWidth;
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(video, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    return { base64: dataUrl.split(',')[1] || '', mediaType: 'image/jpeg' };
   };
 
-  // Take a photo of the nutrition label and extract macros via vision agent
-  const handlePhotoCapture = async (barcode: string, file: File) => {
+  // Open camera for label photo, capture a frame, then send to vision
+  const handleSnapLabel = async (barcode: string) => {
+    setState({ step: 'photo_capture', barcode });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      labelStreamRef.current = stream;
+      // Wait for next render to mount the video element
+      await new Promise((r) => setTimeout(r, 100));
+      if (labelVideoRef.current) {
+        labelVideoRef.current.srcObject = stream;
+        await labelVideoRef.current.play();
+      }
+    } catch {
+      setState({ step: 'error', message: 'Camera access denied.' });
+    }
+  };
+
+  const takeLabelPhoto = async () => {
+    if (!labelVideoRef.current) return;
+    const barcode = currentBarcodeRef.current;
+    const { base64, mediaType } = captureFrame(labelVideoRef.current);
+    stopLabelCamera();
+    await handlePhotoCapture(barcode, base64, mediaType);
+  };
+
+  // Process captured photo through vision agent
+  const handlePhotoCapture = async (barcode: string, base64: string, mediaType: string) => {
     setState({ step: 'photo_analyzing', barcode });
 
     try {
-      // Resize and compress image before sending
-      const { base64, mediaType } = await resizeImage(file);
 
       // Send to chat API with vision agent
       const res = await fetch('/api/chat', {
@@ -403,20 +426,32 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         </div>
       )}
 
-      {/* Hidden file input — always mounted (iOS Safari fails if inside conditional render) */}
-      <input
-        ref={photoInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        style={{ position: 'absolute', left: '-9999px', opacity: 0 }}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          const bc = currentBarcodeRef.current;
-          if (file && bc) handlePhotoCapture(bc, file);
-          if (e.target) e.target.value = '';
-        }}
-      />
+      {/* Photo capture camera view */}
+      {state.step === 'photo_capture' && (
+        <div className="flex-1 relative overflow-hidden">
+          <video
+            ref={labelVideoRef}
+            className="absolute inset-0 w-full h-full object-cover"
+            playsInline
+            muted
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-72 h-48 border-2 border-blue-400/60 rounded-lg" />
+          </div>
+          <p className="absolute top-6 inset-x-0 text-center text-sm text-white/70">
+            Frame the nutrition label
+          </p>
+          {/* Shutter button */}
+          <div className="absolute bottom-8 inset-x-0 flex justify-center">
+            <button
+              onClick={takeLabelPhoto}
+              className="w-16 h-16 rounded-full bg-white/90 border-4 border-white shadow-lg active:scale-90 transition-transform"
+            >
+              <div className="w-full h-full rounded-full border-2 border-slate-300" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Not found — register new food */}
       {(state.step === 'not_found' || (state.step === 'register' && !state.saving)) && (
@@ -429,7 +464,7 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
 
             {/* Snap label button */}
             <button
-              onClick={() => photoInputRef.current?.click()}
+              onClick={() => handleSnapLabel(state.step === 'not_found' ? state.barcode : (state as { barcode: string }).barcode)}
               className="w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-xl bg-blue-500/15 text-blue-400 font-medium text-sm hover:bg-blue-500/25 active:scale-[0.98] transition-all border border-blue-500/20"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
