@@ -750,13 +750,19 @@ export default function NutritionPage() {
         <h2 className="text-xl font-bold text-white">Nutrition</h2>
         <button
           onClick={() => setScannerOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/15 text-primary text-xs font-medium hover:bg-primary/25 transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary/15 text-primary hover:bg-primary/25 active:scale-95 transition-all"
+          aria-label="Scan barcode"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h4V3H2v5h1V4zm14-1v1h4v4h1V3h-5zM3 20v-4H2v5h5v-1H3zm18-4v4h-4v1h5v-5h-1z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h10M7 16h6" />
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+            {/* Scanner corners */}
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2" />
+            {/* Barcode lines */}
+            <line x1="7" y1="7" x2="7" y2="17" strokeWidth={2} />
+            <line x1="10" y1="7" x2="10" y2="17" strokeWidth={1} />
+            <line x1="12" y1="7" x2="12" y2="17" strokeWidth={2} />
+            <line x1="14.5" y1="7" x2="14.5" y2="17" strokeWidth={1} />
+            <line x1="17" y1="7" x2="17" y2="17" strokeWidth={2.5} />
           </svg>
-          Scan
         </button>
       </div>
 
