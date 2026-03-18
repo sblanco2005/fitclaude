@@ -51,7 +51,6 @@ model User {
   nutritionSummaries   DailyNutritionSummary[]
   conversations        ConversationHistory[]
   apiTokens            ApiToken[]
-  userFoods            UserFood[]
   activities           Activity[]
   tokenUsages          TokenUsage[]
   usageLimit           UserUsageLimit?
@@ -330,30 +329,6 @@ model ExerciseVideo {
 // ============================================
 // Personal Food Database
 // ============================================
-
-model UserFood {
-  id            String   @id @default(cuid())
-  userId        String
-  name          String
-  servingAmount Float
-  servingUnit   String
-  calories      Float
-  proteinG      Float
-  carbsG        Float
-  fatG          Float
-  fiberG        Float?
-  barcode       String?
-  timesUsed     Int      @default(1)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, name])
-  @@unique([userId, barcode])
-  @@index([userId])
-  @@map("user_foods")
-}
 
 // ============================================
 // Mobile API Tokens

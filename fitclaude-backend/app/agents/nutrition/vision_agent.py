@@ -11,7 +11,6 @@ import re
 from anthropic import AsyncAnthropic
 
 from app.agents.base import BaseAgent
-from app.agents.nutrition.known_foods import lookup_known_food
 from app.agents.nutrition.schemas import FoodItem
 from app.agents.nutrition.vision_prompts import get_vision_nutrition_prompt
 
@@ -145,18 +144,6 @@ class VisionNutritionAgent(BaseAgent):
                 "error": "Sorry, I couldn't identify any food in this photo. "
                          "Try a clearer photo or describe what you ate in text."
             }
-
-        # Apply known-foods overrides
-        for item in items:
-            known = lookup_known_food(item.name)
-            if known:
-                item.name = known.get("name", item.name)
-                item.calories = known.get("calories", item.calories)
-                item.protein_g = known.get("protein_g", item.protein_g)
-                item.carbs_g = known.get("carbs_g", item.carbs_g)
-                item.fat_g = known.get("fat_g", item.fat_g)
-                item.unit = known.get("unit", item.unit)
-                item.estimated = known.get("estimated", False)
 
         # Build confirmation and totals
         parts = []

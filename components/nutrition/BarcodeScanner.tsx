@@ -6,15 +6,12 @@ import { Card } from '@/components/ui/Card';
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface FoodData {
-  id: string;
   name: string;
-  servingAmount: number;
   servingUnit: string;
   calories: number;
   proteinG: number;
   carbsG: number;
   fatG: number;
-  fiberG: number | null;
   barcode: string;
 }
 
@@ -37,7 +34,6 @@ type ScanState =
   | { step: 'found'; food: FoodData; logging: boolean }
   | { step: 'logged'; result: LogResult }
   | { step: 'not_found'; barcode: string }
-  | { step: 'register'; barcode: string; saving: boolean }
   | { step: 'photo_capture'; barcode: string }
   | { step: 'photo_analyzing'; barcode: string }
   | { step: 'error'; message: string };
@@ -47,8 +43,9 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const scanningRef = useRef(true);
   const [state, setState] = useState<ScanState>({ step: 'scanning' });
+  const [quantity, setQuantity] = useState(1);
 
-  // Register form
+  // Manual entry form
   const [regName, setRegName] = useState('');
   const [regCal, setRegCal] = useState('');
   const [regPro, setRegPro] = useState('');
@@ -101,11 +98,9 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
           await videoRef.current.play();
         }
 
-        // Dynamic import to avoid SSR issues
         const { BrowserMultiFormatReader } = await import('@zxing/browser');
         const reader = new BrowserMultiFormatReader();
 
-        // ZXing uses a callback-based continuous scanning API
         const controls = await reader.decodeFromVideoElement(
           videoRef.current!,
           (result, _error, _controls) => {
@@ -117,7 +112,6 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
           }
         );
 
-        // Store controls for cleanup
         if (cancelled) {
           controls.stop();
         }
@@ -143,12 +137,11 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
       if (res.ok) {
         const data = await res.json();
         if (data.found) {
-          // Auto-log immediately — no enter key needed
-          setState({ step: 'found', food: data.food, logging: true });
-          await autoLog(code, 1);
+          stopCamera();
+          setQuantity(1);
+          setState({ step: 'found', food: data.food, logging: false });
         }
       } else if (res.status === 404) {
-        // New barcode — ask for macro info
         stopCamera();
         currentBarcodeRef.current = code;
         setState({ step: 'not_found', barcode: code });
@@ -158,42 +151,21 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
     }
   };
 
-  // Auto-log a known food
-  const autoLog = async (barcode: string, qty: number) => {
-    try {
-      const res = await fetch('/api/nutrition/barcode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ barcode, quantity: qty, timezone }),
-      });
-      if (res.ok) {
-        const result: LogResult = await res.json();
-        stopCamera();
-        setState({ step: 'logged', result });
-        onLogged();
-      }
-    } catch {
-      setState({ step: 'error', message: 'Failed to log food' });
-    }
-  };
-
-  // Register new food with barcode
-  const handleRegister = async (barcode: string) => {
-    if (!regName.trim() || !regCal || !regPro) return;
-    setState({ step: 'register', barcode, saving: true });
-
+  // Log food with quantity
+  const logFood = async (food: FoodData, qty: number) => {
+    setState({ step: 'found', food, logging: true });
     try {
       const res = await fetch('/api/nutrition/barcode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          barcode,
-          name: regName.trim(),
-          calories: parseFloat(regCal),
-          proteinG: parseFloat(regPro),
-          carbsG: parseFloat(regCarbs || '0'),
-          fatG: parseFloat(regFat || '0'),
-          servingUnit: regUnit,
+          name: food.name,
+          calories: food.calories,
+          proteinG: food.proteinG,
+          carbsG: food.carbsG,
+          fatG: food.fatG,
+          servingUnit: food.servingUnit,
+          quantity: qty,
           timezone,
         }),
       });
@@ -202,10 +174,41 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         setState({ step: 'logged', result });
         onLogged();
       } else {
-        setState({ step: 'error', message: 'Failed to save food' });
+        setState({ step: 'error', message: 'Failed to log food' });
       }
     } catch {
-      setState({ step: 'error', message: 'Failed to save food' });
+      setState({ step: 'error', message: 'Failed to log food' });
+    }
+  };
+
+  // Log manually entered food
+  const handleManualLog = async (barcode: string) => {
+    if (!regName.trim() || !regCal || !regPro) return;
+
+    try {
+      const res = await fetch('/api/nutrition/barcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: regName.trim(),
+          calories: parseFloat(regCal),
+          proteinG: parseFloat(regPro),
+          carbsG: parseFloat(regCarbs || '0'),
+          fatG: parseFloat(regFat || '0'),
+          servingUnit: regUnit,
+          quantity: 1,
+          timezone,
+        }),
+      });
+      if (res.ok) {
+        const result: LogResult = await res.json();
+        setState({ step: 'logged', result });
+        onLogged();
+      } else {
+        setState({ step: 'error', message: 'Failed to log food' });
+      }
+    } catch {
+      setState({ step: 'error', message: 'Failed to log food' });
     }
   };
 
@@ -234,7 +237,6 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       labelStreamRef.current = stream;
-      // Wait for next render to mount the video element
       await new Promise((r) => setTimeout(r, 100));
       if (labelVideoRef.current) {
         labelVideoRef.current.srcObject = stream;
@@ -258,8 +260,6 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
     setState({ step: 'photo_analyzing', barcode });
 
     try {
-
-      // Send to chat API with vision agent
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -276,13 +276,8 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
       if (res.ok) {
         const data = await res.json();
         const response: string = data.response || '';
-        console.log('[BarcodeScanner] Vision response:', response);
-
-        // Strip markdown bold markers for easier parsing
         const clean = response.replace(/\*\*/g, '');
 
-        // Parse macros — very permissive regexes
-        // Handles: "Calories: 150", "150 cal", "calories 150", "150g protein", etc.
         const calMatch = clean.match(/calorie[s]?\s*[:=]?\s*(\d+(?:\.\d+)?)/i)
           || clean.match(/(\d+(?:\.\d+)?)\s*(?:cal|kcal)/i);
         const proMatch = clean.match(/protein\s*[:=]?\s*(\d+(?:\.\d+)?)/i)
@@ -291,18 +286,14 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
           || clean.match(/(\d+(?:\.\d+)?)\s*g?\s*carb/i);
         const fatMatch = clean.match(/(?:total\s+)?fat\s*[:=]?\s*(\d+(?:\.\d+)?)/i)
           || clean.match(/(\d+(?:\.\d+)?)\s*g?\s*fat/i);
-
-        // Extract food name — try "Logged X —" or first line as fallback
         const nameMatch = clean.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)\s*[\u2014\u2013\-—–]/)
           || clean.match(/[Ll]ogged\s+(?:\d+x?\s+)?(.+?)(?:\s*\d+\s*cal|\n)/i);
-
-        // Extract serving size — "Serving Size: 1/2 cup (36g)" → "1/2 cup"
         const servingMatch = clean.match(/serving\s*size\s*[:=]?\s*(.+?)(?:\s*\(|$)/im);
+
         if (servingMatch) {
           const sv = servingMatch[1].trim();
           if (sv.length > 0) setRegUnit(sv);
         }
-
         if (calMatch) setRegCal(calMatch[1]);
         if (proMatch) setRegPro(proMatch[1]);
         if (carbMatch) setRegCarbs(carbMatch[1]);
@@ -311,19 +302,9 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
           const extracted = nameMatch[1].trim();
           if (extracted.length > 1) setRegName(extracted);
         }
-
-        const parsed = {
-          cal: calMatch?.[1], pro: proMatch?.[1],
-          carbs: carbMatch?.[1], fat: fatMatch?.[1],
-          name: nameMatch?.[1],
-        };
-        console.log('[BarcodeScanner] Parsed:', parsed);
-      } else {
-        const errData = await res.json().catch(() => null);
-        console.error('[BarcodeScanner] Vision API error:', res.status, errData);
       }
 
-      // Go to registration form with pre-filled values
+      // Go to manual entry form with pre-filled values
       setState({ step: 'not_found', barcode });
     } catch (err) {
       console.error('[BarcodeScanner] Photo capture failed:', err);
@@ -332,12 +313,13 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
   };
 
   const handleScanAgain = () => {
+    setQuantity(1);
     setState({ step: 'scanning' });
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 flex flex-col">
-      {/* Header — safe area padding for iOS notch/dynamic island */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 pb-3 pt-[env(safe-area-inset-top,48px)] bg-black/60">
         <h3 className="text-white font-semibold text-sm">Scan Barcode</h3>
         <button
@@ -350,7 +332,7 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         </button>
       </div>
 
-      {/* Camera view (only show when scanning) */}
+      {/* Camera view */}
       {state.step === 'scanning' && (
         <div className="flex-1 relative overflow-hidden">
           <video
@@ -359,12 +341,9 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
             playsInline
             muted
           />
-          {/* Scanning overlay */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-64 h-40 border-2 border-primary rounded-lg relative">
-              {/* Animated scan line */}
               <div className="absolute inset-x-0 h-0.5 bg-primary/80 animate-scan" />
-              {/* Corner brackets */}
               <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-primary rounded-tl" />
               <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-primary rounded-tr" />
               <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-primary rounded-bl" />
@@ -377,7 +356,135 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         </div>
       )}
 
-      {/* Auto-logged result */}
+      {/* Found — show macros + quantity stepper */}
+      {state.step === 'found' && !state.logging && (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <Card className="w-full max-w-sm !p-6">
+            <h3 className="text-lg font-bold text-white mb-1 text-center">{state.food.name}</h3>
+            <p className="text-xs text-muted text-center mb-4">
+              Per serving ({state.food.servingUnit})
+            </p>
+
+            {/* Per-serving macros */}
+            <div className="grid grid-cols-4 gap-2 text-center mb-5">
+              <div>
+                <div className="text-sm font-bold text-primary">{Math.round(state.food.calories)}</div>
+                <div className="text-xs text-muted">cal</div>
+              </div>
+              <div>
+                <div className="text-sm font-bold text-blue-400">{Math.round(state.food.proteinG)}g</div>
+                <div className="text-xs text-muted">protein</div>
+              </div>
+              <div>
+                <div className="text-sm font-bold text-amber-400">{Math.round(state.food.carbsG)}g</div>
+                <div className="text-xs text-muted">carbs</div>
+              </div>
+              <div>
+                <div className="text-sm font-bold text-red-400">{Math.round(state.food.fatG)}g</div>
+                <div className="text-xs text-muted">fat</div>
+              </div>
+            </div>
+
+            {/* Quantity stepper */}
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="w-10 h-10 rounded-full bg-slate-700/60 text-white font-bold text-lg flex items-center justify-center active:bg-slate-600/60"
+              >
+                −
+              </button>
+              <div className="text-center min-w-[60px]">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={quantity}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    if (!isNaN(v) && v >= 1 && v <= 50) setQuantity(v);
+                  }}
+                  className="w-14 text-center bg-transparent text-2xl font-bold text-white border-b-2 border-primary/50 focus:border-primary focus:outline-none"
+                />
+                <div className="text-xs text-muted mt-1">servings</div>
+              </div>
+              <button
+                onClick={() => setQuantity(Math.min(50, quantity + 1))}
+                className="w-10 h-10 rounded-full bg-slate-700/60 text-white font-bold text-lg flex items-center justify-center active:bg-slate-600/60"
+              >
+                +
+              </button>
+            </div>
+
+            {/* Total preview (when qty > 1) */}
+            {quantity > 1 && (
+              <div className="bg-slate-800/50 rounded-lg px-3 py-2 mb-4 text-center">
+                <span className="text-xs text-muted">Total: </span>
+                <span className="text-sm font-semibold text-primary">
+                  {Math.round(state.food.calories * quantity)} cal
+                </span>
+                <span className="text-xs text-muted"> · </span>
+                <span className="text-sm font-semibold text-blue-400">
+                  {Math.round(state.food.proteinG * quantity)}g P
+                </span>
+                <span className="text-xs text-muted"> · </span>
+                <span className="text-sm font-semibold text-amber-400">
+                  {Math.round(state.food.carbsG * quantity)}g C
+                </span>
+                <span className="text-xs text-muted"> · </span>
+                <span className="text-sm font-semibold text-red-400">
+                  {Math.round(state.food.fatG * quantity)}g F
+                </span>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => logFood(state.food, quantity)}
+                className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary-dark text-white font-medium text-sm transition-colors"
+              >
+                Log It
+              </button>
+              <button
+                onClick={handleScanAgain}
+                className="flex-1 py-3 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm"
+              >
+                Scan Again
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Found + logging spinner */}
+      {state.step === 'found' && state.logging && (
+        <div className="flex-1 flex items-center justify-center">
+          <Card className="w-full max-w-sm mx-4 text-center !p-6">
+            <p className="text-sm text-white mb-2">
+              Logging {quantity > 1 ? `${quantity}x ` : ''}{state.food.name}...
+            </p>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div>
+                <div className="text-sm font-bold text-primary">{Math.round(state.food.calories * quantity)}</div>
+                <div className="text-xs text-muted">cal</div>
+              </div>
+              <div>
+                <div className="text-sm font-bold text-blue-400">{Math.round(state.food.proteinG * quantity)}g</div>
+                <div className="text-xs text-muted">protein</div>
+              </div>
+              <div>
+                <div className="text-sm font-bold text-amber-400">{Math.round(state.food.carbsG * quantity)}g</div>
+                <div className="text-xs text-muted">carbs</div>
+              </div>
+              <div>
+                <div className="text-sm font-bold text-red-400">{Math.round(state.food.fatG * quantity)}g</div>
+                <div className="text-xs text-muted">fat</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Logged result */}
       {state.step === 'logged' && (
         <div className="flex-1 flex items-center justify-center p-6">
           <Card className="w-full max-w-sm text-center !p-6">
@@ -445,7 +552,6 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
           <p className="absolute top-6 inset-x-0 text-center text-sm text-white/70">
             Frame the nutrition label
           </p>
-          {/* Shutter button */}
           <div className="absolute bottom-8 inset-x-0 flex justify-center">
             <button
               onClick={takeLabelPhoto}
@@ -457,18 +563,18 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         </div>
       )}
 
-      {/* Not found — register new food */}
-      {(state.step === 'not_found' || (state.step === 'register' && !state.saving)) && (
+      {/* Not found — manual entry */}
+      {state.step === 'not_found' && (
         <div className="flex-1 overflow-y-auto p-4">
           <Card className="w-full max-w-sm mx-auto !p-5">
-            <h3 className="text-base font-bold text-white mb-1">New Product</h3>
+            <h3 className="text-base font-bold text-white mb-1">Not Found</h3>
             <p className="text-xs text-muted mb-3">
-              Barcode <span className="text-slate-400 font-mono">{state.step === 'not_found' ? state.barcode : state.barcode}</span> not in your database.
+              Barcode <span className="text-slate-400 font-mono">{state.barcode}</span> not found on Open Food Facts.
             </p>
 
             {/* Snap label button */}
             <button
-              onClick={() => handleSnapLabel(state.step === 'not_found' ? state.barcode : (state as { barcode: string }).barcode)}
+              onClick={() => handleSnapLabel(state.barcode)}
               className="w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-xl bg-blue-500/15 text-blue-400 font-medium text-sm hover:bg-blue-500/25 active:scale-[0.98] transition-all border border-blue-500/20"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -554,21 +660,14 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
               </div>
 
               <button
-                onClick={() => handleRegister(state.step === 'not_found' ? state.barcode : (state as { barcode: string }).barcode)}
+                onClick={() => handleManualLog(state.barcode)}
                 disabled={!regName.trim() || !regCal || !regPro}
                 className="w-full py-3 rounded-xl bg-primary hover:bg-primary-dark disabled:opacity-40 text-white font-medium text-sm transition-colors mt-2"
               >
-                Save & Log
+                Log It
               </button>
             </div>
           </Card>
-        </div>
-      )}
-
-      {/* Saving spinner */}
-      {state.step === 'register' && state.saving && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-muted">Saving...</div>
         </div>
       )}
 
@@ -611,33 +710,6 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
               >
                 Close
               </button>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Found + auto-logging */}
-      {state.step === 'found' && state.logging && (
-        <div className="flex-1 flex items-center justify-center">
-          <Card className="w-full max-w-sm mx-4 text-center !p-6">
-            <p className="text-sm text-white mb-2">Logging {state.food.name}...</p>
-            <div className="grid grid-cols-4 gap-2 text-center">
-              <div>
-                <div className="text-sm font-bold text-primary">{Math.round(state.food.calories)}</div>
-                <div className="text-xs text-muted">cal</div>
-              </div>
-              <div>
-                <div className="text-sm font-bold text-blue-400">{Math.round(state.food.proteinG)}g</div>
-                <div className="text-xs text-muted">protein</div>
-              </div>
-              <div>
-                <div className="text-sm font-bold text-amber-400">{Math.round(state.food.carbsG)}g</div>
-                <div className="text-xs text-muted">carbs</div>
-              </div>
-              <div>
-                <div className="text-sm font-bold text-red-400">{Math.round(state.food.fatG)}g</div>
-                <div className="text-xs text-muted">fat</div>
-              </div>
             </div>
           </Card>
         </div>

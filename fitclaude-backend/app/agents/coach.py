@@ -31,7 +31,6 @@ from app.models import (
     Exercise,
     NutritionLog,
     User,
-    UserFood,
     Workout,
     WorkoutExercise,
 )
@@ -117,10 +116,6 @@ async def _execute_tool(
         )
     elif tool_name == "mark_workout_complete":
         return await _tool_mark_workout_complete(db, tool_input)
-    elif tool_name == "lookup_user_foods":
-        return await _tool_lookup_user_foods(db, user_id, tool_input)
-    elif tool_name == "update_user_food":
-        return await _tool_update_user_food(db, user_id, tool_input)
     elif tool_name == "parse_youtube_video":
         return await import_exercises_from_youtube(db, tool_input["youtube_url"])
     elif tool_name == "log_activity":
@@ -683,79 +678,6 @@ def _sanitize_raw_text(text: str) -> str:
     return cleaned
 
 
-async def _upsert_user_food(
-    db: AsyncSession, user_id: str, name: str,
-    serving_amount: float, serving_unit: str,
-    calories: float, protein_g: float, carbs_g: float, fat_g: float,
-    barcode: str | None = None,
-) -> UserFood | None:
-    """Create or update a UserFood entry and return it.
-
-    If the food already exists (by name), increments times_used and returns
-    the existing record — does NOT overwrite macros (user may have corrected them).
-    If barcode is provided and the existing record has no barcode, saves it.
-    """
-    try:
-        result = await db.execute(
-            select(UserFood).where(
-                UserFood.user_id == user_id,
-                func.lower(UserFood.name) == name.strip().lower(),
-            )
-        )
-        existing = result.scalar_one_or_none()
-
-        if existing:
-            existing.times_used = (existing.times_used or 0) + 1
-            if barcode and not existing.barcode:
-                existing.barcode = barcode
-            await db.flush()
-            return existing
-
-        # New food
-        food = UserFood(
-            id=cuid_generator.generate(),
-            user_id=user_id,
-            name=name.strip(),
-            serving_amount=serving_amount,
-            serving_unit=serving_unit,
-            calories=round(calories, 1),
-            protein_g=round(protein_g, 1),
-            carbs_g=round(carbs_g, 1),
-            fat_g=round(fat_g, 1),
-            barcode=barcode,
-            times_used=1,
-        )
-        db.add(food)
-        await db.flush()
-        return food
-    except Exception as e:
-        logger.warning(f"[Coach] Failed to upsert UserFood '{name}': {e}")
-        return None
-
-
-async def _upsert_foods_from_items(
-    db: AsyncSession, user_id: str, items: list[dict]
-) -> None:
-    """Upsert each food item to the user's food database.
-
-    Items should have: name, quantity, unit, calories, protein_g, carbs_g, fat_g
-    (macros are totals for the full quantity).
-    """
-    for item in items:
-        qty = item.get("quantity", 1) or 1
-        # Per-serving macros = total / quantity
-        per_cal = (item.get("calories") or 0) / qty
-        per_pro = (item.get("protein_g") or 0) / qty
-        per_carb = (item.get("carbs_g") or 0) / qty
-        per_fat = (item.get("fat_g") or 0) / qty
-
-        await _upsert_user_food(
-            db, user_id, item["name"],
-            serving_amount=1, serving_unit=item.get("unit", "serving"),
-            calories=per_cal, protein_g=per_pro, carbs_g=per_carb, fat_g=per_fat,
-        )
-
-
 async def _tool_log_nutrition(
     db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
@@ -820,18 +742,6 @@ async def _tool_log_nutrition(
     except Exception as e:
         logger.error(f"[Coach] Failed to get daily totals after logging: {e}")
         daily = {"date": str(user_today), "total_calories": 0, "total_protein_g": 0, "total_carbs_g": 0, "total_fat_g": 0, "meal_count": 0}
-
-    # Upsert food items to UserFood table
-    try:
-        await _upsert_user_food(
-            db, user_id, raw_text,
-            serving_amount=1, serving_unit="serving",
-            calories=calories or 0, protein_g=protein_g or 0,
-            carbs_g=carbs_g or 0, fat_g=fat_g or 0,
-        )
-        await db.commit()
-    except Exception as e:
-        logger.warning(f"[Coach] Failed to upsert food entry: {e}")
 
     return {
         "nutrition_log_id": log.id,
@@ -956,136 +866,6 @@ async def _tool_mark_workout_complete(db: AsyncSession, params: dict) -> dict:
         "workout_id": workout.id,
         "completed": True,
         "fatigue_rating": workout.fatigue_rating,
-    }
-
-
-async def _tool_lookup_user_foods(
-    db: AsyncSession, user_id: str, params: dict
-) -> dict:
-    """Look up foods in the user's personal food database with fuzzy matching.
-
-    First tries exact match, then substring match (any search word found in DB name
-    or any DB name word found in search term). Returns exact matches as 'found' and
-    close matches as 'similar' so the coach can use them or ask the user.
-    """
-    names = [n.lower().strip() for n in params.get("food_names", [])]
-    if not names:
-        return {"found": [], "similar": [], "not_found": []}
-
-    # Load all user foods once (typically <50 items)
-    all_result = await db.execute(
-        select(UserFood).where(UserFood.user_id == user_id)
-    )
-    all_foods = all_result.scalars().all()
-
-    found = []
-    similar = []
-    not_found = []
-
-    for search_name in names:
-        search_words = set(search_name.split())
-
-        # 1. Exact match
-        exact = next((f for f in all_foods if f.name.lower() == search_name), None)
-        if exact:
-            found.append(exact)
-            continue
-
-        # 2. Fuzzy match — check if search words overlap with food name words
-        matches = []
-        for f in all_foods:
-            db_name = f.name.lower()
-            db_words = set(db_name.split())
-
-            # Substring match: search term in DB name or DB name contains search term
-            if search_name in db_name or db_name in search_name:
-                matches.append((f, 3))  # high confidence
-                continue
-
-            # Word overlap: any meaningful word (>2 chars) shared
-            overlap = search_words & db_words
-            meaningful_overlap = {w for w in overlap if len(w) > 2}
-            if meaningful_overlap:
-                matches.append((f, len(meaningful_overlap)))
-
-        if matches:
-            # Sort by confidence score descending
-            matches.sort(key=lambda x: x[1], reverse=True)
-            best = matches[0]
-            if best[1] >= 3:
-                # High confidence — treat as found
-                found.append(best[0])
-            else:
-                # Partial match — suggest
-                for m, _ in matches[:3]:
-                    similar.append(m)
-                not_found.append(search_name)
-        else:
-            not_found.append(search_name)
-
-    def food_dict(f: UserFood) -> dict:
-        return {
-            "name": f.name,
-            "serving_amount": f.serving_amount,
-            "serving_unit": f.serving_unit,
-            "per_serving": {
-                "calories": round(f.calories, 2),
-                "protein_g": round(f.protein_g, 2),
-                "carbs_g": round(f.carbs_g, 2),
-                "fat_g": round(f.fat_g, 2),
-            },
-        }
-
-    # Deduplicate similar (exclude already-found)
-    found_ids = {f.id for f in found}
-    seen_similar = set()
-    unique_similar = []
-    for f in similar:
-        if f.id not in found_ids and f.id not in seen_similar:
-            unique_similar.append(f)
-            seen_similar.add(f.id)
-
-    return {
-        "found": [food_dict(f) for f in found],
-        "similar": [food_dict(f) for f in unique_similar],
-        "not_found": not_found,
-    }
-
-
-async def _tool_update_user_food(
-    db: AsyncSession, user_id: str, params: dict
-) -> dict:
-    """Update macros for a food in the user's personal food database."""
-    food_name = params.get("food_name", "").strip()
-    if not food_name:
-        return {"error": "No food_name provided"}
-
-    result = await db.execute(
-        select(UserFood).where(
-            UserFood.user_id == user_id,
-            func.lower(UserFood.name) == food_name.lower(),
-        )
-    )
-    food = result.scalar_one_or_none()
-    if not food:
-        return {"error": f"No food found with name '{food_name}'"}
-
-    food.calories = params["calories"]
-    food.protein_g = params["protein_g"]
-    food.carbs_g = params.get("carbs_g", food.carbs_g)
-    food.fat_g = params["fat_g"]
-    if params.get("fiber_g") is not None:
-        food.fiber_g = params["fiber_g"]
-    await db.commit()
-
-    return {
-        "name": food.name,
-        "updated": {
-            "calories": food.calories,
-            "protein_g": food.protein_g,
-            "carbs_g": food.carbs_g,
-            "fat_g": food.fat_g,
-        },
     }
 
 
@@ -1277,42 +1057,6 @@ async def handle_chat(
                     request_id = str(uuid.uuid4())[:8]
                     await log_token_usage(db, user_id, "vision_nutrition", settings.agent_model, usage, request_id=request_id)
 
-                # Check barcodes — override AI macros with stored values if found
-                items = result.get("items", [])
-                barcode_matched = False
-                for item in items:
-                    bc = item.get("barcode")
-                    if bc:
-                        bc_result = await db.execute(
-                            select(UserFood).where(
-                                UserFood.user_id == user_id,
-                                UserFood.barcode == bc,
-                            )
-                        )
-                        known = bc_result.scalar_one_or_none()
-                        if known:
-                            # Override with stored macros
-                            qty = item.get("quantity", 1) or 1
-                            item["calories"] = round(known.calories * qty, 1)
-                            item["protein_g"] = round(known.protein_g * qty, 1)
-                            item["carbs_g"] = round(known.carbs_g * qty, 1)
-                            item["fat_g"] = round(known.fat_g * qty, 1)
-                            item["name"] = known.name
-                            item["estimated"] = False
-                            barcode_matched = True
-                            logger.info(f"[Coach] Barcode {bc} matched to '{known.name}'")
-
-                # Recalculate totals if barcode overrode any items
-                if barcode_matched:
-                    total_cal = sum(i.get("calories") or 0 for i in items)
-                    total_pro = sum(i.get("protein_g") or 0 for i in items)
-                    total_carb = sum(i.get("carbs_g") or 0 for i in items)
-                    total_fat = sum(i.get("fat_g") or 0 for i in items)
-                    result["total_calories"] = round(total_cal)
-                    result["total_protein_g"] = round(total_pro, 1)
-                    result["total_carbs_g"] = round(total_carb, 1)
-                    result["total_fat_g"] = round(total_fat, 1)
-
                 # Log nutrition via existing tool handler
                 log_result = await _tool_log_nutrition(
                     db, user_id,
@@ -1327,27 +1071,6 @@ async def handle_chat(
                     user_tz=user_tz,
                 )
 
-                # Save barcodes to UserFood for future lookups
-                for item in items:
-                    bc = item.get("barcode")
-                    if bc:
-                        try:
-                            # Upsert food with barcode
-                            qty = item.get("quantity", 1) or 1
-                            per_cal = (item.get("calories") or 0) / qty
-                            per_pro = (item.get("protein_g") or 0) / qty
-                            per_carb = (item.get("carbs_g") or 0) / qty
-                            per_fat = (item.get("fat_g") or 0) / qty
-                            await _upsert_user_food(
-                                db, user_id, item["name"],
-                                serving_amount=1, serving_unit=item.get("unit", "serving"),
-                                calories=per_cal, protein_g=per_pro, carbs_g=per_carb, fat_g=per_fat,
-                                barcode=bc,
-                            )
-                            await db.commit()
-                        except Exception as e:
-                            logger.warning(f"[Coach] Failed to save barcode {bc}: {e}")
-
                 daily = log_result.get("daily_totals", {})
                 conf = result["confirmation"]
                 cal = result["total_calories"]
@@ -1360,8 +1083,6 @@ async def handle_chat(
                     f"Logged {conf} — {cal} cal | {pro}g protein | {carb}g carbs | {fat}g fat.\n"
                     f"Daily total: {daily_cal} cal, {daily_pro}g protein."
                 )
-                if barcode_matched:
-                    resp_text += "\n(Barcode matched — used stored macros)"
                 return {
                     "response": resp_text,
                     "workout_id": None,
@@ -1404,15 +1125,6 @@ async def handle_chat(
                     user_tz=user_tz,
                 )
                 daily = log_result.get("daily_totals", {})
-
-                # Upsert food items to database
-                try:
-                    items = result.get("items", [])
-                    if items:
-                        await _upsert_foods_from_items(db, user_id, items)
-                        await db.commit()
-                except Exception as e:
-                    logger.warning(f"[Coach] Failed to upsert foods in fast-path: {e}")
 
                 # Build friendly confirmation
                 conf = result["confirmation"]

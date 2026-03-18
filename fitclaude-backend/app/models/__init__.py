@@ -5,7 +5,6 @@ from app.models.pending_exercise import PendingExercise, PendingVariation
 from app.models.workout import Workout, WorkoutExercise
 from app.models.nutrition import DailyNutritionSummary, NutritionLog
 from app.models.conversation import ConversationHistory
-from app.models.user_food import UserFood
 from app.models.activity import Activity
 from app.models.token_usage import TokenUsage, UserUsageLimit
 
@@ -21,7 +20,6 @@ __all__ = [
     "NutritionLog",
     "DailyNutritionSummary",
     "ConversationHistory",
-    "UserFood",
     "Activity",
     "TokenUsage",
     "UserUsageLimit",

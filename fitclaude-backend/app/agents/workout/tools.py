@@ -296,49 +296,6 @@ TOOL_DEFINITIONS = [
         },
     },
     {
-        "name": "lookup_user_foods",
-        "description": (
-            "Search the user's personal food database for previously logged foods with "
-            "verified macros. ALWAYS call this before log_nutrition to check if the food "
-            "has known macros. Uses fuzzy matching — returns 'found' (exact matches), "
-            "'similar' (close matches like 'tuna' matching 'tuna can albacore'), and "
-            "'not_found'. Use similar matches if they're clearly the same food."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "food_names": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of food names to look up (e.g. ['chicken breast', 'protein shake'])",
-                },
-            },
-            "required": ["food_names"],
-        },
-    },
-    {
-        "name": "update_user_food",
-        "description": (
-            "Update the macros for a food in the user's personal food database. "
-            "Use when the user wants to correct stored nutrition values for a food."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "food_name": {
-                    "type": "string",
-                    "description": "The food name to update, e.g. 'Field Trip Chicken Stick'",
-                },
-                "calories": {"type": "number", "description": "New calories per serving"},
-                "protein_g": {"type": "number", "description": "New protein grams per serving"},
-                "carbs_g": {"type": "number", "description": "New carbs grams per serving"},
-                "fat_g": {"type": "number", "description": "New fat grams per serving"},
-                "fiber_g": {"type": "number", "description": "New fiber grams per serving (optional)"},
-            },
-            "required": ["food_name", "calories", "protein_g", "carbs_g", "fat_g"],
-        },
-    },
-    {
         "name": "parse_youtube_video",
         "description": (
             "Extract exercises from a YouTube video transcript and add them to the "

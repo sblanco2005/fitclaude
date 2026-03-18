@@ -11,7 +11,6 @@ import re
 from anthropic import AsyncAnthropic
 
 from app.agents.base import BaseAgent
-from app.agents.nutrition.known_foods import lookup_known_food
 from app.agents.nutrition.prompts import NUTRITION_SYSTEM_PROMPT
 from app.agents.nutrition.schemas import FoodItem
 
@@ -78,9 +77,26 @@ class NutritionAgent(BaseAgent):
 
         return items
 
+    @staticmethod
+    def _dedup_items(items: list[FoodItem]) -> list[FoodItem]:
+        """Merge duplicate items with the same normalized name (sum macros)."""
+        seen: dict[str, FoodItem] = {}
+        for item in items:
+            key = item.name.strip().lower()
+            if key in seen:
+                existing = seen[key]
+                existing.calories = (existing.calories or 0) + (item.calories or 0)
+                existing.protein_g = (existing.protein_g or 0) + (item.protein_g or 0)
+                existing.carbs_g = (existing.carbs_g or 0) + (item.carbs_g or 0)
+                existing.fat_g = (existing.fat_g or 0) + (item.fat_g or 0)
+                existing.quantity += item.quantity
+            else:
+                seen[key] = item
+        return list(seen.values())
+
     async def extract_and_validate(self, user_message: str) -> dict:
         """
-        Extract food items, apply known-foods overrides, build confirmation.
+        Extract food items, validate, dedup, build confirmation.
         Returns {items, confirmation, count, raw_text, total_calories, total_protein_g, total_carbs_g, total_fat_g}
         """
         try:
@@ -104,17 +120,8 @@ class NutritionAgent(BaseAgent):
                          "Try being more specific, like '1 protein shake' or '2 eggs with toast'."
             }
 
-        # Apply known-foods overrides
-        for item in items:
-            known = lookup_known_food(item.name)
-            if known:
-                item.name = known.get("name", item.name)
-                item.calories = known.get("calories", item.calories)
-                item.protein_g = known.get("protein_g", item.protein_g)
-                item.carbs_g = known.get("carbs_g", item.carbs_g)
-                item.fat_g = known.get("fat_g", item.fat_g)
-                item.unit = known.get("unit", item.unit)
-                item.estimated = known.get("estimated", False)
+        # Deduplicate items with same name (Haiku sometimes splits one item into two)
+        items = self._dedup_items(items)
 
         # Build confirmation and totals
         parts = []
