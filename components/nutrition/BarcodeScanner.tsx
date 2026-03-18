@@ -311,12 +311,9 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
           name: nameMatch?.[1],
         };
         console.log('[BarcodeScanner] Parsed:', parsed);
-        // Temporary debug alert — remove after fixing
-        alert(`Response: ${response.slice(0, 200)}\n\nParsed: ${JSON.stringify(parsed)}`);
       } else {
         const errData = await res.json().catch(() => null);
         console.error('[BarcodeScanner] Vision API error:', res.status, errData);
-        alert(`Vision API error ${res.status}: ${JSON.stringify(errData)}`);
       }
 
       // Go to registration form with pre-filled values
