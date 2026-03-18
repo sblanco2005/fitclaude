@@ -204,12 +204,20 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
     setState({ step: 'photo_analyzing', barcode });
 
     try {
-      // Convert file to base64
-      const buffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      const base64 = btoa(binary);
+      // Convert file to base64 using FileReader (reliable on all browsers)
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          // Strip the "data:image/jpeg;base64," prefix
+          const b64 = dataUrl.split(',')[1];
+          if (b64) resolve(b64);
+          else reject(new Error('Failed to read file'));
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
       const mediaType = file.type || 'image/jpeg';
 
       // Send to chat API with vision agent
@@ -217,7 +225,7 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: 'Read the nutrition label and extract the macros. Just extract, do not log.',
+          message: 'Read the nutrition label and extract the macros.',
           topic: 'nutrition',
           image_base64: base64,
           image_media_type: mediaType,
@@ -228,31 +236,36 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
 
       if (res.ok) {
         const data = await res.json();
-        const response = data.response || '';
+        const response: string = data.response || '';
 
         // Parse macros from the vision agent response
+        // Response format: "Logged X — Y cal | Zg protein | Wg carbs | Vg fat."
         const calMatch = response.match(/(\d+(?:\.\d+)?)\s*cal/i);
         const proMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*protein/i);
         const carbMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*carb/i);
         const fatMatch = response.match(/(\d+(?:\.\d+)?)\s*g?\s*fat/i);
 
-        // Also try to extract the food name from "Logged X —" pattern
-        const nameMatch = response.match(/(?:Logged\s+(?:\d+x\s+)?)?([^—\n]+?)(?:\s*—|\s*\d+\s*cal)/i);
+        // Extract food name from "Logged [qty] FoodName —" pattern
+        const nameMatch = response.match(/Logged\s+(?:\d+x?\s+)?(.+?)\s*—/i);
 
         if (calMatch) setRegCal(calMatch[1]);
         if (proMatch) setRegPro(proMatch[1]);
         if (carbMatch) setRegCarbs(carbMatch[1]);
         if (fatMatch) setRegFat(fatMatch[1]);
         if (nameMatch) {
-          const extracted = nameMatch[1].replace(/^(Logged|logged)\s+/, '').trim();
-          if (extracted && extracted.length > 2) setRegName(extracted);
+          const extracted = nameMatch[1].trim();
+          if (extracted.length > 1) setRegName(extracted);
         }
+      } else {
+        const errData = await res.json().catch(() => null);
+        console.error('[BarcodeScanner] Vision API error:', errData);
       }
 
       // Go to registration form with pre-filled values
       setState({ step: 'not_found', barcode });
-    } catch {
-      setState({ step: 'error', message: 'Failed to analyze photo' });
+    } catch (err) {
+      console.error('[BarcodeScanner] Photo capture failed:', err);
+      setState({ step: 'error', message: 'Failed to analyze photo. Try entering macros manually.' });
     }
   };
 
@@ -363,7 +376,6 @@ export function BarcodeScanner({ onLogged, onClose }: BarcodeScannerProps) {
             ref={photoInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
