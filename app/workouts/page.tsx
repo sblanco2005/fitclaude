@@ -1796,7 +1796,7 @@ function ActiveWorkout({
   const latest = workouts[0];
   const muscles = uniqueMuscles(latest);
   const INACTIVITY_LIMIT = 20 * 60; // 20 minutes with no set logged
-  const HARD_CAP = 1 * 60 * 60; // 1 hour max
+  const HARD_CAP = 90 * 60; // 90 minutes max
 
   // ─── Session persistence helpers ───
   const sessionKey = `fitclaude:session:${routineName}`;
