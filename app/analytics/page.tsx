@@ -21,7 +21,7 @@ import type { AnalyticsData } from '@/types';
 export default function AnalyticsPage() {
   const { status } = useSession();
   const [data, setData] = useState<AnalyticsData | null>(null);
-  const [period, setPeriod] = useState('30d');
+  const [period, setPeriod] = useState('week');
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'training' | 'nutrition'>('training');
 
