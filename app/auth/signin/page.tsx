@@ -39,6 +39,10 @@ export default function SignInPage() {
           </svg>
           Sign in with Google
         </Button>
+
+        <a href="/privacy" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
+          Privacy Policy
+        </a>
       </div>
     </div>
   );

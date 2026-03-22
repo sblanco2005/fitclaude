@@ -53,6 +53,15 @@ export default function RootLayout({
             </ToastProvider>
           </FitClaudeProvider>
         </SessionProvider>
+        {/* Server-rendered for Google bot visibility — hidden behind bottom nav in app */}
+        <noscript>
+          <div style={{ textAlign: 'center', padding: '8px' }}>
+            <a href="/privacy" style={{ color: '#64748b', fontSize: '10px' }}>Privacy Policy</a>
+          </div>
+        </noscript>
+        <div className="sr-only" aria-hidden="true">
+          <a href="/privacy">Privacy Policy</a>
+        </div>
       </body>
     </html>
   );
