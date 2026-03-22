@@ -695,22 +695,11 @@ async def _tool_log_nutrition(
     # Sanitize raw_text — Claude sometimes injects XML parameter tags
     raw_text = _sanitize_raw_text(params["raw_text"])
 
-    # Try nutrition agent for more accurate macro extraction
+    # Use Claude's macro estimates directly (no re-extraction — Pydantic validates upstream)
     calories = params.get("calories")
     protein_g = params.get("protein_g")
     carbs_g = params.get("carbs_g")
     fat_g = params.get("fat_g")
-
-    try:
-        agent_result = await nutrition_agent.extract_and_validate(raw_text)
-        if "error" not in agent_result:
-            calories = agent_result["total_calories"]
-            protein_g = agent_result["total_protein_g"]
-            carbs_g = agent_result["total_carbs_g"]
-            fat_g = agent_result["total_fat_g"]
-            logger.info(f"[Coach] Nutrition agent override: {calories} cal, {protein_g}g pro, {carbs_g}g carb, {fat_g}g fat")
-    except Exception as e:
-        logger.warning(f"[Coach] Nutrition agent failed in tool handler, using Claude estimates: {e}")
 
     # Store as UTC but ensure the date component matches the user's local date
     log = NutritionLog(
@@ -1101,9 +1090,9 @@ async def handle_chat(
             # Fall through to general coach with image
 
     # ── Fast path: dedicated nutrition agent for simple food logging ──
+    # Routes food logging to the nutrition agent regardless of topic
     if (
-        topic == "nutrition"
-        and not image_base64
+        not image_base64
         and user_message
         and detect_food_logging_intent(user_message)
     ):
