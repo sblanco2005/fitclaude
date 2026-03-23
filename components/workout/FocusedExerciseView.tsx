@@ -446,10 +446,30 @@ export default function FocusedExerciseView({
 
         {/* Last session */}
         {lastLogs && (
-          <p className="text-xs text-slate-600 font-bold mt-0.5 tabular-nums">
-            Last: {lastLogs.slice(0, 4).map((l) => `${formatWeight(l.weight, unit)}×${l.reps}`).join('  ')}
+          <p className="text-xs text-slate-300 font-medium mt-0.5 tabular-nums">
+            <span className="text-slate-400">Last:</span> {lastLogs.slice(0, 4).map((l) => `${formatWeight(l.weight, unit)}×${l.reps}`).join('  ')}
           </p>
         )}
+        {/* Personal Record */}
+        {(() => {
+          let best: { weight: number; reps: number } | null = null;
+          for (const w of allWorkouts) {
+            for (const wex of w.exercises) {
+              if (getExerciseName(wex) !== eName) continue;
+              const ls = parseStoredSetLogs(wex.setLogs);
+              for (const l of ls) {
+                if (l.weight > 0 && (!best || l.weight > best.weight || (l.weight === best.weight && l.reps > best.reps))) {
+                  best = { weight: l.weight, reps: l.reps };
+                }
+              }
+            }
+          }
+          return best ? (
+            <p className="text-xs font-bold mt-0.5 tabular-nums">
+              <span className="text-amber-400">PR:</span> <span className="text-amber-300">{formatWeight(best.weight, unit)}×{best.reps}</span>
+            </p>
+          ) : null;
+        })()}
 
         {/* Coaching tip */}
         {tip && <p className="text-xs text-slate-500 italic mt-1 leading-relaxed">{tip}</p>}
