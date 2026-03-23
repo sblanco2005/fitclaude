@@ -641,6 +641,27 @@ function getLastLogForExercise(
   return null;
 }
 
+// ─── find personal record (heaviest weight) for an exercise ─────────────────
+
+function getPRForExercise(
+  workouts: Workout[],
+  exerciseName: string,
+): { weight: number; reps: number } | null {
+  let best: { weight: number; reps: number } | null = null;
+  for (const w of workouts) {
+    for (const ex of w.exercises) {
+      if (getExerciseName(ex) !== exerciseName) continue;
+      const logs = parseStoredSetLogs(ex.setLogs);
+      for (const l of logs) {
+        if (l.weight > 0 && (!best || l.weight > best.weight || (l.weight === best.weight && l.reps > best.reps))) {
+          best = { weight: l.weight, reps: l.reps };
+        }
+      }
+    }
+  }
+  return best;
+}
+
 // ─── RoutineExerciseRow (expandable exercise in routine detail) ──────────────
 
 function RoutineExerciseRow({
@@ -648,6 +669,7 @@ function RoutineExerciseRow({
   globalIndex,
   tip,
   lastLog,
+  pr,
   onSwap,
   onUpdate,
   weightUnit = 'lb',
@@ -657,6 +679,7 @@ function RoutineExerciseRow({
   globalIndex: number;
   tip: string | null;
   lastLog: SetLog[] | null;
+  pr: { weight: number; reps: number } | null;
   onSwap: () => void;
   onUpdate: (updates: { sets?: number; reps?: string; restSeconds?: number }) => void;
   weightUnit?: 'lb' | 'kg';
@@ -760,8 +783,13 @@ function RoutineExerciseRow({
               </p>
             )}
             {lastLog && (
-              <p className="text-xs text-slate-500 font-bold mt-0.5 tabular-nums">
-                Last: {lastLog.map((l) => `${formatWeight(l.weight, weightUnit)}×${l.reps}`).join('  ')}
+              <p className="text-xs text-slate-300 font-medium mt-0.5 tabular-nums">
+                <span className="text-slate-400">Last:</span> {lastLog.map((l) => `${formatWeight(l.weight, weightUnit)}×${l.reps}`).join('  ')}
+              </p>
+            )}
+            {pr && (
+              <p className="text-xs font-bold mt-0.5 tabular-nums">
+                <span className="text-amber-400">PR:</span> <span className="text-amber-300">{formatWeight(pr.weight, weightUnit)}×{pr.reps}</span>
               </p>
             )}
           </div>
@@ -1411,6 +1439,7 @@ function RoutineDetail({
                   globalIndex={i + 1}
                   tip={getCoachingTip(ex)}
                   lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
+                  pr={getPRForExercise(workouts, getExerciseName(ex))}
                   onSwap={() => setSwappingExercise(ex)}
                   onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                   weightUnit={weightUnit}
@@ -1434,6 +1463,7 @@ function RoutineDetail({
                       globalIndex={globalIndex}
                       tip={getCoachingTip(ex)}
                       lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
+                      pr={getPRForExercise(workouts, getExerciseName(ex))}
                       onSwap={() => setSwappingExercise(ex)}
                       onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                       weightUnit={weightUnit}

@@ -39,36 +39,45 @@ export default function DashboardPage() {
     }
   }, [status, session, router]);
 
-  // Fetch today's data when authenticated
+  // Fetch today's data when authenticated + refetch on visibility change (back button)
   useEffect(() => {
     if (status !== 'authenticated') return;
 
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    fetch(`/api/nutrition/today?tz=${encodeURIComponent(tz)}`)
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (data) setNutrition(data); })
-      .catch(() => {});
+    const fetchDashboard = () => {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      fetch(`/api/nutrition/today?tz=${encodeURIComponent(tz)}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => { if (data) setNutrition(data); })
+        .catch(() => {});
 
-    fetch('/api/workouts?daysBack=1')
-      .then((res) => res.ok ? res.json() : [])
-      .then((workouts: Workout[]) => {
-        const today = new Date().toDateString();
-        setTodayWorkouts(workouts.filter((w) => new Date(w.date).toDateString() === today && w.completed));
-      })
-      .catch(() => {});
+      fetch('/api/workouts?daysBack=1')
+        .then((res) => res.ok ? res.json() : [])
+        .then((workouts: Workout[]) => {
+          const today = new Date().toDateString();
+          setTodayWorkouts(workouts.filter((w) => new Date(w.date).toDateString() === today && w.completed));
+        })
+        .catch(() => {});
 
-    fetch('/api/activities?daysBack=1')
-      .then((res) => res.ok ? res.json() : [])
-      .then((acts: Activity[]) => {
-        const today = new Date().toDateString();
-        setTodayActivities(acts.filter((a) => new Date(a.date).toDateString() === today));
-      })
-      .catch(() => {});
+      fetch('/api/activities?daysBack=1')
+        .then((res) => res.ok ? res.json() : [])
+        .then((acts: Activity[]) => {
+          const today = new Date().toDateString();
+          setTodayActivities(acts.filter((a) => new Date(a.date).toDateString() === today));
+        })
+        .catch(() => {});
 
-    fetch('/api/collections')
-      .then((res) => res.ok ? res.json() : [])
-      .then((data) => setCollections(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      fetch('/api/collections')
+        .then((res) => res.ok ? res.json() : [])
+        .then((data) => setCollections(Array.isArray(data) ? data : []))
+        .catch(() => {});
+    };
+
+    fetchDashboard();
+
+    // Refetch when page becomes visible (back button, tab switch)
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchDashboard(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [status]);
 
   if (status === 'loading') {
@@ -128,7 +137,7 @@ export default function DashboardPage() {
           <Card className="p-3" hover>
             <div className="flex items-center gap-1.5 mb-2">
               <span className="text-base">🍽️</span>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Nutrition</h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Nutrition Coach</h3>
             </div>
             {hasNutrition && totals ? (
               <div className="space-y-1.5">
@@ -165,7 +174,7 @@ export default function DashboardPage() {
           <Card className="p-3" hover>
             <div className="flex items-center gap-1.5 mb-2">
               <span className="text-base">🏋️</span>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Workout</h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Workout Coach</h3>
             </div>
             {hasWorkouts ? (
               <div className="space-y-1.5">
