@@ -1203,6 +1203,8 @@ function RoutineDetail({
   const [renameValue, setRenameValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [swappingExercise, setSwappingExercise] = useState<WorkoutExercise | null>(null);
+  const [swapMenuExercise, setSwapMenuExercise] = useState<WorkoutExercise | null>(null);
+  const [aiSwapping, setAiSwapping] = useState(false);
   const [addingExercise, setAddingExercise] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
 
@@ -1263,6 +1265,25 @@ function RoutineDetail({
   const confirmDeleteAction = () => {
     onDelete(workouts.map((w) => w.id));
     setConfirmDelete(false);
+  };
+
+  const handleAiSwap = async (ex: WorkoutExercise) => {
+    setSwapMenuExercise(null);
+    setAiSwapping(true);
+    try {
+      const res = await fetch(`/api/workouts/${latest.id}/exercises/${ex.id}/suggest`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'No alternatives found');
+        return;
+      }
+      const suggestion = await res.json();
+      await onSwapExercise(latest.id, ex.id, suggestion.id);
+    } catch {
+      alert('Failed to get suggestion');
+    } finally {
+      setAiSwapping(false);
+    }
   };
 
   return (
@@ -1440,7 +1461,7 @@ function RoutineDetail({
                   tip={getCoachingTip(ex)}
                   lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                   pr={getPRForExercise(workouts, getExerciseName(ex))}
-                  onSwap={() => setSwappingExercise(ex)}
+                  onSwap={() => setSwapMenuExercise(ex)}
                   onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                   weightUnit={weightUnit}
                   supersetLabel={supersetLabelMap.get(ex.id)}
@@ -1464,7 +1485,7 @@ function RoutineDetail({
                       tip={getCoachingTip(ex)}
                       lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                       pr={getPRForExercise(workouts, getExerciseName(ex))}
-                      onSwap={() => setSwappingExercise(ex)}
+                      onSwap={() => setSwapMenuExercise(ex)}
                       onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                       weightUnit={weightUnit}
                       supersetLabel={supersetLabelMap.get(ex.id)}
@@ -1489,6 +1510,59 @@ function RoutineDetail({
             </div>
           )}
         </div>
+
+      {/* Swap Method Action Sheet */}
+      {swapMenuExercise && !aiSwapping && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setSwapMenuExercise(null)} />
+          <div className="fixed left-1/2 bottom-24 -translate-x-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-4 w-[280px] shadow-2xl">
+            <p className="text-xs text-muted uppercase tracking-[0.15em] font-bold mb-3 text-center">
+              Swap {getExerciseName(swapMenuExercise)}
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  const ex = swapMenuExercise;
+                  setSwapMenuExercise(null);
+                  setSwappingExercise(ex);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700/50 hover:bg-slate-700 transition-colors text-left"
+              >
+                <svg className="w-5 h-5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-bold text-white">Pick manually</p>
+                  <p className="text-xs text-muted">Browse exercises</p>
+                </div>
+              </button>
+              <button
+                onClick={() => handleAiSwap(swapMenuExercise)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 transition-colors text-left"
+              >
+                <svg className="w-5 h-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <div>
+                  <p className="text-sm font-bold text-primary">Regenerate</p>
+                  <p className="text-xs text-muted">New exercise, same muscle</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* AI Swap Loading Overlay */}
+      {aiSwapping && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-bold text-white">Finding a new exercise...</p>
+          </div>
+        </>
+      )}
 
       {/* Swap Exercise Modal */}
       <SwapExerciseModal
@@ -2503,6 +2577,8 @@ function WorkoutsPageInner() {
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
   >([]);
   const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
+  const [hitItSwapMenu, setHitItSwapMenu] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
+  const [hitItAiSwapping, setHitItAiSwapping] = useState(false);
   const [hitItReplaceConfirm, setHitItReplaceConfirm] = useState<string | null>(null); // name of routine trying to start
   const [activities, setActivities] = useState<Activity[]>([]);
   const [collections, setCollections] = useState<WorkoutCollection[]>([]);
@@ -3359,7 +3435,7 @@ function WorkoutsPageInner() {
                     onFinish={handleFinish}
                     onRemove={removeFromHitIt}
                     onSwapExercise={(workoutId, workoutExerciseId) =>
-                      setHitItSwapping({ workoutId, workoutExerciseId, exerciseName: '' })
+                      setHitItSwapMenu({ workoutId, workoutExerciseId, exerciseName: '' })
                     }
                     weightUnit={weightUnit}
                   />
@@ -3467,6 +3543,77 @@ function WorkoutsPageInner() {
           </div>
         );
       })()}
+
+      {/* Hit It Swap Method Action Sheet */}
+      {hitItSwapMenu && !hitItAiSwapping && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setHitItSwapMenu(null)} />
+          <div className="fixed left-1/2 bottom-24 -translate-x-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-4 w-[280px] shadow-2xl">
+            <p className="text-xs text-muted uppercase tracking-[0.15em] font-bold mb-3 text-center">
+              Swap Exercise
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  const menu = hitItSwapMenu;
+                  setHitItSwapMenu(null);
+                  setHitItSwapping(menu);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700/50 hover:bg-slate-700 transition-colors text-left"
+              >
+                <svg className="w-5 h-5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-bold text-white">Pick manually</p>
+                  <p className="text-xs text-muted">Browse exercises</p>
+                </div>
+              </button>
+              <button
+                onClick={async () => {
+                  const menu = hitItSwapMenu;
+                  setHitItSwapMenu(null);
+                  setHitItAiSwapping(true);
+                  try {
+                    const res = await fetch(`/api/workouts/${menu.workoutId}/exercises/${menu.workoutExerciseId}/suggest`);
+                    if (!res.ok) {
+                      const err = await res.json().catch(() => ({}));
+                      alert(err.error || 'No alternatives found');
+                      return;
+                    }
+                    const suggestion = await res.json();
+                    await handleSwapExercise(menu.workoutId, menu.workoutExerciseId, suggestion.id);
+                  } catch {
+                    alert('Failed to get suggestion');
+                  } finally {
+                    setHitItAiSwapping(false);
+                  }
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 transition-colors text-left"
+              >
+                <svg className="w-5 h-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <div>
+                  <p className="text-sm font-bold text-primary">Regenerate</p>
+                  <p className="text-xs text-muted">New exercise, same muscle</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Hit It AI Swap Loading */}
+      {hitItAiSwapping && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-bold text-white">Finding a new exercise...</p>
+          </div>
+        </>
+      )}
 
       {/* Swap Exercise Modal for Hit It tab */}
       <SwapExerciseModal
