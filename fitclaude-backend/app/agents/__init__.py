@@ -9,5 +9,5 @@ from app.agents.nutrition.vision_agent import VisionNutritionAgent
 client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 nutrition_agent = NutritionAgent(client, model=settings.haiku_model)
-vision_nutrition_agent = VisionNutritionAgent(client, model=settings.agent_model)
+vision_nutrition_agent = VisionNutritionAgent(client, model=settings.haiku_model)
 # workout_agent = WorkoutAgent(client, model=settings.agent_model)  # future

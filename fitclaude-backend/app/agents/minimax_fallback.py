@@ -1,15 +1,14 @@
 """
-MiniMax M2.5 fallback — conversational only (no tool-use).
+Anthropic Haiku fallback — conversational only (no tool-use).
 
-Used when Anthropic's API is overloaded or unavailable. Provides a degraded
-but functional chat experience: the coach can talk, but cannot save workouts
-or log nutrition.
+Used when the primary API (MiniMax) is overloaded or unavailable. Provides a
+degraded but functional chat experience: the coach can talk, but cannot save
+workouts or log nutrition.
 """
 
 import logging
-import re
 
-from openai import AsyncOpenAI
+from anthropic import AsyncAnthropic
 
 from app.config import settings
 
@@ -24,35 +23,28 @@ FALLBACK_NOTE = (
 )
 
 
-async def handle_chat_minimax(
+async def handle_chat_fallback(
     user_message: str,
     history: list[dict],
     system_prompt: str,
 ) -> str:
     """
-    Fallback chat handler using MiniMax M2.5 via OpenAI-compatible API.
+    Fallback chat handler using Anthropic Haiku.
 
     Returns the assistant's text response. Raises on failure so the caller
     can fall through to the generic error handler.
     """
-    if not settings.minimax_api_key:
-        raise RuntimeError("MiniMax API key not configured")
+    if not settings.anthropic_api_key:
+        raise RuntimeError("Anthropic API key not configured")
 
-    client = AsyncOpenAI(
-        base_url="https://api.minimax.io/v1",
-        api_key=settings.minimax_api_key,
-    )
+    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
-    # Build OpenAI-format messages
-    messages: list[dict] = [
-        {"role": "system", "content": system_prompt + FALLBACK_NOTE},
-    ]
+    # Build Anthropic-format messages
+    messages: list[dict] = []
 
-    # Convert history — coerce non-string content to strings
     for msg in history:
         content = msg.get("content", "")
         if not isinstance(content, str):
-            # Handle Anthropic-style content blocks (list of dicts with "text" key)
             if isinstance(content, list):
                 content = " ".join(
                     block.get("text", "") if isinstance(block, dict) else str(block)
@@ -64,16 +56,15 @@ async def handle_chat_minimax(
 
     messages.append({"role": "user", "content": user_message})
 
-    logger.info(f"[MiniMax] Calling {settings.minimax_model} with {len(messages)} messages")
+    logger.info(f"[Fallback] Calling {settings.haiku_model} with {len(messages)} messages")
 
-    completion = await client.chat.completions.create(
-        model=settings.minimax_model,
+    response = await client.messages.create(
+        model=settings.haiku_model,
+        system=system_prompt + FALLBACK_NOTE,
         messages=messages,
         max_tokens=2048,
     )
 
-    text = completion.choices[0].message.content or ""
-    # Strip <think>...</think> blocks — MiniMax sometimes outputs chain-of-thought
-    text = re.sub(r"<think>[\s\S]*?</think>\s*", "", text).strip()
-    logger.info(f"[MiniMax] Response received ({len(text)} chars)")
+    text = response.content[0].text if response.content else ""
+    logger.info(f"[Fallback] Response received ({len(text)} chars)")
     return text

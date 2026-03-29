@@ -22,7 +22,7 @@ from app.agents.workout.spicy import get_spicy_variation
 from app.services.youtube_service import import_exercises_from_youtube
 from app.jobs.video_linker import _link_best_video
 from app.agents.workout.tools import TOOL_DEFINITIONS
-from app.agents.minimax_fallback import handle_chat_minimax
+from app.agents.minimax_fallback import handle_chat_fallback
 from app.config import settings
 from app.services.usage_service import check_rate_limit, get_model_for_tier, log_token_usage
 from app.models import (
@@ -38,7 +38,10 @@ from app.models.exercise_video import ExerciseVideo
 # Note: ConversationHistory is still imported for _load_conversation_history reads,
 # but conversation saving is handled by the Next.js API route (Prisma).
 
-client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+client = AsyncAnthropic(
+    api_key=settings.minimax_api_key or settings.anthropic_api_key,
+    base_url=settings.agent_base_url or None,
+)
 cuid_generator = Cuid()
 
 
@@ -695,11 +698,22 @@ async def _tool_log_nutrition(
     # Sanitize raw_text — Claude sometimes injects XML parameter tags
     raw_text = _sanitize_raw_text(params["raw_text"])
 
-    # Use Claude's macro estimates directly (no re-extraction — Pydantic validates upstream)
+    # Try nutrition agent for more accurate macro extraction
     calories = params.get("calories")
     protein_g = params.get("protein_g")
     carbs_g = params.get("carbs_g")
     fat_g = params.get("fat_g")
+
+    try:
+        agent_result = await nutrition_agent.extract_and_validate(raw_text)
+        if "error" not in agent_result:
+            calories = agent_result["total_calories"]
+            protein_g = agent_result["total_protein_g"]
+            carbs_g = agent_result["total_carbs_g"]
+            fat_g = agent_result["total_fat_g"]
+            logger.info(f"[Coach] Nutrition agent override: {calories} cal, {protein_g}g pro, {carbs_g}g carb, {fat_g}g fat")
+    except Exception as e:
+        logger.warning(f"[Coach] Nutrition agent failed in tool handler, using Claude estimates: {e}")
 
     # Store as UTC but ensure the date component matches the user's local date
     log = NutritionLog(
@@ -1090,9 +1104,9 @@ async def handle_chat(
             # Fall through to general coach with image
 
     # ── Fast path: dedicated nutrition agent for simple food logging ──
-    # Routes food logging to the nutrition agent regardless of topic
     if (
-        not image_base64
+        topic == "nutrition"
+        and not image_base64
         and user_message
         and detect_food_logging_intent(user_message)
     ):
@@ -1184,8 +1198,12 @@ async def handle_chat(
             "model_used": None,
         }
 
-    # Select model based on user tier
-    active_model = await get_model_for_tier(db, user_id)
+    # Select model: use configured agent model (e.g. MiniMax) if base_url is set,
+    # otherwise use tier-based Anthropic model
+    if settings.agent_base_url:
+        active_model = settings.agent_model
+    else:
+        active_model = await get_model_for_tier(db, user_id)
     request_id = str(uuid.uuid4())[:8]
 
     try:
@@ -1252,7 +1270,7 @@ async def handle_chat(
 
         # Extract final text
         assistant_text = "".join(
-            block.text for block in response.content if hasattr(block, "text")
+            block.text for block in response.content if hasattr(block, "text") and block.text
         )
 
         # Safety net: if the topic is nutrition and the user mentioned food but
@@ -1317,7 +1335,7 @@ async def handle_chat(
                 await log_token_usage(db, user_id, "chat_retry", active_model, response.usage, request_id=request_id)
             # Use the retry response text
             assistant_text = "".join(
-                block.text for block in response.content if hasattr(block, "text")
+                block.text for block in response.content if hasattr(block, "text") and block.text
             )
 
         # Safety net: if the topic is workout and the user asked for a workout but
@@ -1389,7 +1407,7 @@ async def handle_chat(
 
         logger.warning("[Coach] Falling back to MiniMax")
         system_plain = COACH_SYSTEM_PROMPT + "\n" + context
-        fallback_text = await handle_chat_minimax(user_message, history, system_plain)
+        fallback_text = await handle_chat_fallback(user_message, history, system_plain)
         # Strip any leaked <think> tags
         fallback_text = re.sub(r"<think>[\s\S]*?</think>\s*", "", fallback_text).strip()
         return {

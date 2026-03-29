@@ -4,13 +4,14 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     anthropic_api_key: str = ""
     database_url: str = ""
-    agent_model: str = "claude-sonnet-4-20250514"
+    agent_model: str = "MiniMax-M2.7"
+    agent_base_url: str = ""
     haiku_model: str = "claude-haiku-4-5-20251001"
     debug: bool = False
 
     # MiniMax fallback
     minimax_api_key: str = ""
-    minimax_model: str = "MiniMax-M2.5"
+    minimax_model: str = "MiniMax-M2.7"
 
     # YouTube subagent
     youtube_api_key: str = ""
