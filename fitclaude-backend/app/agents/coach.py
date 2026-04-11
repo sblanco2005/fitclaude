@@ -54,7 +54,7 @@ async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
     if not user:
         raise ValueError(f"User {user_id} not found")
 
-    return {
+    user_data = {
         "name": user.name,
         "fitness_goal": user.fitness_goal,
         "experience_level": user.experience_level,
@@ -67,6 +67,23 @@ async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
         "carbs_percent": user.carbs_percent,
         "fat_percent": user.fat_percent,
     }
+
+    # For home gym users, pre-filter exercises by available equipment
+    # so the coach only sees exercises the user can actually do.
+    if user.gym_type == "own_gym" and user.equipment_text:
+        user_equipment = _parse_user_equipment(user.equipment_text)
+        all_exercises = await db.execute(select(Exercise))
+        exercises = all_exercises.scalars().all()
+
+        by_muscle: dict[str, list[str]] = {}
+        for ex in exercises:
+            if _exercise_fits_equipment(ex.equipment_required, user_equipment):
+                group = ex.muscle_group or "other"
+                by_muscle.setdefault(group, []).append(ex.name)
+
+        user_data["available_exercises_by_muscle"] = by_muscle
+
+    return user_data
 
 
 HISTORY_LIMITS: dict[str, int] = {
