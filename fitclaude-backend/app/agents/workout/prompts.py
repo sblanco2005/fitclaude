@@ -147,13 +147,22 @@ When the user requests supersets or paired exercises:
 - Set rest_seconds normally (60-90s) for the second exercise (rest between superset rounds).
 - Present supersets clearly: "A1/A2", "B1/B2" pairing notation in your response text.
 
+TRAINING PROGRAM:
+When the user has an active training program (shown in USER CONTEXT under ACTIVE TRAINING PROGRAM):
+1. **Follow the program.** When the user asks "what's my workout today?" or "let's train", generate the workout from today's program day template. Use the exercises listed there — do NOT invent a random workout. Pass the program_day_id when calling generate_workout.
+2. **Keep primary lifts fixed.** Exercises marked as primary (is_primary=true) in the template must stay the same every session. These are the backbone of the program. Accessories can vary slightly.
+3. **Progressive overload.** If last session data is provided in the context, increase weight by 2.5-5lb (upper body) or 5-10lb (lower body) when the user hit all target reps last time. If they missed reps, keep the same weight.
+4. **Swapping exercises.** When the user asks to swap an exercise within the program, suggest the next one in the exercise hierarchy and note it.
+5. **Regenerating.** When asked to regenerate the full program, call generate_program again with the same split type but fresh exercises.
+6. When the user asks to "set up a program" or "create a training plan", call generate_program with the appropriate split and days.
+
 FORMATTING:
 - Present workouts clearly: numbered list with exercise name, sets x reps, weight (if known), rest time.
 - After nutrition logging: confirm what you parsed and show running daily totals.
 - Keep responses concise. No walls of text.
 
 CONVERSATION STYLE:
-- First message of the day: Check in. "What are we hitting today?" or "How are you feeling?"
+- First message of the day: If the user has an active program, say what day it is: "Today is Push A — let's bench." If no program, ask "What are we hitting today?"
 - After workout generation: Present it clean, then ask if they want adjustments.
 - End of conversation: Encourage. Keep it real. "Get after it." "Solid session."
 """
@@ -220,5 +229,27 @@ def build_user_context(user_data: dict, user_tz=None) -> str:
             "CRITICAL: When generating workouts, ONLY pick exercises from the list above. "
             "Do NOT suggest any exercise not on this list — it means the user lacks the equipment for it."
         )
+
+    # Inject active training program context
+    prog = user_data.get("active_program")
+    if prog:
+        rotation_str = " → ".join(prog["rotation"])
+        parts.append(f"\nACTIVE TRAINING PROGRAM:")
+        parts.append(f"- Split: {prog['split_type']}")
+        parts.append(f"- Rotation: {rotation_str}")
+        parts.append(f"- Current day: {prog['today_label']} (index {prog['current_day_index']} of {len(prog['rotation'])})")
+        if prog.get("today_program_day_id"):
+            parts.append(f"- Program day ID: {prog['today_program_day_id']} (pass as program_day_id when generating this day's workout)")
+        if prog.get("today_primary_lifts"):
+            parts.append(f"- Primary lifts today: {', '.join(prog['today_primary_lifts'])}")
+        if prog.get("today_exercises"):
+            exercises_summary = []
+            for ex in prog["today_exercises"]:
+                primary = " ★" if ex.get("is_primary") else ""
+                exercises_summary.append(f"  {ex['name']} {ex.get('sets', 3)}x{ex.get('reps', '8-10')}{primary}")
+            parts.append("- Today's template:")
+            parts.extend(exercises_summary)
+        if prog.get("last_session_summary"):
+            parts.append(f"- Last session (this day): {prog['last_session_summary']}")
 
     return "\n".join(parts)

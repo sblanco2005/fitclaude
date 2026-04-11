@@ -108,6 +108,10 @@ TOOL_DEFINITIONS = [
                     "enum": ["coach", "manual"],
                     "description": "Source: 'coach' for AI-generated (default), 'manual' for user-logged external workouts/classes",
                 },
+                "program_day_id": {
+                    "type": "string",
+                    "description": "If generating from a training program, the ProgramDay ID to link this workout to. Only set when generating a program day's workout.",
+                },
             },
             "required": ["workout_type", "category", "exercises"],
         },
@@ -311,6 +315,84 @@ TOOL_DEFINITIONS = [
                 },
             },
             "required": ["youtube_url"],
+        },
+    },
+    {
+        "name": "generate_program",
+        "description": (
+            "Generate a complete training program with exercise templates for each day "
+            "in the rotation. Call this when the user wants to set up a structured "
+            "training program (PPL, Upper/Lower, Full Body). This creates a persistent "
+            "program that the user follows day by day with progressive overload. "
+            "Each day should have 1-2 PRIMARY lifts (big compounds that stay the same "
+            "every week) and 3-4 accessories. Mark primary lifts with is_primary=true."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "split_type": {
+                    "type": "string",
+                    "enum": ["ppl", "upper_lower", "full_body"],
+                    "description": "The training split type",
+                },
+                "days": {
+                    "type": "array",
+                    "description": "Exercise templates for each day in the rotation",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "day_label": {
+                                "type": "string",
+                                "description": "Human-readable day name (e.g. 'Push A', 'Pull B', 'Upper 1')",
+                            },
+                            "workout_type": {
+                                "type": "string",
+                                "enum": ["push", "pull", "legs", "upper", "lower", "full_body"],
+                                "description": "The workout type for this day",
+                            },
+                            "day_index": {
+                                "type": "integer",
+                                "description": "Position in the rotation (0-based)",
+                            },
+                            "exercises": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string",
+                                            "description": "Exercise name",
+                                        },
+                                        "muscle_group": {
+                                            "type": "string",
+                                            "description": "Primary muscle group",
+                                        },
+                                        "sets": {
+                                            "type": "integer",
+                                            "description": "Number of sets",
+                                        },
+                                        "reps": {
+                                            "type": "string",
+                                            "description": "Rep range (e.g. '4-6', '8-10')",
+                                        },
+                                        "is_primary": {
+                                            "type": "boolean",
+                                            "description": "True for main compound lifts that stay fixed week to week",
+                                        },
+                                        "notes": {
+                                            "type": "string",
+                                            "description": "Coaching tips for this exercise",
+                                        },
+                                    },
+                                    "required": ["name", "muscle_group", "sets", "reps"],
+                                },
+                            },
+                        },
+                        "required": ["day_label", "workout_type", "day_index", "exercises"],
+                    },
+                },
+            },
+            "required": ["split_type", "days"],
         },
     },
 ]

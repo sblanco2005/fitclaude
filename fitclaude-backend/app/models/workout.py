@@ -26,6 +26,9 @@ class Workout(Base):
         "fatigueRating", nullable=True
     )
     completed: Mapped[bool] = mapped_column(default=False)
+    program_day_id: Mapped[Optional[str]] = mapped_column(
+        "programDayId", ForeignKey("program_days.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         "createdAt", DateTime, default=func.now()
     )
@@ -34,6 +37,7 @@ class Workout(Base):
     exercises: Mapped[List["WorkoutExercise"]] = relationship(
         back_populates="workout", cascade="all, delete-orphan"
     )
+    program_day: Mapped[Optional["ProgramDay"]] = relationship(back_populates="workouts")  # noqa: F821
 
 
 class WorkoutExercise(Base):

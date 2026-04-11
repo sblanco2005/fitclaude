@@ -7,7 +7,22 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TextArea } from '@/components/ui/TextArea';
 import { useToast } from '@/components/ui/Toast';
-import type { UserProfile } from '@/types';
+import type { UserProfile, TrainingProgram } from '@/types';
+
+const trainingSplits = [
+  { value: 'ppl', label: 'Push / Pull / Legs' },
+  { value: 'upper_lower', label: 'Upper / Lower' },
+  { value: 'full_body', label: 'Full Body' },
+];
+
+const splitColors: Record<string, string> = {
+  push: 'bg-red-500/20 text-red-400',
+  pull: 'bg-blue-500/20 text-blue-400',
+  legs: 'bg-amber-500/20 text-amber-400',
+  upper: 'bg-purple-500/20 text-purple-400',
+  lower: 'bg-emerald-500/20 text-emerald-400',
+  full_body: 'bg-cyan-500/20 text-cyan-400',
+};
 
 const fitnessGoals = [
   { value: 'build_muscle', label: 'Build Muscle' },
@@ -30,16 +45,63 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [program, setProgram] = useState<TrainingProgram | null>(null);
+  const [selectedSplit, setSelectedSplit] = useState<string>('ppl');
+  const [generatingProgram, setGeneratingProgram] = useState(false);
 
   useEffect(() => {
-    fetch('/api/profile')
-      .then((res) => res.json())
-      .then((data) => {
-        setProfile(data);
+    Promise.all([
+      fetch('/api/profile').then((r) => r.json()),
+      fetch('/api/program').then((r) => r.json()),
+    ])
+      .then(([profileData, programData]) => {
+        setProfile(profileData);
+        if (programData?.id) {
+          setProgram(programData);
+          setSelectedSplit(programData.splitType);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const generateProgram = async () => {
+    setGeneratingProgram(true);
+    try {
+      // Send a chat message to the coach to generate the program
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Set up a ${trainingSplits.find((s) => s.value === selectedSplit)?.label || selectedSplit} training program for me. Use the generate_program tool with split_type="${selectedSplit}". Generate ${profile.trainingFrequency || 6} training days based on my equipment and goals. Make sure each day has 1-2 primary compound lifts and 3-4 accessories.`,
+          topic: 'workout',
+        }),
+      });
+      if (res.ok) {
+        // Refetch program
+        const progRes = await fetch('/api/program');
+        const progData = await progRes.json();
+        if (progData?.id) {
+          setProgram(progData);
+          toast('Training program created!');
+        }
+      }
+    } catch {
+      toast('Failed to generate program', 'error');
+    } finally {
+      setGeneratingProgram(false);
+    }
+  };
+
+  const deleteProgram = async () => {
+    try {
+      await fetch('/api/program', { method: 'DELETE' });
+      setProgram(null);
+      toast('Program removed');
+    } catch {
+      toast('Failed to remove program', 'error');
+    }
+  };
 
   const updateField = (field: string, value: unknown) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
@@ -186,6 +248,69 @@ export default function SettingsPage() {
             />
           )}
         </div>
+      </Card>
+
+      {/* Training Program */}
+      <Card>
+        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Training Program</h3>
+        {program ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-white font-medium">
+                {trainingSplits.find((s) => s.value === program.splitType)?.label || program.splitType}
+              </span>
+              <button
+                onClick={deleteProgram}
+                className="text-xs text-red-400 hover:text-red-300 transition-colors"
+              >
+                Reset Program
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {program.days.map((day, i) => (
+                <span
+                  key={day.id}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+                    i === program.currentDayIndex
+                      ? 'ring-2 ring-primary ring-offset-1 ring-offset-slate-900'
+                      : ''
+                  } ${splitColors[day.workoutType] || 'bg-slate-700 text-slate-300'}`}
+                >
+                  {day.dayLabel}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-muted">
+              Current day: <span className="text-white">{program.days[program.currentDayIndex]?.dayLabel}</span>
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-muted">Choose a training split and the coach will generate a structured program for you.</p>
+            <div className="flex flex-col gap-2">
+              {trainingSplits.map((split) => (
+                <button
+                  key={split.value}
+                  onClick={() => setSelectedSplit(split.value)}
+                  className={`w-full px-4 py-2.5 rounded-lg text-sm font-medium text-left transition-colors ${
+                    selectedSplit === split.value
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {split.label}
+                </button>
+              ))}
+            </div>
+            <Button
+              onClick={generateProgram}
+              disabled={generatingProgram}
+              className="w-full"
+            >
+              {generatingProgram ? 'Generating...' : 'Generate Program'}
+            </Button>
+          </div>
+        )}
       </Card>
 
       {/* Nutrition Targets */}

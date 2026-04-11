@@ -163,6 +163,53 @@ export interface WorkoutCollection {
   routineNames: string[];
 }
 
+// Training Program
+export interface ProgramDayExercise {
+  name: string;
+  muscle_group: string;
+  sets: number;
+  reps: string;
+  is_primary?: boolean;
+  notes?: string;
+}
+
+export interface ProgramDay {
+  id: string;
+  dayLabel: string;
+  workoutType: string;
+  dayIndex: number;
+  exerciseTemplate: ProgramDayExercise[];
+}
+
+export interface TrainingProgram {
+  id: string;
+  splitType: string;
+  rotation: string[];
+  currentDayIndex: number;
+  isActive: boolean;
+  days: ProgramDay[];
+}
+
+export interface TodayWorkout {
+  programDayId: string;
+  dayLabel: string;
+  workoutType: string;
+  dayIndex: number;
+  exerciseTemplate: ProgramDayExercise[];
+  isRestDay: boolean;
+  lastSession: {
+    date: string | null;
+    fatigueRating: number | null;
+    exercises: {
+      name: string;
+      sets: number;
+      reps: string | null;
+      weight: number | null;
+      setLogs: string | null;
+    }[];
+  } | null;
+}
+
 // Nutrition
 export interface NutritionLog {
   id: string;

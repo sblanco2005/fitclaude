@@ -30,6 +30,8 @@ from app.models import (
     ConversationHistory,
     Exercise,
     NutritionLog,
+    ProgramDay,
+    TrainingProgram,
     User,
     Workout,
     WorkoutExercise,
@@ -82,6 +84,71 @@ async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
                 by_muscle.setdefault(group, []).append(ex.name)
 
         user_data["available_exercises_by_muscle"] = by_muscle
+
+    # Load active training program if one exists
+    prog_result = await db.execute(
+        select(TrainingProgram)
+        .where(TrainingProgram.user_id == user_id, TrainingProgram.is_active == True)
+    )
+    program = prog_result.scalar_one_or_none()
+    if program:
+        rotation = json.loads(program.rotation)
+        current_type = rotation[program.current_day_index] if rotation else None
+
+        # Load the current day's template
+        day_result = await db.execute(
+            select(ProgramDay).where(
+                ProgramDay.program_id == program.id,
+                ProgramDay.day_index == program.current_day_index,
+            )
+        )
+        current_day = day_result.scalar_one_or_none()
+
+        prog_context: dict = {
+            "split_type": program.split_type,
+            "rotation": rotation,
+            "current_day_index": program.current_day_index,
+            "today_workout_type": current_type,
+            "today_label": current_day.day_label if current_day else current_type,
+            "today_program_day_id": current_day.id if current_day else None,
+        }
+
+        # Load the exercise template for today
+        if current_day:
+            template = json.loads(current_day.exercise_template)
+            prog_context["today_exercises"] = template
+            prog_context["today_primary_lifts"] = [
+                e["name"] for e in template if e.get("is_primary")
+            ]
+
+            # Load last completed session for this program day (progressive overload)
+            last_session = await db.execute(
+                select(Workout)
+                .where(
+                    Workout.program_day_id == current_day.id,
+                    Workout.completed == True,
+                )
+                .order_by(Workout.date.desc())
+                .limit(1)
+            )
+            last_workout = last_session.scalar_one_or_none()
+            if last_workout:
+                from sqlalchemy.orm import selectinload
+                # Re-query with exercises loaded
+                lw_result = await db.execute(
+                    select(Workout)
+                    .where(Workout.id == last_workout.id)
+                    .options(selectinload(Workout.exercises))
+                )
+                last_workout = lw_result.scalar_one()
+                last_summary = []
+                for we in sorted(last_workout.exercises, key=lambda e: e.order):
+                    name = we.notes.split("|")[0] if we.notes and "|" in we.notes else "?"
+                    weight = we.weight_kg or "?"
+                    last_summary.append(f"{name} {we.sets}x{we.reps} @ {weight}")
+                prog_context["last_session_summary"] = ", ".join(last_summary)
+
+        user_data["active_program"] = prog_context
 
     return user_data
 
@@ -142,6 +209,8 @@ async def _execute_tool(
         return await _tool_log_activity(db, user_id, tool_input, user_tz=user_tz)
     elif tool_name == "log_routine_done":
         return await _tool_log_routine_done(db, user_id, tool_input, user_tz=user_tz)
+    elif tool_name == "generate_program":
+        return await _tool_generate_program(db, user_id, tool_input)
     else:
         return {"error": f"Unknown tool: {tool_name}"}
 
@@ -497,6 +566,109 @@ def _match_exercise(name: str, all_exercises: list) -> "Exercise | None":
     return None
 
 
+async def _tool_generate_program(
+    db: AsyncSession, user_id: str, params: dict
+) -> dict:
+    """Create a training program with exercise templates for each day."""
+    split_type = params["split_type"]
+    days_data = params.get("days", [])
+
+    if not days_data:
+        return {"error": "No days provided in the program."}
+
+    # Delete any existing program for this user (one active program per user)
+    existing = await db.execute(
+        select(TrainingProgram).where(TrainingProgram.user_id == user_id)
+    )
+    old_program = existing.scalar_one_or_none()
+    if old_program:
+        await db.delete(old_program)
+        await db.flush()
+
+    # Build rotation array from the days
+    rotation = json.dumps([d["workout_type"] for d in days_data])
+
+    program = TrainingProgram(
+        id=cuid_generator.generate(),
+        user_id=user_id,
+        split_type=split_type,
+        rotation=rotation,
+        current_day_index=0,
+        is_active=True,
+    )
+    db.add(program)
+    await db.flush()
+
+    # Equipment validation — load user + exercises for filtering
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    user_equipment: set[str] | None = None
+    if user and user.gym_type == "own_gym" and user.equipment_text:
+        user_equipment = _parse_user_equipment(user.equipment_text)
+
+    all_exercises_result = await db.execute(select(Exercise))
+    all_exercises = all_exercises_result.scalars().all()
+
+    program_days = []
+    for day_data in days_data:
+        # Validate exercises against equipment
+        valid_exercises = []
+        rejected = []
+        for ex in day_data.get("exercises", []):
+            ex_name = ex.get("name", "")
+            if user_equipment is not None and ex_name:
+                found = _match_exercise(ex_name, all_exercises)
+                if found and found.equipment_required:
+                    if not _exercise_fits_equipment(found.equipment_required, user_equipment):
+                        rejected.append(ex_name)
+                        continue
+            valid_exercises.append(ex)
+
+        if rejected:
+            logger.info(
+                f"[Program] Day '{day_data['day_label']}': rejected {rejected} "
+                f"(user equipment: {user_equipment})"
+            )
+
+        day = ProgramDay(
+            id=cuid_generator.generate(),
+            program_id=program.id,
+            day_label=day_data["day_label"],
+            workout_type=day_data["workout_type"],
+            day_index=day_data["day_index"],
+            exercise_template=json.dumps(valid_exercises),
+        )
+        db.add(day)
+        program_days.append({
+            "day_label": day.day_label,
+            "workout_type": day.workout_type,
+            "day_index": day.day_index,
+            "exercise_count": len(valid_exercises),
+            "primary_lifts": [
+                e["name"] for e in valid_exercises if e.get("is_primary")
+            ],
+            "rejected_exercises": rejected,
+        })
+
+    await db.commit()
+    logger.info(
+        f"[Program] Created {split_type} program for user {user_id} "
+        f"with {len(program_days)} days"
+    )
+
+    return {
+        "program_id": program.id,
+        "split_type": split_type,
+        "days": program_days,
+        "message": (
+            f"Training program created! {split_type.upper()} split with "
+            f"{len(program_days)} training days. Present the full program to the user "
+            "with each day's exercises and primary lifts highlighted. "
+            "Tell them they can start their first workout by asking 'what's my workout today?'"
+        ),
+    }
+
+
 async def _tool_generate_workout(
     db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
@@ -535,6 +707,7 @@ async def _tool_generate_workout(
         date=datetime.now(user_tz).astimezone(tz.utc).replace(tzinfo=None) if user_tz else datetime.utcnow(),
         display_id=next_display_id,
         notes=tips or None,
+        program_day_id=params.get("program_day_id"),
     )
     db.add(workout)
     await db.flush()
@@ -879,14 +1052,40 @@ async def _tool_mark_workout_complete(db: AsyncSession, params: dict) -> dict:
     workout.fatigue_rating = params["fatigue_rating"]
     if params.get("notes"):
         workout.notes = params["notes"]
+
+    # Advance training program day index if this workout is linked to a program
+    program_advanced = False
+    if workout.program_day_id:
+        day_result = await db.execute(
+            select(ProgramDay).where(ProgramDay.id == workout.program_day_id)
+        )
+        program_day = day_result.scalar_one_or_none()
+        if program_day:
+            prog_result = await db.execute(
+                select(TrainingProgram).where(TrainingProgram.id == program_day.program_id)
+            )
+            program = prog_result.scalar_one_or_none()
+            if program:
+                rotation = json.loads(program.rotation)
+                program.current_day_index = (program.current_day_index + 1) % len(rotation)
+                program_advanced = True
+                logger.info(
+                    f"[Coach] Program advanced to day {program.current_day_index} "
+                    f"({rotation[program.current_day_index]})"
+                )
+
     await db.commit()
     logger.info(f"[Coach] Workout {workout.id} marked complete")
 
-    return {
+    result = {
         "workout_id": workout.id,
         "completed": True,
         "fatigue_rating": workout.fatigue_rating,
     }
+    if program_advanced:
+        result["program_advanced"] = True
+        result["next_day_index"] = program.current_day_index
+    return result
 
 
 async def _tool_log_activity(

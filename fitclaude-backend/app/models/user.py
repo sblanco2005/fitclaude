@@ -68,3 +68,4 @@ class User(Base):
     activities: Mapped[List["Activity"]] = relationship(back_populates="user")  # noqa: F821
     token_usages: Mapped[List["TokenUsage"]] = relationship(back_populates="user")  # noqa: F821
     usage_limit: Mapped[Optional["UserUsageLimit"]] = relationship(back_populates="user", uselist=False)  # noqa: F821
+    training_program: Mapped[Optional["TrainingProgram"]] = relationship(back_populates="user", uselist=False)  # noqa: F821

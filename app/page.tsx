@@ -6,7 +6,16 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import type { Activity, DailyNutrition, Workout, WorkoutCollection } from '@/types';
+import type { Activity, DailyNutrition, TodayWorkout, Workout, WorkoutCollection } from '@/types';
+
+const splitColors: Record<string, string> = {
+  push: 'text-red-400',
+  pull: 'text-blue-400',
+  legs: 'text-amber-400',
+  upper: 'text-purple-400',
+  lower: 'text-emerald-400',
+  full_body: 'text-cyan-400',
+};
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -15,6 +24,7 @@ export default function DashboardPage() {
   const [todayWorkouts, setTodayWorkouts] = useState<Workout[]>([]);
   const [todayActivities, setTodayActivities] = useState<Activity[]>([]);
   const [collections, setCollections] = useState<WorkoutCollection[]>([]);
+  const [programToday, setProgramToday] = useState<TodayWorkout | null>(null);
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.isOnboarded === false) {
@@ -69,6 +79,11 @@ export default function DashboardPage() {
       fetch('/api/collections')
         .then((res) => res.ok ? res.json() : [])
         .then((data) => setCollections(Array.isArray(data) ? data : []))
+        .catch(() => {});
+
+      fetch('/api/program/today')
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => { if (data?.programDayId) setProgramToday(data); })
         .catch(() => {});
     };
 
@@ -169,44 +184,74 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        {/* Workout card — taps to /workouts */}
-        <Link href="/workouts" className="block">
-          <Card className="p-3" hover>
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-base">🏋️</span>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Workout Coach</h3>
-            </div>
-            {hasWorkouts ? (
-              <div className="space-y-1.5">
-                {todayWorkouts.slice(0, 2).map((w) => (
-                  <div key={w.id} className="py-2 px-3 rounded-lg bg-slate-800/50">
-                    <div className="text-xs font-medium text-white truncate">
-                      {w.name || w.workoutType.replace('_', ' ')}
-                    </div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-xs text-muted">{w.exercises?.length || 0} exercises</span>
-                      <span className="text-xs font-medium text-white bg-primary/30 px-1.5 py-0.5 rounded-full">Done</span>
-                    </div>
-                  </div>
-                ))}
-                {todayActivities.slice(0, todayWorkouts.length >= 2 ? 0 : 2 - todayWorkouts.length).map((a) => (
-                  <div key={a.id} className="py-2 px-3 rounded-lg bg-slate-800/50">
-                    <div className="text-xs font-medium text-white truncate capitalize">{a.name}</div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-xs text-muted">{a.durationMinutes ? `${a.durationMinutes} min` : 'Activity'}</span>
-                      <span className="text-xs font-medium text-white bg-amber-500/30 px-1.5 py-0.5 rounded-full">Activity</span>
-                    </div>
-                  </div>
-                ))}
-                {(todayWorkouts.length + todayActivities.length) > 2 && (
-                  <div className="text-xs text-muted text-center">+{todayWorkouts.length + todayActivities.length - 2} more</div>
-                )}
+        {/* Workout card — program-aware */}
+        {programToday ? (
+          <Link href="/workouts" className="block">
+            <Card className="p-3" hover>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-base">🏋️</span>
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Today&apos;s Workout</h3>
               </div>
-            ) : (
-              <p className="text-muted text-xs text-center py-3">No workout today</p>
-            )}
-          </Card>
-        </Link>
+              <div className="space-y-2">
+                <div className={`text-lg font-bold ${splitColors[programToday.workoutType] || 'text-white'}`}>
+                  {programToday.dayLabel}
+                </div>
+                <div className="space-y-1">
+                  {programToday.exerciseTemplate
+                    .filter((e) => e.is_primary)
+                    .map((e, i) => (
+                      <div key={i} className="text-xs text-white">
+                        {e.name} <span className="text-muted">{e.sets}x{e.reps}</span>
+                      </div>
+                    ))}
+                  {programToday.exerciseTemplate.filter((e) => !e.is_primary).length > 0 && (
+                    <div className="text-xs text-muted">
+                      +{programToday.exerciseTemplate.filter((e) => !e.is_primary).length} accessories
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </Link>
+        ) : (
+          <Link href="/workouts" className="block">
+            <Card className="p-3" hover>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-base">🏋️</span>
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Workout Coach</h3>
+              </div>
+              {hasWorkouts ? (
+                <div className="space-y-1.5">
+                  {todayWorkouts.slice(0, 2).map((w) => (
+                    <div key={w.id} className="py-2 px-3 rounded-lg bg-slate-800/50">
+                      <div className="text-xs font-medium text-white truncate">
+                        {w.name || w.workoutType.replace('_', ' ')}
+                      </div>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-xs text-muted">{w.exercises?.length || 0} exercises</span>
+                        <span className="text-xs font-medium text-white bg-primary/30 px-1.5 py-0.5 rounded-full">Done</span>
+                      </div>
+                    </div>
+                  ))}
+                  {todayActivities.slice(0, todayWorkouts.length >= 2 ? 0 : 2 - todayWorkouts.length).map((a) => (
+                    <div key={a.id} className="py-2 px-3 rounded-lg bg-slate-800/50">
+                      <div className="text-xs font-medium text-white truncate capitalize">{a.name}</div>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-xs text-muted">{a.durationMinutes ? `${a.durationMinutes} min` : 'Activity'}</span>
+                        <span className="text-xs font-medium text-white bg-amber-500/30 px-1.5 py-0.5 rounded-full">Activity</span>
+                      </div>
+                    </div>
+                  ))}
+                  {(todayWorkouts.length + todayActivities.length) > 2 && (
+                    <div className="text-xs text-muted text-center">+{todayWorkouts.length + todayActivities.length - 2} more</div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-muted text-xs text-center py-3">No workout today</p>
+              )}
+            </Card>
+          </Link>
+        )}
       </div>
 
       {/* Collections / Routines */}

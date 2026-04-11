@@ -55,6 +55,7 @@ model User {
   tokenUsages          TokenUsage[]
   usageLimit           UserUsageLimit?
   collections          WorkoutCollection[]
+  trainingProgram      TrainingProgram?
 
   @@map("users")
 }
@@ -159,10 +160,12 @@ model Workout {
   fatigueRating   Int?     // 1-10
   completed       Boolean  @default(false)
   isFavorite      Boolean  @default(false)
+  programDayId    String?
   createdAt       DateTime @default(now())
 
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exercises WorkoutExercise[]
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises  WorkoutExercise[]
+  programDay ProgramDay?       @relation(fields: [programDayId], references: [id])
 
   @@index([userId])
   @@index([userId, date])
@@ -439,4 +442,41 @@ model WorkoutCollectionWorkout {
   @@unique([collectionId, routineName])
   @@index([collectionId])
   @@map("workout_collection_workouts")
+}
+
+// ============================================
+// Training Programs
+// ============================================
+
+model TrainingProgram {
+  id              String   @id @default(cuid())
+  userId          String   @unique          // one active program per user
+  splitType       String                    // "ppl", "upper_lower", "full_body"
+  rotation        String   @db.Text         // JSON: ["push","pull","legs","push","pull","legs"]
+  currentDayIndex Int      @default(0)      // where user is in rotation (0-based)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  days ProgramDay[]
+
+  @@index([userId])
+  @@map("training_programs")
+}
+
+model ProgramDay {
+  id               String @id @default(cuid())
+  programId        String
+  dayLabel         String           // "Push A", "Pull B", "Legs", etc.
+  workoutType      String           // push, pull, legs, upper, lower, full_body
+  dayIndex         Int              // position in rotation (0-based)
+  exerciseTemplate String @db.Text  // JSON: [{name, muscle_group, sets, reps, is_primary, notes, order}]
+
+  program  TrainingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  workouts Workout[]
+
+  @@unique([programId, dayIndex])
+  @@index([programId])
+  @@map("program_days")
 }
