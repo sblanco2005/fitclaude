@@ -367,6 +367,10 @@ TOOL_DEFINITIONS = [
                                 "enum": ["push", "pull", "legs", "upper", "lower", "full_body", "custom"],
                                 "description": "Workout type for coached days (omit for pt/class/rest)",
                             },
+                            "keep_existing": {
+                                "type": "boolean",
+                                "description": "If true, preserve the existing day's exercise template and linked routine — do NOT regenerate. Use this when the user hasn't changed this day's configuration and you want to avoid clobbering their manual edits. Omit or false to regenerate fresh exercises.",
+                            },
                             "exercises": {
                                 "type": "array",
                                 "description": "Exercise template for coached days (omit for pt/class/rest)",

@@ -74,6 +74,17 @@ interface DayDraft {
   exerciseCount?: number;
 }
 
+/** Stable fingerprint for detecting whether a day's config has changed. */
+function dayFingerprint(d: DayDraft): string {
+  return [
+    d.dayType,
+    d.dayLabel.trim().toLowerCase(),
+    (d.focusMuscles || []).slice().sort().join(','),
+    d.exerciseCount ?? '',
+    d.workoutType ?? '',
+  ].join('|');
+}
+
 export default function ProgramPage() {
   const { toast } = useToast();
   const [program, setProgram] = useState<TrainingProgram | null>(null);
@@ -84,6 +95,9 @@ export default function ProgramPage() {
   // Builder state — start with 2 weeks, all rest days
   const [totalWeeks, setTotalWeeks] = useState(2);
   const [draftDays, setDraftDays] = useState<DayDraft[]>([]);
+  // Snapshot of the days as they were when the builder was opened — used to
+  // detect which days are unchanged so we can skip regenerating them.
+  const [originalDrafts, setOriginalDrafts] = useState<DayDraft[]>([]);
   const [editingDay, setEditingDay] = useState<DayDraft | null>(null);
   const [generating, setGenerating] = useState(false);
 
@@ -114,6 +128,7 @@ export default function ProgramPage() {
       }
     }
     setDraftDays(days);
+    setOriginalDrafts([]); // No baseline — brand-new program, everything is "new"
     setBuilding(true);
   };
 
@@ -148,31 +163,73 @@ export default function ProgramPage() {
   const generateProgram = async () => {
     setGenerating(true);
     try {
-      // Filter out rest days with no info, and build a description of what we want
-      const coachedDays = draftDays.filter((d) => d.dayType === 'coached');
-      const nonCoachedDays = draftDays.filter((d) => d.dayType !== 'coached' && d.dayType !== 'rest');
-
-      let message = `Set up my training program. Use the generate_program tool with total_weeks=${totalWeeks} and these days:\n\n`;
-
-      draftDays.forEach((d) => {
-        if (d.dayType === 'rest') return;
-        message += `- Week ${d.weekNumber}, ${WEEKDAYS_LONG[d.weekday]} (weekday=${d.weekday}): ${DAY_TYPE_LABELS[d.dayType]} — "${d.dayLabel}"`;
-        if (d.workoutType) message += ` (workout_type=${d.workoutType})`;
-        if (d.dayType === 'coached' && d.focusMuscles && d.focusMuscles.length > 0) {
-          message += ` — target muscles: ${d.focusMuscles.join(', ')}`;
-        }
-        if (d.dayType === 'coached' && d.exerciseCount) {
-          message += ` — EXACTLY ${d.exerciseCount} exercises`;
-        }
-        message += '\n';
+      // Build a fingerprint map of the original so we can detect unchanged days
+      const originalByKey = new Map<string, DayDraft>();
+      originalDrafts.forEach((d) => {
+        originalByKey.set(`${d.weekday}-${d.weekNumber}`, d);
       });
 
-      if (coachedDays.length > 0) {
-        message += `\nFor each Coach Fit day, generate EXACTLY the number of exercises specified for that day. Target ONLY the listed muscles. Include 1-2 primary compound lifts (is_primary=true) from the top of the exercise hierarchy, then fill the rest with accessories. Respect my equipment.`;
+      // Classify each draft day as unchanged / changed / new
+      const classified = draftDays.map((d) => {
+        const original = originalByKey.get(`${d.weekday}-${d.weekNumber}`);
+        const unchanged = !!original && dayFingerprint(d) === dayFingerprint(original);
+        return { day: d, unchanged };
+      });
+
+      // Short-circuit: nothing changed
+      const anyChanged = classified.some((c) => !c.unchanged);
+      if (!anyChanged && originalDrafts.length > 0) {
+        toast('No changes to save');
+        setBuilding(false);
+        setGenerating(false);
+        return;
       }
-      if (nonCoachedDays.length > 0) {
-        message += `\nFor PT sessions, classes, and rest days, do NOT generate exercises — just save them as the day label.`;
+
+      const unchangedDays = classified.filter((c) => c.unchanged).map((c) => c.day);
+      const changedDays = classified.filter((c) => !c.unchanged).map((c) => c.day);
+
+      let message = `Save my training program. Use the generate_program tool with total_weeks=${totalWeeks}.\n\n`;
+
+      if (unchangedDays.length > 0) {
+        message += `KEEP THESE DAYS EXACTLY AS THEY ARE (pass keep_existing=true for each, no exercises array needed — omit the 'exercises' field):\n`;
+        unchangedDays.forEach((d) => {
+          if (d.dayType === 'rest') {
+            message += `- Week ${d.weekNumber}, ${WEEKDAYS_LONG[d.weekday]} (weekday=${d.weekday}): Rest (day_type=rest, keep_existing=true)\n`;
+          } else {
+            message += `- Week ${d.weekNumber}, ${WEEKDAYS_LONG[d.weekday]} (weekday=${d.weekday}): ${DAY_TYPE_LABELS[d.dayType]} — "${d.dayLabel}" (day_type=${d.dayType}, keep_existing=true`;
+            if (d.workoutType) message += `, workout_type=${d.workoutType}`;
+            message += `)\n`;
+          }
+        });
+        message += `\n`;
       }
+
+      if (changedDays.length > 0) {
+        message += `GENERATE OR REPLACE THESE DAYS (do NOT pass keep_existing, generate fresh exercises for coached days):\n`;
+        changedDays.forEach((d) => {
+          if (d.dayType === 'rest') {
+            message += `- Week ${d.weekNumber}, ${WEEKDAYS_LONG[d.weekday]} (weekday=${d.weekday}): Rest (day_type=rest)\n`;
+            return;
+          }
+          message += `- Week ${d.weekNumber}, ${WEEKDAYS_LONG[d.weekday]} (weekday=${d.weekday}): ${DAY_TYPE_LABELS[d.dayType]} — "${d.dayLabel}" (day_type=${d.dayType}`;
+          if (d.workoutType) message += `, workout_type=${d.workoutType}`;
+          message += `)`;
+          if (d.dayType === 'coached' && d.focusMuscles && d.focusMuscles.length > 0) {
+            message += ` — target muscles: ${d.focusMuscles.join(', ')}`;
+          }
+          if (d.dayType === 'coached' && d.exerciseCount) {
+            message += ` — EXACTLY ${d.exerciseCount} exercises`;
+          }
+          message += '\n';
+        });
+
+        const coachedChanged = changedDays.filter((d) => d.dayType === 'coached');
+        if (coachedChanged.length > 0) {
+          message += `\nFor each Coach Fit day in the GENERATE section, produce EXACTLY the number of exercises specified. Target ONLY the listed muscles. Include 1-2 primary compound lifts (is_primary=true) from the top of the exercise hierarchy, then fill the rest with accessories. Respect my equipment.`;
+        }
+      }
+
+      message += `\n\nCRITICAL: You must include BOTH the keep-existing days and the generate-new days in the same tool call, all in one 'days' array. Do not skip any day.`;
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -332,23 +389,24 @@ export default function ProgramPage() {
               setBuilding(true);
               // Load current program into draft
               setTotalWeeks(program.totalWeeks);
-              setDraftDays(
-                program.days.map((d) => {
-                  // Derive focusMuscles from exercise template
-                  const muscles = d.exerciseTemplate
-                    ? Array.from(new Set(d.exerciseTemplate.map((e) => e.muscle_group)))
-                    : [];
-                  return {
-                    weekday: d.weekday,
-                    weekNumber: d.weekNumber,
-                    dayType: d.dayType,
-                    dayLabel: d.dayLabel,
-                    workoutType: d.workoutType ?? undefined,
-                    focusMuscles: muscles,
-                    exerciseCount: d.exerciseTemplate?.length || 5,
-                  };
-                })
-              );
+              const loaded = program.days.map((d) => {
+                // Derive focusMuscles from exercise template
+                const muscles = d.exerciseTemplate
+                  ? Array.from(new Set(d.exerciseTemplate.map((e) => e.muscle_group)))
+                  : [];
+                return {
+                  weekday: d.weekday,
+                  weekNumber: d.weekNumber,
+                  dayType: d.dayType,
+                  dayLabel: d.dayLabel,
+                  workoutType: d.workoutType ?? undefined,
+                  focusMuscles: muscles,
+                  exerciseCount: d.exerciseTemplate?.length || 5,
+                };
+              });
+              setDraftDays(loaded);
+              // Deep clone the snapshot so later edits don't mutate it
+              setOriginalDrafts(loaded.map((d) => ({ ...d, focusMuscles: [...(d.focusMuscles || [])] })));
             }}
             variant="ghost"
             className="w-full"

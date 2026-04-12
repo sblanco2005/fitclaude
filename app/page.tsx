@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [programToday, setProgramToday] = useState<TodayWorkout | null>(null);
   const [program, setProgram] = useState<TrainingProgram | null>(null);
   const [programLoaded, setProgramLoaded] = useState(false);
+  const [viewedWeek, setViewedWeek] = useState<number | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -153,11 +154,13 @@ export default function DashboardPage() {
   const todayWeekday = jsDay === 0 ? 6 : jsDay - 1;
   const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // Days of the CURRENT week from the program, keyed by weekday
-  const currentWeekDays = program
-    ? program.days.filter((d) => d.weekNumber === program.currentWeek)
+  // Days of the VIEWED week (defaults to current program week)
+  const displayWeek = viewedWeek ?? program?.currentWeek ?? 1;
+  const displayedWeekDays = program
+    ? program.days.filter((d) => d.weekNumber === displayWeek)
     : [];
-  const daysByWeekday = new Map(currentWeekDays.map((d) => [d.weekday, d]));
+  const daysByWeekday = new Map(displayedWeekDays.map((d) => [d.weekday, d]));
+  const isViewingCurrentWeek = program ? displayWeek === program.currentWeek : true;
 
   // Build the combined "today" activity list (workouts + activities)
   type TodayItem = { id: string; label: string; meta: string; kcal?: number | null; done: boolean; type: 'workout' | 'activity' | 'todo'; href?: string; onClick?: () => void };
@@ -225,20 +228,55 @@ export default function DashboardPage() {
           <div className="h-20 bg-slate-800/40 rounded animate-pulse" />
         </Card>
       ) : program ? (
-        <Link href="/program" className="block">
-          <Card className="p-4" hover>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Program — Week {program.currentWeek} of {program.totalWeeks}
-              </h3>
-              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              {program.totalWeeks > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewedWeek(displayWeek > 1 ? displayWeek - 1 : program.totalWeeks);
+                  }}
+                  className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+                  aria-label="Previous week"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              )}
+              <Link href="/program" className="text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-white transition-colors">
+                Program — Week {displayWeek} of {program.totalWeeks}
+                {!isViewingCurrentWeek && <span className="ml-1.5 text-[9px] normal-case font-medium text-slate-600">(preview)</span>}
+              </Link>
+              {program.totalWeeks > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewedWeek(displayWeek < program.totalWeeks ? displayWeek + 1 : 1);
+                  }}
+                  className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+                  aria-label="Next week"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <Link href="/program" className="text-slate-600 hover:text-white transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
-            </div>
+            </Link>
+          </div>
+          <Link href="/program" className="block">
             <div className="grid grid-cols-7 gap-1.5">
               {WEEKDAY_LABELS.map((label, wd) => {
                 const day = daysByWeekday.get(wd);
-                const isToday = wd === todayWeekday;
+                const isToday = isViewingCurrentWeek && wd === todayWeekday;
                 const dayType = day?.dayType || 'rest';
 
                 const typeColor =
@@ -261,8 +299,8 @@ export default function DashboardPage() {
                 );
               })}
             </div>
-          </Card>
-        </Link>
+          </Link>
+        </Card>
       ) : (
         <Link href="/program" className="block">
           <Card className="p-4" hover>

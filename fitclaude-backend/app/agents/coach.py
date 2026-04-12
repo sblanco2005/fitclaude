@@ -629,28 +629,35 @@ async def _tool_generate_program(
     if not isinstance(days_data[0], dict):
         return {"error": f"Expected list of day objects, got list of {type(days_data[0]).__name__}"}
 
-    # Delete any existing program for this user (one active program per user)
-    existing = await db.execute(
-        select(TrainingProgram).where(TrainingProgram.user_id == user_id)
-    )
-    old_program = existing.scalar_one_or_none()
-    if old_program:
-        await db.delete(old_program)
-        await db.flush()
-
     # Determine total_weeks from the data (max week_number across all days)
     max_week = max((d.get("week_number", 1) for d in days_data), default=1)
     total_weeks = max(total_weeks, max_week)
 
-    program = TrainingProgram(
-        id=cuid_generator.generate(),
-        user_id=user_id,
-        total_weeks=total_weeks,
-        current_week=1,
-        is_active=True,
+    # Load or create the active program (upsert semantics, not wipe-and-replace)
+    existing = await db.execute(
+        select(TrainingProgram)
+        .where(TrainingProgram.user_id == user_id, TrainingProgram.is_active == True)
+        .options(selectinload(TrainingProgram.days))
     )
-    db.add(program)
-    await db.flush()
+    program = existing.scalar_one_or_none()
+    if program:
+        program.total_weeks = total_weeks
+    else:
+        program = TrainingProgram(
+            id=cuid_generator.generate(),
+            user_id=user_id,
+            total_weeks=total_weeks,
+            current_week=1,
+            is_active=True,
+        )
+        db.add(program)
+        await db.flush()
+
+    # Map existing ProgramDays by (weekday, week_number) for upsert
+    existing_days_by_key: dict[tuple[int, int], ProgramDay] = {}
+    if program.days:
+        for d in program.days:
+            existing_days_by_key[(d.weekday, d.week_number)] = d
 
     # Equipment validation — load user + exercises for filtering
     user_result = await db.execute(select(User).where(User.id == user_id))
@@ -664,8 +671,41 @@ async def _tool_generate_program(
 
     WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     program_days = []
+    incoming_keys: set[tuple[int, int]] = set()
+
     for day_data in days_data:
         day_type = day_data.get("day_type", "coached")
+        weekday = day_data.get("weekday", 0)
+        week_num = day_data.get("week_number", 1)
+        key = (weekday, week_num)
+        incoming_keys.add(key)
+        existing_day = existing_days_by_key.get(key)
+        keep_existing = bool(day_data.get("keep_existing", False)) and existing_day is not None
+
+        # ── KEEP EXISTING path — don't touch the template or routine ──
+        if keep_existing and existing_day is not None:
+            # Allow label/type updates (lightweight changes)
+            if day_data.get("day_label"):
+                existing_day.day_label = day_data["day_label"]
+            if day_data.get("workout_type"):
+                existing_day.workout_type = day_data["workout_type"]
+            existing_day.day_type = day_type
+
+            kept_template = json.loads(existing_day.exercise_template) if existing_day.exercise_template else []
+            program_days.append({
+                "weekday": WEEKDAY_NAMES[weekday],
+                "week_number": week_num,
+                "day_type": day_type,
+                "day_label": existing_day.day_label,
+                "exercise_count": len(kept_template),
+                "primary_lifts": [e["name"] for e in kept_template if e.get("is_primary")],
+                "rejected_exercises": [],
+                "preserved": True,
+            })
+            logger.info(f"[Program] Preserved day {WEEKDAY_NAMES[weekday]} week {week_num} (keep_existing)")
+            continue
+
+        # ── REGENERATE path — delete linked Workouts for this day and replace template ──
         exercises_list = day_data.get("exercises", [])
 
         # Equipment-validate exercises for coached days
@@ -682,26 +722,40 @@ async def _tool_generate_program(
                             continue
                 valid_exercises.append(ex)
 
-        weekday = day_data.get("weekday", 0)
-        week_num = day_data.get("week_number", 1)
+        if existing_day is not None:
+            # Delete any uncompleted routine workouts linked to this day so we replace cleanly
+            old_workouts = await db.execute(
+                select(Workout).where(
+                    Workout.program_day_id == existing_day.id,
+                    Workout.completed == False,
+                )
+            )
+            for w in old_workouts.scalars().all():
+                await db.delete(w)
+            await db.flush()
 
-        day = ProgramDay(
-            id=cuid_generator.generate(),
-            program_id=program.id,
-            weekday=weekday,
-            week_number=week_num,
-            day_type=day_type,
-            day_label=day_data.get("day_label", WEEKDAY_NAMES[weekday]),
-            workout_type=day_data.get("workout_type"),
-            exercise_template=json.dumps(valid_exercises) if valid_exercises else None,
-        )
-        db.add(day)
+            # Update existing day in place
+            existing_day.day_type = day_type
+            existing_day.day_label = day_data.get("day_label", WEEKDAY_NAMES[weekday])
+            existing_day.workout_type = day_data.get("workout_type")
+            existing_day.exercise_template = json.dumps(valid_exercises) if valid_exercises else None
+            day = existing_day
+        else:
+            day = ProgramDay(
+                id=cuid_generator.generate(),
+                program_id=program.id,
+                weekday=weekday,
+                week_number=week_num,
+                day_type=day_type,
+                day_label=day_data.get("day_label", WEEKDAY_NAMES[weekday]),
+                workout_type=day_data.get("workout_type"),
+                exercise_template=json.dumps(valid_exercises) if valid_exercises else None,
+            )
+            db.add(day)
         await db.flush()
 
-        # For coached days, also create a Workout routine template linked to this ProgramDay
-        # so it shows up in the routines list and can be edited/tracked.
+        # For coached days, create a Workout routine template linked to this ProgramDay
         if day_type == "coached" and valid_exercises:
-            # Get next display_id for this user
             max_result = await db.execute(
                 select(func.max(Workout.display_id)).where(Workout.user_id == user_id)
             )
@@ -723,7 +777,6 @@ async def _tool_generate_program(
             db.add(routine_workout)
             await db.flush()
 
-            # Create WorkoutExercise rows
             for i, ex in enumerate(valid_exercises):
                 ex_name = ex.get("name", "")
                 exercise_id = None
@@ -747,7 +800,7 @@ async def _tool_generate_program(
                     notes=notes_str,
                 )
                 db.add(we)
-            logger.info(f"[Program] Created routine '{routine_name}' (display #{next_display_id}) for program day {day.id}")
+            logger.info(f"[Program] Regenerated routine '{routine_name}' (display #{next_display_id}) for program day {day.id}")
 
         program_days.append({
             "weekday": WEEKDAY_NAMES[weekday],
@@ -757,7 +810,20 @@ async def _tool_generate_program(
             "exercise_count": len(valid_exercises),
             "primary_lifts": [e["name"] for e in valid_exercises if e.get("is_primary")],
             "rejected_exercises": rejected,
+            "preserved": False,
         })
+
+    # Delete any existing days NOT in the incoming payload (user removed them)
+    for (wd, wn), d in existing_days_by_key.items():
+        if (wd, wn) not in incoming_keys:
+            # Null out linked workouts first so FK doesn't block
+            linked = await db.execute(
+                select(Workout).where(Workout.program_day_id == d.id)
+            )
+            for w in linked.scalars().all():
+                w.program_day_id = None
+            await db.delete(d)
+            logger.info(f"[Program] Removed day {WEEKDAY_NAMES[wd]} week {wn} (not in new payload)")
 
     await db.commit()
     logger.info(
