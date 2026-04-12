@@ -173,30 +173,35 @@ export interface ProgramDayExercise {
   notes?: string;
 }
 
+export type DayType = 'coached' | 'pt_session' | 'class' | 'rest';
+
 export interface ProgramDay {
   id: string;
+  weekday: number; // 0=Mon ... 6=Sun
+  weekNumber: number;
+  dayType: DayType;
   dayLabel: string;
-  workoutType: string;
-  dayIndex: number;
-  exerciseTemplate: ProgramDayExercise[];
+  workoutType: string | null;
+  exerciseTemplate: ProgramDayExercise[] | null;
 }
 
 export interface TrainingProgram {
   id: string;
-  splitType: string;
-  rotation: string[];
-  currentDayIndex: number;
+  totalWeeks: number;
+  currentWeek: number;
   isActive: boolean;
   days: ProgramDay[];
 }
 
 export interface TodayWorkout {
-  programDayId: string;
+  programDayId: string | null;
+  weekday: number;
+  weekdayName: string;
+  weekNumber: number;
+  dayType: DayType;
   dayLabel: string;
-  workoutType: string;
-  dayIndex: number;
-  exerciseTemplate: ProgramDayExercise[];
-  isRestDay: boolean;
+  workoutType: string | null;
+  exerciseTemplate: ProgramDayExercise[] | null;
   lastSession: {
     date: string | null;
     fatigueRating: number | null;

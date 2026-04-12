@@ -92,36 +92,62 @@ async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
     )
     program = prog_result.scalar_one_or_none()
     if program:
-        rotation = json.loads(program.rotation)
-        current_type = rotation[program.current_day_index] if rotation else None
+        # Determine today's weekday (0=Mon ... 6=Sun)
+        from datetime import datetime as _dt, timezone as _tz2
+        today_weekday = _dt.now(_tz2.utc).weekday()  # 0=Mon
 
-        # Load the current day's template
+        WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+        # Find today's program day for the current week
         day_result = await db.execute(
             select(ProgramDay).where(
                 ProgramDay.program_id == program.id,
-                ProgramDay.day_index == program.current_day_index,
+                ProgramDay.weekday == today_weekday,
+                ProgramDay.week_number == program.current_week,
             )
         )
         current_day = day_result.scalar_one_or_none()
 
+        # Build weekly schedule summary (all days, current week)
+        all_days_result = await db.execute(
+            select(ProgramDay).where(
+                ProgramDay.program_id == program.id,
+                ProgramDay.week_number == program.current_week,
+            )
+        )
+        all_days = all_days_result.scalars().all()
+        schedule = {d.weekday: d for d in all_days}
+
         prog_context: dict = {
-            "split_type": program.split_type,
-            "rotation": rotation,
-            "current_day_index": program.current_day_index,
-            "today_workout_type": current_type,
-            "today_label": current_day.day_label if current_day else current_type,
+            "total_weeks": program.total_weeks,
+            "current_week": program.current_week,
+            "today_weekday": WEEKDAY_NAMES[today_weekday],
+            "today_day_type": current_day.day_type if current_day else "rest",
+            "today_label": current_day.day_label if current_day else "Rest",
             "today_program_day_id": current_day.id if current_day else None,
+            "today_workout_type": current_day.workout_type if current_day else None,
         }
 
-        # Load the exercise template for today
-        if current_day:
+        # Build weekly schedule string
+        week_schedule = []
+        for wd in range(7):
+            d = schedule.get(wd)
+            marker = " ← TODAY" if wd == today_weekday else ""
+            if d:
+                week_schedule.append(f"  {WEEKDAY_NAMES[wd]}: {d.day_label} ({d.day_type}){marker}")
+            else:
+                week_schedule.append(f"  {WEEKDAY_NAMES[wd]}: Rest{marker}")
+        prog_context["week_schedule"] = week_schedule
+
+        # Load exercise template for coached days
+        if current_day and current_day.day_type == "coached" and current_day.exercise_template:
             template = json.loads(current_day.exercise_template)
             prog_context["today_exercises"] = template
             prog_context["today_primary_lifts"] = [
                 e["name"] for e in template if e.get("is_primary")
             ]
 
-            # Load last completed session for this program day (progressive overload)
+            # Load last completed session for progressive overload
             last_session = await db.execute(
                 select(Workout)
                 .where(
@@ -133,8 +159,6 @@ async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
             )
             last_workout = last_session.scalar_one_or_none()
             if last_workout:
-                from sqlalchemy.orm import selectinload
-                # Re-query with exercises loaded
                 lw_result = await db.execute(
                     select(Workout)
                     .where(Workout.id == last_workout.id)
@@ -569,9 +593,9 @@ def _match_exercise(name: str, all_exercises: list) -> "Exercise | None":
 async def _tool_generate_program(
     db: AsyncSession, user_id: str, params: dict
 ) -> dict:
-    """Create a training program with exercise templates for each day."""
-    split_type = params["split_type"]
+    """Create a weekly training program with per-day types and multi-week rotation."""
     days_data = params.get("days", [])
+    total_weeks = params.get("total_weeks", 1)
 
     if not days_data:
         return {"error": "No days provided in the program."}
@@ -585,15 +609,15 @@ async def _tool_generate_program(
         await db.delete(old_program)
         await db.flush()
 
-    # Build rotation array from the days
-    rotation = json.dumps([d["workout_type"] for d in days_data])
+    # Determine total_weeks from the data (max week_number across all days)
+    max_week = max((d.get("week_number", 1) for d in days_data), default=1)
+    total_weeks = max(total_weeks, max_week)
 
     program = TrainingProgram(
         id=cuid_generator.generate(),
         user_id=user_id,
-        split_type=split_type,
-        rotation=rotation,
-        current_day_index=0,
+        total_weeks=total_weeks,
+        current_week=1,
         is_active=True,
     )
     db.add(program)
@@ -609,62 +633,66 @@ async def _tool_generate_program(
     all_exercises_result = await db.execute(select(Exercise))
     all_exercises = all_exercises_result.scalars().all()
 
+    WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     program_days = []
     for day_data in days_data:
-        # Validate exercises against equipment
+        day_type = day_data.get("day_type", "coached")
+        exercises_list = day_data.get("exercises", [])
+
+        # Equipment-validate exercises for coached days
         valid_exercises = []
         rejected = []
-        for ex in day_data.get("exercises", []):
-            ex_name = ex.get("name", "")
-            if user_equipment is not None and ex_name:
-                found = _match_exercise(ex_name, all_exercises)
-                if found and found.equipment_required:
-                    if not _exercise_fits_equipment(found.equipment_required, user_equipment):
-                        rejected.append(ex_name)
-                        continue
-            valid_exercises.append(ex)
+        if day_type == "coached" and exercises_list:
+            for ex in exercises_list:
+                ex_name = ex.get("name", "")
+                if user_equipment is not None and ex_name:
+                    found = _match_exercise(ex_name, all_exercises)
+                    if found and found.equipment_required:
+                        if not _exercise_fits_equipment(found.equipment_required, user_equipment):
+                            rejected.append(ex_name)
+                            continue
+                valid_exercises.append(ex)
 
-        if rejected:
-            logger.info(
-                f"[Program] Day '{day_data['day_label']}': rejected {rejected} "
-                f"(user equipment: {user_equipment})"
-            )
+        weekday = day_data.get("weekday", 0)
+        week_num = day_data.get("week_number", 1)
 
         day = ProgramDay(
             id=cuid_generator.generate(),
             program_id=program.id,
-            day_label=day_data["day_label"],
-            workout_type=day_data["workout_type"],
-            day_index=day_data["day_index"],
-            exercise_template=json.dumps(valid_exercises),
+            weekday=weekday,
+            week_number=week_num,
+            day_type=day_type,
+            day_label=day_data.get("day_label", WEEKDAY_NAMES[weekday]),
+            workout_type=day_data.get("workout_type"),
+            exercise_template=json.dumps(valid_exercises) if valid_exercises else None,
         )
         db.add(day)
         program_days.append({
+            "weekday": WEEKDAY_NAMES[weekday],
+            "week_number": week_num,
+            "day_type": day_type,
             "day_label": day.day_label,
-            "workout_type": day.workout_type,
-            "day_index": day.day_index,
             "exercise_count": len(valid_exercises),
-            "primary_lifts": [
-                e["name"] for e in valid_exercises if e.get("is_primary")
-            ],
+            "primary_lifts": [e["name"] for e in valid_exercises if e.get("is_primary")],
             "rejected_exercises": rejected,
         })
 
     await db.commit()
     logger.info(
-        f"[Program] Created {split_type} program for user {user_id} "
-        f"with {len(program_days)} days"
+        f"[Program] Created program for user {user_id} "
+        f"with {len(program_days)} day entries across {total_weeks} week(s)"
     )
 
     return {
         "program_id": program.id,
-        "split_type": split_type,
+        "total_weeks": total_weeks,
         "days": program_days,
         "message": (
-            f"Training program created! {split_type.upper()} split with "
-            f"{len(program_days)} training days. Present the full program to the user "
-            "with each day's exercises and primary lifts highlighted. "
-            "Tell them they can start their first workout by asking 'what's my workout today?'"
+            f"Training program created! {total_weeks}-week rotation with "
+            f"{len(program_days)} day entries. Present the full weekly schedule to the user. "
+            "Show coached days with their exercises and primary lifts highlighted. "
+            "Show PT/class/rest days with their labels. "
+            "Tell them the coach will follow this schedule automatically."
         ),
     }
 
@@ -1053,7 +1081,10 @@ async def _tool_mark_workout_complete(db: AsyncSession, params: dict) -> dict:
     if params.get("notes"):
         workout.notes = params["notes"]
 
-    # Advance training program day index if this workout is linked to a program
+    # Advance training program week if this completes a coached day
+    # The week advances when it's Sunday (weekday 6) or when this is the last
+    # coached day in the current week. For simplicity, we advance on Sunday's
+    # workout or when the user explicitly completes the week's last coached workout.
     program_advanced = False
     if workout.program_day_id:
         day_result = await db.execute(
@@ -1066,13 +1097,25 @@ async def _tool_mark_workout_complete(db: AsyncSession, params: dict) -> dict:
             )
             program = prog_result.scalar_one_or_none()
             if program:
-                rotation = json.loads(program.rotation)
-                program.current_day_index = (program.current_day_index + 1) % len(rotation)
-                program_advanced = True
-                logger.info(
-                    f"[Coach] Program advanced to day {program.current_day_index} "
-                    f"({rotation[program.current_day_index]})"
+                # Check if this is the last coached day of the week (highest weekday with coached type)
+                week_days_result = await db.execute(
+                    select(ProgramDay).where(
+                        ProgramDay.program_id == program.id,
+                        ProgramDay.week_number == program.current_week,
+                        ProgramDay.day_type == "coached",
+                    )
                 )
+                coached_days = week_days_result.scalars().all()
+                max_coached_weekday = max((d.weekday for d in coached_days), default=-1)
+
+                if program_day.weekday >= max_coached_weekday:
+                    # This was the last coached day — advance to next week
+                    program.current_week = (program.current_week % program.total_weeks) + 1
+                    program_advanced = True
+                    logger.info(
+                        f"[Coach] Program advanced to week {program.current_week} "
+                        f"of {program.total_weeks}"
+                    )
 
     await db.commit()
     logger.info(f"[Coach] Workout {workout.id} marked complete")
@@ -1084,7 +1127,7 @@ async def _tool_mark_workout_complete(db: AsyncSession, params: dict) -> dict:
     }
     if program_advanced:
         result["program_advanced"] = True
-        result["next_day_index"] = program.current_day_index
+        result["next_week"] = program.current_week
     return result
 
 

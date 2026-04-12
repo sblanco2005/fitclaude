@@ -320,79 +320,78 @@ TOOL_DEFINITIONS = [
     {
         "name": "generate_program",
         "description": (
-            "Generate a complete training program with exercise templates for each day "
-            "in the rotation. Call this when the user wants to set up a structured "
-            "training program (PPL, Upper/Lower, Full Body). This creates a persistent "
-            "program that the user follows day by day with progressive overload. "
-            "Each day should have 1-2 PRIMARY lifts (big compounds that stay the same "
-            "every week) and 3-4 accessories. Mark primary lifts with is_primary=true."
+            "Generate a weekly training program with a fixed schedule. Each day of the week "
+            "gets a type: 'coached' (AI generates workout), 'pt_session' (user logs PT), "
+            "'class' (user logs activity), or 'rest'. Coached days have exercise templates "
+            "with 1-2 PRIMARY lifts and 3-4 accessories. For multi-week rotation, include "
+            "multiple entries for the same weekday with different week_number values. "
+            "weekday: 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday, 5=Saturday, 6=Sunday."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "split_type": {
-                    "type": "string",
-                    "enum": ["ppl", "upper_lower", "full_body"],
-                    "description": "The training split type",
+                "total_weeks": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4,
+                    "description": "How many weeks before the rotation repeats (e.g. 2 for A/B week alternation)",
                 },
                 "days": {
                     "type": "array",
-                    "description": "Exercise templates for each day in the rotation",
+                    "description": "Day entries — one per weekday per week in the rotation",
                     "items": {
                         "type": "object",
                         "properties": {
+                            "weekday": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 6,
+                                "description": "Day of week: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun",
+                            },
+                            "week_number": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "description": "Which week in the rotation (1-based)",
+                            },
+                            "day_type": {
+                                "type": "string",
+                                "enum": ["coached", "pt_session", "class", "rest"],
+                                "description": "coached=AI generates, pt_session=user logs PT, class=user logs activity, rest=off day",
+                            },
                             "day_label": {
                                 "type": "string",
-                                "description": "Human-readable day name (e.g. 'Push A', 'Pull B', 'Upper 1')",
+                                "description": "Human-readable label (e.g. 'Deadlifts + Glutes', 'PT Session', 'Alpha X', 'Rest')",
                             },
                             "workout_type": {
                                 "type": "string",
-                                "enum": ["push", "pull", "legs", "upper", "lower", "full_body"],
-                                "description": "The workout type for this day",
-                            },
-                            "day_index": {
-                                "type": "integer",
-                                "description": "Position in the rotation (0-based)",
+                                "enum": ["push", "pull", "legs", "upper", "lower", "full_body", "custom"],
+                                "description": "Workout type for coached days (omit for pt/class/rest)",
                             },
                             "exercises": {
                                 "type": "array",
+                                "description": "Exercise template for coached days (omit for pt/class/rest)",
                                 "items": {
                                     "type": "object",
                                     "properties": {
-                                        "name": {
-                                            "type": "string",
-                                            "description": "Exercise name",
-                                        },
-                                        "muscle_group": {
-                                            "type": "string",
-                                            "description": "Primary muscle group",
-                                        },
-                                        "sets": {
-                                            "type": "integer",
-                                            "description": "Number of sets",
-                                        },
-                                        "reps": {
-                                            "type": "string",
-                                            "description": "Rep range (e.g. '4-6', '8-10')",
-                                        },
+                                        "name": {"type": "string"},
+                                        "muscle_group": {"type": "string"},
+                                        "sets": {"type": "integer"},
+                                        "reps": {"type": "string"},
                                         "is_primary": {
                                             "type": "boolean",
-                                            "description": "True for main compound lifts that stay fixed week to week",
+                                            "description": "True for main compound lifts that stay fixed",
                                         },
-                                        "notes": {
-                                            "type": "string",
-                                            "description": "Coaching tips for this exercise",
-                                        },
+                                        "notes": {"type": "string"},
                                     },
                                     "required": ["name", "muscle_group", "sets", "reps"],
                                 },
                             },
                         },
-                        "required": ["day_label", "workout_type", "day_index", "exercises"],
+                        "required": ["weekday", "week_number", "day_type", "day_label"],
                     },
                 },
             },
-            "required": ["split_type", "days"],
+            "required": ["total_weeks", "days"],
         },
     },
 ]

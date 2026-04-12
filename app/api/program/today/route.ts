@@ -2,79 +2,96 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 
-// GET — get today's workout from the training program
+const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+// JavaScript getDay(): 0=Sun, 1=Mon ... 6=Sat
+// We want: 0=Mon, 1=Tue ... 6=Sun
+function getMondayWeekday(date: Date): number {
+  const d = date.getDay();
+  return d === 0 ? 6 : d - 1;
+}
+
 export const GET = withAuth(async (_request, user) => {
   try {
     const program = await prisma.trainingProgram.findFirst({
       where: { userId: user.id, isActive: true },
-      include: {
-        days: { orderBy: { dayIndex: 'asc' } },
-      },
     });
 
     if (!program) {
       return NextResponse.json({ program: null });
     }
 
-    const rotation = JSON.parse(program.rotation) as string[];
-    if (!rotation.length) {
-      return NextResponse.json({ program: null });
-    }
+    const todayWeekday = getMondayWeekday(new Date());
 
-    const currentDay = program.days.find(
-      (d) => d.dayIndex === program.currentDayIndex
-    );
-
-    if (!currentDay) {
-      return NextResponse.json({ program: null });
-    }
-
-    const template = JSON.parse(currentDay.exerciseTemplate);
-
-    // Load last completed workout for this program day
-    let lastSession = null;
-    const lastWorkout = await prisma.workout.findFirst({
+    const currentDay = await prisma.programDay.findFirst({
       where: {
-        programDayId: currentDay.id,
-        completed: true,
-      },
-      orderBy: { date: 'desc' },
-      include: {
-        exercises: {
-          orderBy: { order: 'asc' },
-          include: {
-            exercise: { select: { name: true } },
-          },
-        },
+        programId: program.id,
+        weekday: todayWeekday,
+        weekNumber: program.currentWeek,
       },
     });
 
-    if (lastWorkout) {
-      lastSession = {
-        date: lastWorkout.date.toISOString(),
-        fatigueRating: lastWorkout.fatigueRating,
-        exercises: lastWorkout.exercises.map((we) => {
-          const name =
-            we.exercise?.name ||
-            (we.notes?.includes('|') ? we.notes.split('|')[0] : '?');
-          return {
-            name,
-            sets: we.sets,
-            reps: we.reps,
-            weight: we.weightKg,
-            setLogs: we.setLogs,
-          };
-        }),
-      };
+    if (!currentDay) {
+      return NextResponse.json({
+        programDayId: null,
+        weekday: todayWeekday,
+        weekdayName: WEEKDAY_NAMES[todayWeekday],
+        weekNumber: program.currentWeek,
+        dayType: 'rest',
+        dayLabel: 'Rest',
+        workoutType: null,
+        exerciseTemplate: null,
+        lastSession: null,
+      });
+    }
+
+    const template = currentDay.exerciseTemplate
+      ? JSON.parse(currentDay.exerciseTemplate)
+      : null;
+
+    // Load last completed workout for this program day
+    let lastSession = null;
+    if (currentDay.dayType === 'coached') {
+      const lastWorkout = await prisma.workout.findFirst({
+        where: { programDayId: currentDay.id, completed: true },
+        orderBy: { date: 'desc' },
+        include: {
+          exercises: {
+            orderBy: { order: 'asc' },
+            include: { exercise: { select: { name: true } } },
+          },
+        },
+      });
+
+      if (lastWorkout) {
+        lastSession = {
+          date: lastWorkout.date.toISOString(),
+          fatigueRating: lastWorkout.fatigueRating,
+          exercises: lastWorkout.exercises.map((we) => {
+            const name =
+              we.exercise?.name ||
+              (we.notes?.includes('|') ? we.notes.split('|')[0] : '?');
+            return {
+              name,
+              sets: we.sets,
+              reps: we.reps,
+              weight: we.weightKg,
+              setLogs: we.setLogs,
+            };
+          }),
+        };
+      }
     }
 
     return NextResponse.json({
       programDayId: currentDay.id,
+      weekday: currentDay.weekday,
+      weekdayName: WEEKDAY_NAMES[currentDay.weekday],
+      weekNumber: currentDay.weekNumber,
+      dayType: currentDay.dayType,
       dayLabel: currentDay.dayLabel,
       workoutType: currentDay.workoutType,
-      dayIndex: currentDay.dayIndex,
       exerciseTemplate: template,
-      isRestDay: false,
       lastSession,
     });
   } catch (error) {

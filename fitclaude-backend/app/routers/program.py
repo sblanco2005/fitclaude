@@ -1,6 +1,7 @@
 """Training Program API routes."""
 
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -9,9 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import ProgramDay, TrainingProgram, Workout, WorkoutExercise
+from app.models import ProgramDay, TrainingProgram, Workout
 
 router = APIRouter(prefix="/api/users/{user_id}/program", tags=["program"])
+
+WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
 # ── Response schemas ─────────────────────────────────────────────────────────
@@ -19,19 +22,20 @@ router = APIRouter(prefix="/api/users/{user_id}/program", tags=["program"])
 
 class ProgramDayResponse(BaseModel):
     id: str
+    weekday: int
+    weekNumber: int
+    dayType: str
     dayLabel: str
-    workoutType: str
-    dayIndex: int
-    exerciseTemplate: list  # parsed JSON
+    workoutType: str | None = None
+    exerciseTemplate: list | None = None
 
     model_config = {"from_attributes": True}
 
 
 class ProgramResponse(BaseModel):
     id: str
-    splitType: str
-    rotation: list  # parsed JSON
-    currentDayIndex: int
+    totalWeeks: int
+    currentWeek: int
     isActive: bool
     days: list[ProgramDayResponse]
 
@@ -39,12 +43,14 @@ class ProgramResponse(BaseModel):
 
 
 class TodayResponse(BaseModel):
-    programDayId: str
+    programDayId: str | None
+    weekday: int
+    weekdayName: str
+    weekNumber: int
+    dayType: str
     dayLabel: str
-    workoutType: str
-    dayIndex: int
-    exerciseTemplate: list
-    isRestDay: bool = False
+    workoutType: str | None = None
+    exerciseTemplate: list | None = None
     lastSession: dict | None = None
 
 
@@ -67,36 +73,35 @@ async def get_program(
 
     return ProgramResponse(
         id=program.id,
-        splitType=program.split_type,
-        rotation=json.loads(program.rotation),
-        currentDayIndex=program.current_day_index,
+        totalWeeks=program.total_weeks,
+        currentWeek=program.current_week,
         isActive=program.is_active,
         days=[
             ProgramDayResponse(
                 id=d.id,
+                weekday=d.weekday,
+                weekNumber=d.week_number,
+                dayType=d.day_type,
                 dayLabel=d.day_label,
                 workoutType=d.workout_type,
-                dayIndex=d.day_index,
-                exerciseTemplate=json.loads(d.exercise_template),
+                exerciseTemplate=json.loads(d.exercise_template) if d.exercise_template else None,
             )
-            for d in sorted(program.days, key=lambda d: d.day_index)
+            for d in sorted(program.days, key=lambda d: (d.week_number, d.weekday))
         ],
     )
 
 
 @router.delete("")
 async def delete_program(user_id: str, db: AsyncSession = Depends(get_db)):
-    """Deactivate the user's training program."""
+    """Delete the user's training program."""
     result = await db.execute(
-        select(TrainingProgram).where(
-            TrainingProgram.user_id == user_id, TrainingProgram.is_active == True
-        )
+        select(TrainingProgram).where(TrainingProgram.user_id == user_id)
     )
     program = result.scalar_one_or_none()
     if not program:
-        raise HTTPException(status_code=404, detail="No active program found")
+        raise HTTPException(status_code=404, detail="No program found")
 
-    program.is_active = False
+    await db.delete(program)
     await db.commit()
     return {"deleted": True}
 
@@ -105,7 +110,7 @@ async def delete_program(user_id: str, db: AsyncSession = Depends(get_db)):
 async def get_today(
     user_id: str, db: AsyncSession = Depends(get_db)
 ) -> TodayResponse | dict:
-    """Get today's workout from the training program rotation."""
+    """Get today's program day based on the current weekday + week."""
     result = await db.execute(
         select(TrainingProgram).where(
             TrainingProgram.user_id == user_id, TrainingProgram.is_active == True
@@ -115,58 +120,71 @@ async def get_today(
     if not program:
         return {"program": None}
 
-    rotation = json.loads(program.rotation)
-    if not rotation:
-        return {"program": None}
+    today_weekday = datetime.now(timezone.utc).weekday()
 
-    # Get current day
     day_result = await db.execute(
         select(ProgramDay).where(
             ProgramDay.program_id == program.id,
-            ProgramDay.day_index == program.current_day_index,
+            ProgramDay.weekday == today_weekday,
+            ProgramDay.week_number == program.current_week,
         )
     )
     current_day = day_result.scalar_one_or_none()
+
     if not current_day:
-        return {"program": None}
-
-    template = json.loads(current_day.exercise_template)
-
-    # Load last completed session for this program day
-    last_session_data = None
-    last_result = await db.execute(
-        select(Workout)
-        .where(
-            Workout.program_day_id == current_day.id,
-            Workout.completed == True,
+        # Default to rest if no entry exists for today
+        return TodayResponse(
+            programDayId=None,
+            weekday=today_weekday,
+            weekdayName=WEEKDAY_NAMES[today_weekday],
+            weekNumber=program.current_week,
+            dayType="rest",
+            dayLabel="Rest",
         )
-        .options(selectinload(Workout.exercises))
-        .order_by(Workout.date.desc())
-        .limit(1)
+
+    template = (
+        json.loads(current_day.exercise_template) if current_day.exercise_template else None
     )
-    last_workout = last_result.scalar_one_or_none()
-    if last_workout:
-        exercises_data = []
-        for we in sorted(last_workout.exercises, key=lambda e: e.order):
-            name = we.notes.split("|")[0] if we.notes and "|" in we.notes else "?"
-            exercises_data.append({
-                "name": name,
-                "sets": we.sets,
-                "reps": we.reps,
-                "weight": we.weight_kg,
-                "setLogs": we.set_logs,
-            })
-        last_session_data = {
-            "date": last_workout.date.isoformat() if last_workout.date else None,
-            "fatigueRating": last_workout.fatigue_rating,
-            "exercises": exercises_data,
-        }
+
+    # Load last completed session for this program day (progressive overload reference)
+    last_session_data = None
+    if current_day.day_type == "coached":
+        last_result = await db.execute(
+            select(Workout)
+            .where(
+                Workout.program_day_id == current_day.id,
+                Workout.completed == True,
+            )
+            .options(selectinload(Workout.exercises))
+            .order_by(Workout.date.desc())
+            .limit(1)
+        )
+        last_workout = last_result.scalar_one_or_none()
+        if last_workout:
+            exercises_data = []
+            for we in sorted(last_workout.exercises, key=lambda e: e.order):
+                name = we.notes.split("|")[0] if we.notes and "|" in we.notes else "?"
+                exercises_data.append({
+                    "name": name,
+                    "sets": we.sets,
+                    "reps": we.reps,
+                    "weight": we.weight_kg,
+                    "setLogs": we.set_logs,
+                })
+            last_session_data = {
+                "date": last_workout.date.isoformat() if last_workout.date else None,
+                "fatigueRating": last_workout.fatigue_rating,
+                "exercises": exercises_data,
+            }
 
     return TodayResponse(
         programDayId=current_day.id,
+        weekday=today_weekday,
+        weekdayName=WEEKDAY_NAMES[today_weekday],
+        weekNumber=program.current_week,
+        dayType=current_day.day_type,
         dayLabel=current_day.day_label,
         workoutType=current_day.workout_type,
-        dayIndex=current_day.day_index,
         exerciseTemplate=template,
         lastSession=last_session_data,
     )
@@ -179,7 +197,7 @@ async def update_program_day(
     body: dict,
     db: AsyncSession = Depends(get_db),
 ):
-    """Update a program day's exercise template (for swaps)."""
+    """Update a program day (swap exercises, change label, etc.)."""
     result = await db.execute(
         select(ProgramDay)
         .join(TrainingProgram)
@@ -194,6 +212,12 @@ async def update_program_day(
 
     if "exerciseTemplate" in body:
         day.exercise_template = json.dumps(body["exerciseTemplate"])
+    if "dayLabel" in body:
+        day.day_label = body["dayLabel"]
+    if "dayType" in body:
+        day.day_type = body["dayType"]
+    if "workoutType" in body:
+        day.workout_type = body["workoutType"]
 
     await db.commit()
     return {"updated": True}

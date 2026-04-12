@@ -233,23 +233,31 @@ def build_user_context(user_data: dict, user_tz=None) -> str:
     # Inject active training program context
     prog = user_data.get("active_program")
     if prog:
-        rotation_str = " → ".join(prog["rotation"])
-        parts.append(f"\nACTIVE TRAINING PROGRAM:")
-        parts.append(f"- Split: {prog['split_type']}")
-        parts.append(f"- Rotation: {rotation_str}")
-        parts.append(f"- Current day: {prog['today_label']} (index {prog['current_day_index']} of {len(prog['rotation'])})")
-        if prog.get("today_program_day_id"):
-            parts.append(f"- Program day ID: {prog['today_program_day_id']} (pass as program_day_id when generating this day's workout)")
-        if prog.get("today_primary_lifts"):
-            parts.append(f"- Primary lifts today: {', '.join(prog['today_primary_lifts'])}")
-        if prog.get("today_exercises"):
-            exercises_summary = []
-            for ex in prog["today_exercises"]:
-                primary = " ★" if ex.get("is_primary") else ""
-                exercises_summary.append(f"  {ex['name']} {ex.get('sets', 3)}x{ex.get('reps', '8-10')}{primary}")
-            parts.append("- Today's template:")
-            parts.extend(exercises_summary)
-        if prog.get("last_session_summary"):
-            parts.append(f"- Last session (this day): {prog['last_session_summary']}")
+        parts.append(f"\nACTIVE TRAINING PROGRAM (Week {prog['current_week']} of {prog['total_weeks']}):")
+        parts.append(f"- Today: {prog['today_weekday']} — {prog['today_label']} ({prog['today_day_type']})")
+        parts.append("- This week's schedule:")
+        for line in prog.get("week_schedule", []):
+            parts.append(line)
+
+        if prog["today_day_type"] == "coached":
+            if prog.get("today_program_day_id"):
+                parts.append(f"- Program day ID: {prog['today_program_day_id']} (pass as program_day_id when generating this day's workout)")
+            if prog.get("today_primary_lifts"):
+                parts.append(f"- Primary lifts today: {', '.join(prog['today_primary_lifts'])}")
+            if prog.get("today_exercises"):
+                exercises_summary = []
+                for ex in prog["today_exercises"]:
+                    primary = " ★" if ex.get("is_primary") else ""
+                    exercises_summary.append(f"  {ex['name']} {ex.get('sets', 3)}x{ex.get('reps', '8-10')}{primary}")
+                parts.append("- Today's exercise template:")
+                parts.extend(exercises_summary)
+            if prog.get("last_session_summary"):
+                parts.append(f"- Last session (this day): {prog['last_session_summary']}")
+        elif prog["today_day_type"] == "pt_session":
+            parts.append("- Today is a PT session day. Wait for the user to tell you what they did, then log it.")
+        elif prog["today_day_type"] == "class":
+            parts.append(f"- Today is {prog['today_label']}. Wait for the user to log it when done.")
+        else:
+            parts.append("- Today is a rest day. Encourage recovery.")
 
     return "\n".join(parts)

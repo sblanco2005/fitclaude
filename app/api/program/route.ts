@@ -8,7 +8,7 @@ export const GET = withAuth(async (_request, user) => {
     const program = await prisma.trainingProgram.findFirst({
       where: { userId: user.id, isActive: true },
       include: {
-        days: { orderBy: { dayIndex: 'asc' } },
+        days: { orderBy: [{ weekNumber: 'asc' }, { weekday: 'asc' }] },
       },
     });
 
@@ -18,16 +18,17 @@ export const GET = withAuth(async (_request, user) => {
 
     return NextResponse.json({
       id: program.id,
-      splitType: program.splitType,
-      rotation: JSON.parse(program.rotation),
-      currentDayIndex: program.currentDayIndex,
+      totalWeeks: program.totalWeeks,
+      currentWeek: program.currentWeek,
       isActive: program.isActive,
       days: program.days.map((d) => ({
         id: d.id,
+        weekday: d.weekday,
+        weekNumber: d.weekNumber,
+        dayType: d.dayType,
         dayLabel: d.dayLabel,
         workoutType: d.workoutType,
-        dayIndex: d.dayIndex,
-        exerciseTemplate: JSON.parse(d.exerciseTemplate),
+        exerciseTemplate: d.exerciseTemplate ? JSON.parse(d.exerciseTemplate) : null,
       })),
     });
   } catch (error) {
@@ -36,22 +37,18 @@ export const GET = withAuth(async (_request, user) => {
   }
 });
 
-// DELETE — deactivate user's training program
+// DELETE — remove user's training program
 export const DELETE = withAuth(async (_request, user) => {
   try {
     const program = await prisma.trainingProgram.findFirst({
-      where: { userId: user.id, isActive: true },
+      where: { userId: user.id },
     });
 
     if (!program) {
-      return NextResponse.json({ error: 'No active program' }, { status: 404 });
+      return NextResponse.json({ error: 'No program' }, { status: 404 });
     }
 
-    await prisma.trainingProgram.update({
-      where: { id: program.id },
-      data: { isActive: false },
-    });
-
+    await prisma.trainingProgram.delete({ where: { id: program.id } });
     return NextResponse.json({ deleted: true });
   } catch (error) {
     console.error('Failed to delete program:', error);

@@ -186,30 +186,47 @@ export default function DashboardPage() {
 
         {/* Workout card — program-aware */}
         {programToday ? (
-          <Link href="/workouts" className="block">
+          <Link href={programToday.dayType === 'coached' ? '/workouts' : '/program'} className="block">
             <Card className="p-3" hover>
               <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-base">🏋️</span>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Today&apos;s Workout</h3>
+                <span className="text-base">
+                  {programToday.dayType === 'coached' ? '🏋️' :
+                   programToday.dayType === 'pt_session' ? '👨‍🏫' :
+                   programToday.dayType === 'class' ? '🎯' : '😴'}
+                </span>
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  {programToday.weekdayName}
+                </h3>
               </div>
               <div className="space-y-2">
-                <div className={`text-lg font-bold ${splitColors[programToday.workoutType] || 'text-white'}`}>
+                <div className={`text-sm font-bold ${programToday.workoutType ? splitColors[programToday.workoutType] || 'text-white' : 'text-white'}`}>
                   {programToday.dayLabel}
                 </div>
-                <div className="space-y-1">
-                  {programToday.exerciseTemplate
-                    .filter((e) => e.is_primary)
-                    .map((e, i) => (
-                      <div key={i} className="text-xs text-white">
-                        {e.name} <span className="text-muted">{e.sets}x{e.reps}</span>
+                {programToday.dayType === 'coached' && programToday.exerciseTemplate && (
+                  <div className="space-y-1">
+                    {programToday.exerciseTemplate
+                      .filter((e) => e.is_primary)
+                      .map((e, i) => (
+                        <div key={i} className="text-xs text-white">
+                          {e.name} <span className="text-muted">{e.sets}x{e.reps}</span>
+                        </div>
+                      ))}
+                    {programToday.exerciseTemplate.filter((e) => !e.is_primary).length > 0 && (
+                      <div className="text-xs text-muted">
+                        +{programToday.exerciseTemplate.filter((e) => !e.is_primary).length} accessories
                       </div>
-                    ))}
-                  {programToday.exerciseTemplate.filter((e) => !e.is_primary).length > 0 && (
-                    <div className="text-xs text-muted">
-                      +{programToday.exerciseTemplate.filter((e) => !e.is_primary).length} accessories
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
+                {programToday.dayType === 'pt_session' && (
+                  <div className="text-xs text-muted">Log after your session</div>
+                )}
+                {programToday.dayType === 'class' && (
+                  <div className="text-xs text-muted">Log when done</div>
+                )}
+                {programToday.dayType === 'rest' && (
+                  <div className="text-xs text-muted">Recover & eat well</div>
+                )}
               </div>
             </Card>
           </Link>
@@ -253,6 +270,24 @@ export default function DashboardPage() {
           </Link>
         )}
       </div>
+
+      {/* Program setup prompt (only when no program exists) */}
+      {!programToday && (
+        <Link href="/program" className="block">
+          <Card className="p-3" hover>
+            <div className="flex items-center gap-2">
+              <span className="text-base">📅</span>
+              <div className="flex-1">
+                <div className="text-xs font-semibold text-white">Set up your training program</div>
+                <div className="text-xs text-muted">Build a weekly schedule the coach can follow</div>
+              </div>
+              <svg className="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </Card>
+        </Link>
+      )}
 
       {/* Collections / Routines */}
       {collections.length > 0 && (
