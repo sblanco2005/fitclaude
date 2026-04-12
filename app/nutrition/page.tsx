@@ -796,19 +796,7 @@ export default function NutritionPage() {
             </div>
             {(!today?.logs || today.logs.length === 0) ? (
               <div className="py-6 text-center">
-                <p className="text-sm text-slate-500 mb-3">No meals logged yet</p>
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => setScannerOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2" />
-                    </svg>
-                    Scan barcode
-                  </button>
-                  <span className="text-slate-700 text-xs">or chat with coach</span>
-                </div>
+                <p className="text-sm text-slate-500">No meals logged yet</p>
               </div>
             ) : (
               <div className="max-h-[40vh] overflow-y-auto -mr-2 pr-2">

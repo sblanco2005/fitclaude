@@ -15,6 +15,7 @@ export const GET = withAuth(async (_request, user) => {
       gymType: true,
       injuriesNotes: true,
       equipmentText: true,
+      weightKg: true,
       dailyCalorieTarget: true,
       dailyProteinTarget: true,
       carbsPercent: true,
@@ -37,7 +38,7 @@ export const PATCH = withAuth(async (request, user) => {
 
   const allowedFields = [
     'name', 'fitnessGoal', 'experienceLevel', 'gymType',
-    'injuriesNotes', 'equipmentText',
+    'injuriesNotes', 'equipmentText', 'weightKg',
     'dailyCalorieTarget', 'dailyProteinTarget',
     'carbsPercent', 'fatPercent',
     'sex', 'trainingFrequency', 'timezone', 'weightUnit', 'isOnboarded',

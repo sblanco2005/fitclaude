@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useFitClaude } from '@/context/FitClaudeContext';
@@ -251,6 +252,7 @@ function RoutineCard({
   const muscles = uniqueMuscles(latest);
   const routineNum = getRoutineDisplayId(workouts);
   const isLifting = (latest.category || 'lifting') === 'lifting';
+  const isProgramLinked = workouts.some((w) => w.programDayId != null);
 
   return (
     <div className="flex items-center gap-1">
@@ -295,8 +297,19 @@ function RoutineCard({
         )}
       </button>
 
-      {/* Collection folder */}
-      {onAddToCollection && (
+      {/* Right-side action: program link (if linked) OR collection folder */}
+      {isProgramLinked ? (
+        <Link
+          href="/program"
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-slate-800/60"
+          title="Linked to training program"
+        >
+          <svg className="w-[18px] h-[18px] text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+        </Link>
+      ) : onAddToCollection ? (
         <button
           onClick={(e) => { e.stopPropagation(); onAddToCollection(name); }}
           className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-slate-800/60"
@@ -305,7 +318,7 @@ function RoutineCard({
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
         </button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -672,6 +685,10 @@ function RoutineExerciseRow({
   pr,
   onSwap,
   onUpdate,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
   weightUnit = 'lb',
   supersetLabel,
 }: {
@@ -682,6 +699,10 @@ function RoutineExerciseRow({
   pr: { weight: number; reps: number } | null;
   onSwap: () => void;
   onUpdate: (updates: { sets?: number; reps?: string; restSeconds?: number }) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
   weightUnit?: 'lb' | 'kg';
   supersetLabel?: string | null;
 }) {
@@ -719,9 +740,39 @@ function RoutineExerciseRow({
     <div className="py-2 border-b border-slate-800/40 last:border-0">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2.5 min-w-0 flex-1">
-          <span className="text-xs text-slate-500 font-bold tabular-nums mt-0.5 shrink-0">
-            {String(globalIndex).padStart(2, '0')}
-          </span>
+          <div className="flex flex-col items-center gap-0.5 shrink-0 mt-0.5">
+            <span className="text-xs text-slate-500 font-bold tabular-nums leading-none">
+              {String(globalIndex).padStart(2, '0')}
+            </span>
+            {(onMoveUp || onMoveDown) && (
+              <div className="flex flex-col -space-y-1">
+                {onMoveUp && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+                    disabled={!canMoveUp}
+                    className="p-0.5 rounded transition-colors text-slate-600 hover:text-emerald-400 disabled:opacity-20 disabled:hover:text-slate-600"
+                    title="Move up"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                    </svg>
+                  </button>
+                )}
+                {onMoveDown && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+                    disabled={!canMoveDown}
+                    className="p-0.5 rounded transition-colors text-slate-600 hover:text-emerald-400 disabled:opacity-20 disabled:hover:text-slate-600"
+                    title="Move down"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <p className="text-sm text-white font-semibold truncate flex-1 min-w-0">
@@ -839,7 +890,7 @@ function RoutineExerciseRow({
         <div className="ml-7 mt-2">
           <div className="relative aspect-video max-h-[50vh] landscape:max-h-[70vh] rounded-lg overflow-hidden bg-slate-900">
             <iframe
-              src={`https://www.youtube.com/embed/${videoId}`}
+              src={`https://www.youtube.com/embed/${videoId}?mute=1&cc_load_policy=1&cc_lang_pref=en`}
               className="absolute inset-0 w-full h-full"
               allowFullScreen
               loading="lazy"
@@ -1180,6 +1231,7 @@ function RoutineDetail({
   onSwapExercise,
   onAddExercise,
   onUpdateExercise,
+  onReorderExercises,
   onSpin,
   weightUnit = 'lb',
 }: {
@@ -1195,6 +1247,7 @@ function RoutineDetail({
   onSwapExercise: (workoutId: string, workoutExerciseId: string, newExerciseId: string) => Promise<void>;
   onAddExercise: (workoutId: string, exerciseId: string) => Promise<void>;
   onUpdateExercise: (workoutId: string, workoutExerciseId: string, updates: { sets?: number; reps?: string; restSeconds?: number }) => Promise<void>;
+  onReorderExercises: (workoutId: string, orderedIds: string[]) => Promise<void>;
   onSpin: () => void;
   weightUnit?: 'lb' | 'kg';
 }) {
@@ -1214,6 +1267,25 @@ function RoutineDetail({
   const exerciseGroups = useMemo(() => groupExercises(latest.exercises), [latest.exercises]);
   const totalExercises = exerciseGroups.length;
   const routineNum = getRoutineDisplayId(workouts);
+
+  // Sorted list of exercises by current order — used to figure out neighbors for up/down
+  const orderedExercises = useMemo(
+    () => [...latest.exercises].sort((a, b) => a.order - b.order),
+    [latest.exercises]
+  );
+
+  const moveExercise = (exerciseId: string, direction: 'up' | 'down') => {
+    const ids = orderedExercises.map((e) => e.id);
+    const idx = ids.indexOf(exerciseId);
+    if (idx === -1) return;
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= ids.length) return;
+    [ids[idx], ids[newIdx]] = [ids[newIdx], ids[idx]];
+    onReorderExercises(latest.id, ids);
+  };
+
+  const isFirst = (exerciseId: string) => orderedExercises[0]?.id === exerciseId;
+  const isLast = (exerciseId: string) => orderedExercises[orderedExercises.length - 1]?.id === exerciseId;
 
   // Build a map from exercise ID → superset label (e.g., "A1", "A2")
   const supersetLabelMap = useMemo(() => {
@@ -1463,6 +1535,10 @@ function RoutineDetail({
                   pr={getPRForExercise(workouts, getExerciseName(ex))}
                   onSwap={() => setSwapMenuExercise(ex)}
                   onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
+                  onMoveUp={() => moveExercise(ex.id, 'up')}
+                  onMoveDown={() => moveExercise(ex.id, 'down')}
+                  canMoveUp={!isFirst(ex.id)}
+                  canMoveDown={!isLast(ex.id)}
                   weightUnit={weightUnit}
                   supersetLabel={supersetLabelMap.get(ex.id)}
                 />
@@ -1487,6 +1563,10 @@ function RoutineDetail({
                       pr={getPRForExercise(workouts, getExerciseName(ex))}
                       onSwap={() => setSwapMenuExercise(ex)}
                       onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
+                      onMoveUp={() => moveExercise(ex.id, 'up')}
+                      onMoveDown={() => moveExercise(ex.id, 'down')}
+                      canMoveUp={!isFirst(ex.id)}
+                      canMoveDown={!isLast(ex.id)}
                       weightUnit={weightUnit}
                       supersetLabel={supersetLabelMap.get(ex.id)}
                     />
@@ -1860,7 +1940,7 @@ function ExerciseLogRow({
           {showVideo && (
             <div className="relative aspect-video max-h-[50vh] landscape:max-h-[70vh] rounded-lg overflow-hidden bg-slate-900 mt-1.5">
               <iframe
-                src={`https://www.youtube.com/embed/${videoId}`}
+                src={`https://www.youtube.com/embed/${videoId}?mute=1&cc_load_policy=1&cc_lang_pref=en`}
                 className="absolute inset-0 w-full h-full"
                 allowFullScreen
                 loading="lazy"
@@ -2554,7 +2634,12 @@ function WorkoutsPageInner() {
     }
     return 'routines';
   });
-  const [selectedRoutine, setSelectedRoutine] = useState<string | null>(null);
+  const [selectedRoutine, setSelectedRoutine] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return searchParams.get('routine');
+    }
+    return null;
+  });
   const [hitItQueue, setHitItQueue] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -2572,6 +2657,15 @@ function WorkoutsPageInner() {
   const [routineSearch, setRoutineSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
+
+  // If navigated with ?chat=1, auto-open the chat overlay in workout topic
+  useEffect(() => {
+    if (searchParams.get('chat') === '1') {
+      setChatTopic('workout');
+      setChatOpen(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [finishedWorkouts, setFinishedWorkouts] = useState<
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
@@ -3026,6 +3120,32 @@ function WorkoutsPageInner() {
     }
   };
 
+  const handleReorderExercises = async (workoutId: string, orderedIds: string[]) => {
+    // Optimistic update
+    setWorkouts((prev) =>
+      prev.map((w) => {
+        if (w.id !== workoutId) return w;
+        const byId = new Map(w.exercises.map((e) => [e.id, e]));
+        const reordered = orderedIds
+          .map((id, i) => {
+            const ex = byId.get(id);
+            return ex ? { ...ex, order: i + 1 } : null;
+          })
+          .filter((e): e is NonNullable<typeof e> => e !== null);
+        return { ...w, exercises: reordered };
+      })
+    );
+    const res = await fetch(`/api/workouts/${workoutId}/exercises/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderedIds }),
+    });
+    if (!res.ok) {
+      // Revert on failure by refetching
+      fetchWorkouts();
+    }
+  };
+
   const requestSpin = (routineName: string) => {
     const group = routineGroups.find(([k]) => k === routineName)?.[1];
     if (!group) return;
@@ -3086,6 +3206,7 @@ function WorkoutsPageInner() {
           onSwapExercise={handleSwapExercise}
           onAddExercise={handleAddExercise}
           onUpdateExercise={handleUpdateExercise}
+          onReorderExercises={handleReorderExercises}
           onSpin={() => requestSpin(selectedRoutine!)}
           weightUnit={weightUnit}
         />

@@ -6,25 +6,21 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import type { Activity, DailyNutrition, TodayWorkout, Workout, WorkoutCollection } from '@/types';
-
-const splitColors: Record<string, string> = {
-  push: 'text-red-400',
-  pull: 'text-blue-400',
-  legs: 'text-amber-400',
-  upper: 'text-purple-400',
-  lower: 'text-emerald-400',
-  full_body: 'text-cyan-400',
-};
+import { useFitClaude } from '@/context/FitClaudeContext';
+import type { Activity, DailyNutrition, TodayWorkout, TrainingProgram, UserProfile, Workout, WorkoutCollection } from '@/types';
+import { estimateActivityKcal } from '@/lib/calorie-estimate';
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { setChatOpen, setChatTopic, dataVersion } = useFitClaude();
   const [nutrition, setNutrition] = useState<DailyNutrition | null>(null);
   const [todayWorkouts, setTodayWorkouts] = useState<Workout[]>([]);
   const [todayActivities, setTodayActivities] = useState<Activity[]>([]);
   const [collections, setCollections] = useState<WorkoutCollection[]>([]);
   const [programToday, setProgramToday] = useState<TodayWorkout | null>(null);
+  const [program, setProgram] = useState<TrainingProgram | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.isOnboarded === false) {
@@ -83,7 +79,17 @@ export default function DashboardPage() {
 
       fetch('/api/program/today')
         .then((res) => res.ok ? res.json() : null)
-        .then((data) => { if (data?.programDayId) setProgramToday(data); })
+        .then((data) => { if (data?.programDayId) setProgramToday(data); else setProgramToday(null); })
+        .catch(() => {});
+
+      fetch('/api/program')
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => { if (data?.id) setProgram(data); else setProgram(null); })
+        .catch(() => {});
+
+      fetch('/api/profile')
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => { if (data) setProfile(data); })
         .catch(() => {});
     };
 
@@ -93,7 +99,7 @@ export default function DashboardPage() {
     const onVisible = () => { if (document.visibilityState === 'visible') fetchDashboard(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [status]);
+  }, [status, dataVersion]);
 
   if (status === 'loading') {
     return (
@@ -132,154 +138,130 @@ export default function DashboardPage() {
   const totals = nutrition?.totals;
   const mealCount = nutrition?.logs?.length || 0;
   const hasNutrition = totals && totals.calories > 0;
-  const hasWorkouts = todayWorkouts.length > 0 || todayActivities.length > 0;
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Late night gains';
   const firstName = session.user?.name?.split(' ')[0] || 'there';
 
+  // Today's weekday index: 0=Mon ... 6=Sun (to match our ProgramDay.weekday)
+  const jsDay = new Date().getDay();
+  const todayWeekday = jsDay === 0 ? 6 : jsDay - 1;
+  const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  // Days of the CURRENT week from the program, keyed by weekday
+  const currentWeekDays = program
+    ? program.days.filter((d) => d.weekNumber === program.currentWeek)
+    : [];
+  const daysByWeekday = new Map(currentWeekDays.map((d) => [d.weekday, d]));
+
+  // Build the combined "today" activity list (workouts + activities)
+  type TodayItem = { id: string; label: string; meta: string; kcal?: number | null; done: boolean; type: 'workout' | 'activity' | 'todo'; href?: string; onClick?: () => void };
+
+  const weightKg = profile?.weightKg ?? null;
+  const todayItems: TodayItem[] = [];
+
+  // Completed workouts
+  todayWorkouts.forEach((w) => {
+    todayItems.push({
+      id: w.id,
+      label: w.name || w.workoutType.replace('_', ' '),
+      meta: `${w.exercises?.length || 0} exercises`,
+      kcal: estimateActivityKcal(w.name || w.workoutType, w.durationMinutes || 50, weightKg),
+      done: true,
+      type: 'workout',
+      href: w.name ? `/workouts?routine=${encodeURIComponent(w.name)}` : '/workouts',
+    });
+  });
+
+  // Completed activities
+  todayActivities.forEach((a) => {
+    todayItems.push({
+      id: a.id,
+      label: a.name,
+      meta: a.durationMinutes ? `${a.durationMinutes} min` : 'Activity',
+      kcal: estimateActivityKcal(a.name, a.durationMinutes, weightKg),
+      done: true,
+      type: 'activity',
+    });
+  });
+
+  // Pending program day (if not yet done)
+  if (programToday && !programToday.completedToday && programToday.dayType !== 'rest') {
+    const isOwn = programToday.dayType === 'pt_session' || programToday.dayType === 'class';
+    todayItems.push({
+      id: `program-${programToday.programDayId}`,
+      label: programToday.dayLabel,
+      meta: isOwn
+        ? 'Tap to log'
+        : programToday.exerciseTemplate
+          ? `${programToday.exerciseTemplate.length} exercises`
+          : 'Routine',
+      done: false,
+      type: 'todo',
+      href:
+        programToday.dayType === 'coached' && programToday.routineName
+          ? `/workouts?routine=${encodeURIComponent(programToday.routineName)}`
+          : undefined,
+      onClick: isOwn
+        ? () => { setChatTopic('workout'); setChatOpen(true); }
+        : undefined,
+    });
+  }
+
   return (
-    <div className="p-4 pb-1 space-y-3 max-w-lg mx-auto">
+    <div className="p-4 pb-1 space-y-4 max-w-lg mx-auto">
       <h2 className="text-xl font-bold text-white">
         {greeting}, {firstName}
       </h2>
 
-      {/* Today — tappable summary cards */}
-      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Today</h3>
-      <div className="grid grid-cols-2 gap-3">
-        {/* Nutrition card — taps to /nutrition */}
-        <Link href="/nutrition" className="block">
-          <Card className="p-3" hover>
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-base">🍽️</span>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Nutrition Coach</h3>
+      {/* ───────────────── BLOCK 1 — PROGRAM (weekly strip) ──────────────────── */}
+      {program ? (
+        <Link href="/program" className="block">
+          <Card className="p-4" hover>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                Program — Week {program.currentWeek} of {program.totalWeeks}
+              </h3>
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
             </div>
-            {hasNutrition && totals ? (
-              <div className="space-y-1.5">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-primary">{Math.round(totals.calories)}</div>
-                  <div className="text-xs text-muted">kcal</div>
-                </div>
-                <div className="grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-xs font-semibold text-blue-400">{Math.round(totals.proteinG)}g</div>
-                    <div className="text-xs text-muted">protein</div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {WEEKDAY_LABELS.map((label, wd) => {
+                const day = daysByWeekday.get(wd);
+                const isToday = wd === todayWeekday;
+                const dayType = day?.dayType || 'rest';
+
+                const typeColor =
+                  dayType === 'coached' ? 'bg-primary/20 text-primary border-primary/40' :
+                  dayType === 'pt_session' || dayType === 'class' ? 'bg-purple-500/20 text-purple-400 border-purple-500/40' :
+                  'bg-slate-800/40 text-slate-500 border-slate-700';
+
+                return (
+                  <div
+                    key={wd}
+                    className={`aspect-[4/5] rounded-lg border flex flex-col items-center justify-center p-1 ${typeColor} ${
+                      isToday ? 'ring-2 ring-primary ring-offset-2 ring-offset-slate-900' : ''
+                    }`}
+                  >
+                    <div className="text-[10px] font-bold opacity-70 uppercase">{label}</div>
+                    <div className="text-[9px] font-medium text-center leading-tight mt-0.5 line-clamp-2">
+                      {day?.dayLabel || 'Rest'}
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-xs font-semibold text-amber-400">{Math.round(totals.carbsG)}g</div>
-                    <div className="text-xs text-muted">carbs</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-red-400">{Math.round(totals.fatG)}g</div>
-                    <div className="text-xs text-muted">fat</div>
-                  </div>
-                </div>
-                <div className="text-xs text-muted text-center pt-0.5">
-                  {mealCount} meal{mealCount !== 1 ? 's' : ''} logged
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted text-xs text-center py-3">No meals logged</p>
-            )}
+                );
+              })}
+            </div>
           </Card>
         </Link>
-
-        {/* Workout card — program-aware */}
-        {programToday ? (
-          <Link href={programToday.dayType === 'coached' ? '/workouts' : '/program'} className="block">
-            <Card className="p-3" hover>
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-base">
-                  {programToday.dayType === 'coached' ? '🏋️' :
-                   programToday.dayType === 'pt_session' ? '👨‍🏫' :
-                   programToday.dayType === 'class' ? '🎯' : '😴'}
-                </span>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                  {programToday.weekdayName}
-                </h3>
-              </div>
-              <div className="space-y-2">
-                <div className={`text-sm font-bold ${programToday.workoutType ? splitColors[programToday.workoutType] || 'text-white' : 'text-white'}`}>
-                  {programToday.dayLabel}
-                </div>
-                {programToday.dayType === 'coached' && programToday.exerciseTemplate && (
-                  <div className="space-y-1">
-                    {programToday.exerciseTemplate
-                      .filter((e) => e.is_primary)
-                      .map((e, i) => (
-                        <div key={i} className="text-xs text-white">
-                          {e.name} <span className="text-muted">{e.sets}x{e.reps}</span>
-                        </div>
-                      ))}
-                    {programToday.exerciseTemplate.filter((e) => !e.is_primary).length > 0 && (
-                      <div className="text-xs text-muted">
-                        +{programToday.exerciseTemplate.filter((e) => !e.is_primary).length} accessories
-                      </div>
-                    )}
-                  </div>
-                )}
-                {programToday.dayType === 'pt_session' && (
-                  <div className="text-xs text-muted">Log after your session</div>
-                )}
-                {programToday.dayType === 'class' && (
-                  <div className="text-xs text-muted">Log when done</div>
-                )}
-                {programToday.dayType === 'rest' && (
-                  <div className="text-xs text-muted">Recover & eat well</div>
-                )}
-              </div>
-            </Card>
-          </Link>
-        ) : (
-          <Link href="/workouts" className="block">
-            <Card className="p-3" hover>
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-base">🏋️</span>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Workout Coach</h3>
-              </div>
-              {hasWorkouts ? (
-                <div className="space-y-1.5">
-                  {todayWorkouts.slice(0, 2).map((w) => (
-                    <div key={w.id} className="py-2 px-3 rounded-lg bg-slate-800/50">
-                      <div className="text-xs font-medium text-white truncate">
-                        {w.name || w.workoutType.replace('_', ' ')}
-                      </div>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-xs text-muted">{w.exercises?.length || 0} exercises</span>
-                        <span className="text-xs font-medium text-white bg-primary/30 px-1.5 py-0.5 rounded-full">Done</span>
-                      </div>
-                    </div>
-                  ))}
-                  {todayActivities.slice(0, todayWorkouts.length >= 2 ? 0 : 2 - todayWorkouts.length).map((a) => (
-                    <div key={a.id} className="py-2 px-3 rounded-lg bg-slate-800/50">
-                      <div className="text-xs font-medium text-white truncate capitalize">{a.name}</div>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-xs text-muted">{a.durationMinutes ? `${a.durationMinutes} min` : 'Activity'}</span>
-                        <span className="text-xs font-medium text-white bg-amber-500/30 px-1.5 py-0.5 rounded-full">Activity</span>
-                      </div>
-                    </div>
-                  ))}
-                  {(todayWorkouts.length + todayActivities.length) > 2 && (
-                    <div className="text-xs text-muted text-center">+{todayWorkouts.length + todayActivities.length - 2} more</div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-muted text-xs text-center py-3">No workout today</p>
-              )}
-            </Card>
-          </Link>
-        )}
-      </div>
-
-      {/* Program setup prompt (only when no program exists) */}
-      {!programToday && (
+      ) : (
         <Link href="/program" className="block">
-          <Card className="p-3" hover>
-            <div className="flex items-center gap-2">
-              <span className="text-base">📅</span>
+          <Card className="p-4" hover>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📅</span>
               <div className="flex-1">
-                <div className="text-xs font-semibold text-white">Set up your training program</div>
-                <div className="text-xs text-muted">Build a weekly schedule the coach can follow</div>
+                <div className="text-sm font-bold text-white">Build your program</div>
+                <div className="text-xs text-muted mt-0.5">Set up a weekly schedule the coach can follow</div>
               </div>
               <svg className="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -289,10 +271,103 @@ export default function DashboardPage() {
         </Link>
       )}
 
-      {/* Collections / Routines */}
+      {/* ───────────────── BLOCK 2 — NUTRITION ───────────────────────────────── */}
+      <Link href="/nutrition" className="block">
+        <Card className="p-4" hover>
+          <div className="flex items-center gap-1.5 mb-3">
+            <span className="text-base">🍽️</span>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nutrition</h3>
+          </div>
+          {hasNutrition && totals ? (
+            <div className="space-y-3">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary leading-none">{Math.round(totals.calories)}</div>
+                <div className="text-[10px] text-muted uppercase tracking-wide mt-1">kcal</div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <div className="text-sm font-semibold text-blue-400">{Math.round(totals.proteinG)}g</div>
+                  <div className="text-[10px] text-muted">protein</div>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-amber-400">{Math.round(totals.carbsG)}g</div>
+                  <div className="text-[10px] text-muted">carbs</div>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-red-400">{Math.round(totals.fatG)}g</div>
+                  <div className="text-[10px] text-muted">fat</div>
+                </div>
+              </div>
+              <div className="text-xs text-muted text-center">
+                {mealCount} meal{mealCount !== 1 ? 's' : ''} logged
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted text-xs py-2">No meals logged — tap to add</p>
+          )}
+        </Card>
+      </Link>
+
+      {/* ───────────────── BLOCK 3 — TODAY (activity list) ───────────────────── */}
+      <Card className="p-4">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Today</h3>
+        {todayItems.length === 0 ? (
+          <p className="text-muted text-xs py-2">Nothing scheduled. Rest day 😴</p>
+        ) : (
+          <div className="space-y-2">
+            {todayItems.map((item) => {
+              const inner = (
+                <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    {item.done ? (
+                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                        <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border-2 border-slate-600 shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-white truncate capitalize">{item.label}</div>
+                      <div className="text-xs text-muted truncate">
+                        {item.meta}
+                        {item.kcal != null && (
+                          <span className="ml-1.5 text-amber-400 font-medium">· ~{item.kcal} kcal</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <svg className="w-4 h-4 text-slate-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              );
+
+              if (item.onClick) {
+                return (
+                  <button key={item.id} type="button" onClick={item.onClick} className="block w-full text-left">
+                    {inner}
+                  </button>
+                );
+              }
+              if (item.href) {
+                return (
+                  <Link key={item.id} href={item.href} className="block">
+                    {inner}
+                  </Link>
+                );
+              }
+              return <div key={item.id}>{inner}</div>;
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* Collections / Routines (kept at bottom for quick access) */}
       {collections.length > 0 && (
         <>
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Routines</h3>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1 pt-1">Routines</h3>
           <div className="grid grid-cols-2 gap-3">
             {collections.map((col) => (
               <Link

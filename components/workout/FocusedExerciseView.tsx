@@ -480,7 +480,7 @@ export default function FocusedExerciseView({
           <div className="py-2">
             <div className="relative aspect-video max-h-[50vh] landscape:max-h-[70vh] rounded-lg overflow-hidden bg-slate-900">
               <iframe
-                src={`https://www.youtube.com/embed/${vidId}`}
+                src={`https://www.youtube.com/embed/${vidId}?mute=1&cc_load_policy=1&cc_lang_pref=en`}
                 className="absolute inset-0 w-full h-full"
                 allowFullScreen
                 loading="lazy"

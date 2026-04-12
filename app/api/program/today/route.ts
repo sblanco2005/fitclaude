@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
+import { estimateActivityKcal } from '@/lib/calorie-estimate';
 
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -28,6 +29,14 @@ export const GET = withAuth(async (_request, user) => {
         programId: program.id,
         weekday: todayWeekday,
         weekNumber: program.currentWeek,
+      },
+      include: {
+        workouts: {
+          where: { completed: false },
+          select: { id: true, name: true, displayId: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
       },
     });
 
@@ -83,6 +92,61 @@ export const GET = withAuth(async (_request, user) => {
       }
     }
 
+    const routine = currentDay.workouts?.[0] || null;
+
+    // Check if the user has already logged something for today
+    // (completed workout OR activity dated today)
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+    const [completedWorkoutToday, activityToday] = await Promise.all([
+      prisma.workout.findFirst({
+        where: {
+          userId: user.id,
+          completed: true,
+          date: { gte: startOfDay, lt: endOfDay },
+        },
+        select: { id: true, name: true, workoutType: true },
+        orderBy: { date: 'desc' },
+      }),
+      prisma.activity.findFirst({
+        where: {
+          userId: user.id,
+          date: { gte: startOfDay, lt: endOfDay },
+        },
+        select: { id: true, name: true, durationMinutes: true },
+        orderBy: { date: 'desc' },
+      }),
+    ]);
+
+    const completedToday = !!(completedWorkoutToday || activityToday);
+    const completedLabel = completedWorkoutToday?.name || activityToday?.name || null;
+
+    // Fetch user weight for calorie estimate
+    const userRow = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { weightKg: true },
+    });
+    const weightKg = userRow?.weightKg ?? null;
+
+    // Conservative (lower-bound) kcal estimate for the completed activity
+    let estimatedKcal: number | null = null;
+    if (activityToday) {
+      estimatedKcal = estimateActivityKcal(
+        activityToday.name,
+        activityToday.durationMinutes,
+        weightKg,
+      );
+    } else if (completedWorkoutToday) {
+      // Lifting sessions default to ~50 min if duration not tracked
+      estimatedKcal = estimateActivityKcal(
+        completedWorkoutToday.name || 'lift',
+        50,
+        weightKg,
+      );
+    }
+
     return NextResponse.json({
       programDayId: currentDay.id,
       weekday: currentDay.weekday,
@@ -92,7 +156,13 @@ export const GET = withAuth(async (_request, user) => {
       dayLabel: currentDay.dayLabel,
       workoutType: currentDay.workoutType,
       exerciseTemplate: template,
+      routineId: routine?.id || null,
+      routineName: routine?.name || null,
+      routineDisplayId: routine?.displayId || null,
       lastSession,
+      completedToday,
+      completedLabel,
+      estimatedKcal,
     });
   } catch (error) {
     console.error('Failed to fetch today workout:', error);

@@ -116,6 +116,33 @@ export default function SettingsPage() {
             </select>
           </div>
 
+          {(() => {
+            const unit = (profile.weightUnit || 'lb') as 'lb' | 'kg';
+            const displayValue = profile.weightKg != null
+              ? (unit === 'kg' ? profile.weightKg : +(profile.weightKg * 2.20462).toFixed(1))
+              : '';
+            return (
+              <Input
+                label={`Your Weight (${unit})`}
+                type="number"
+                step="0.1"
+                placeholder={unit === 'kg' ? 'e.g. 80' : 'e.g. 175'}
+                value={displayValue}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    updateField('weightKg', null);
+                    return;
+                  }
+                  const n = parseFloat(raw);
+                  if (isNaN(n)) return;
+                  const kg = unit === 'kg' ? n : +(n / 2.20462).toFixed(2);
+                  updateField('weightKg', kg);
+                }}
+              />
+            );
+          })()}
+
         </div>
       </Card>
 

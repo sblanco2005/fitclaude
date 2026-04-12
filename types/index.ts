@@ -9,6 +9,7 @@ export interface UserProfile {
   gymType: string | null;
   injuriesNotes: string | null;
   equipmentText: string | null;
+  weightKg: number | null;
   dailyCalorieTarget: number | null;
   dailyProteinTarget: number | null;
   carbsPercent: number | null;
@@ -113,6 +114,7 @@ export interface Workout {
   fatigueRating: number | null;
   completed: boolean;
   isFavorite: boolean;
+  programDayId: string | null;
   createdAt: string;
   exercises: WorkoutExercise[];
 }
@@ -183,6 +185,9 @@ export interface ProgramDay {
   dayLabel: string;
   workoutType: string | null;
   exerciseTemplate: ProgramDayExercise[] | null;
+  routineId?: string | null;
+  routineName?: string | null;
+  routineDisplayId?: number | null;
 }
 
 export interface TrainingProgram {
@@ -202,6 +207,12 @@ export interface TodayWorkout {
   dayLabel: string;
   workoutType: string | null;
   exerciseTemplate: ProgramDayExercise[] | null;
+  routineId?: string | null;
+  routineName?: string | null;
+  routineDisplayId?: number | null;
+  completedToday?: boolean;
+  completedLabel?: string | null;
+  estimatedKcal?: number | null;
   lastSession: {
     date: string | null;
     fatigueRating: number | null;

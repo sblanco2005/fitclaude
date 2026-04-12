@@ -44,6 +44,9 @@ client = AsyncAnthropic(
     api_key=settings.minimax_api_key or settings.anthropic_api_key,
     base_url=settings.agent_base_url or None,
 )
+# Dedicated Anthropic client (no base_url override) for vision requests —
+# MiniMax doesn't support Anthropic-style image content blocks.
+vision_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 cuid_generator = Cuid()
 
 
@@ -597,8 +600,34 @@ async def _tool_generate_program(
     days_data = params.get("days", [])
     total_weeks = params.get("total_weeks", 1)
 
+    logger.info(f"[Program] Raw params type: days={type(days_data).__name__}, total_weeks={type(total_weeks).__name__}")
+    logger.info(f"[Program] Raw days payload (first 500 chars): {str(days_data)[:500]}")
+
+    # MiniMax sometimes passes these as JSON strings — normalize
+    if isinstance(days_data, str):
+        try:
+            days_data = json.loads(days_data)
+        except Exception as e:
+            logger.error(f"[Program] Failed to parse days string: {e}")
+            return {"error": f"Could not parse 'days' — expected array. Got: {str(days_data)[:200]}"}
+    if isinstance(total_weeks, str):
+        try:
+            total_weeks = int(total_weeks)
+        except Exception:
+            total_weeks = 1
+
+    # Each day might also be a string if doubly-encoded
+    if days_data and isinstance(days_data[0], str):
+        try:
+            days_data = [json.loads(d) for d in days_data]
+        except Exception as e:
+            logger.error(f"[Program] Failed to parse individual day strings: {e}")
+
     if not days_data:
         return {"error": "No days provided in the program."}
+
+    if not isinstance(days_data[0], dict):
+        return {"error": f"Expected list of day objects, got list of {type(days_data[0]).__name__}"}
 
     # Delete any existing program for this user (one active program per user)
     existing = await db.execute(
@@ -667,6 +696,59 @@ async def _tool_generate_program(
             exercise_template=json.dumps(valid_exercises) if valid_exercises else None,
         )
         db.add(day)
+        await db.flush()
+
+        # For coached days, also create a Workout routine template linked to this ProgramDay
+        # so it shows up in the routines list and can be edited/tracked.
+        if day_type == "coached" and valid_exercises:
+            # Get next display_id for this user
+            max_result = await db.execute(
+                select(func.max(Workout.display_id)).where(Workout.user_id == user_id)
+            )
+            max_id = max_result.scalar() or 0
+            next_display_id = max_id + 1
+
+            routine_name = day.day_label.lower().strip().rstrip("*")
+            routine_workout = Workout(
+                id=cuid_generator.generate(),
+                user_id=user_id,
+                workout_type=day_data.get("workout_type") or "custom",
+                category="lifting",
+                source="coach",
+                name=routine_name,
+                display_id=next_display_id,
+                program_day_id=day.id,
+                completed=False,
+            )
+            db.add(routine_workout)
+            await db.flush()
+
+            # Create WorkoutExercise rows
+            for i, ex in enumerate(valid_exercises):
+                ex_name = ex.get("name", "")
+                exercise_id = None
+                if ex_name:
+                    found = _match_exercise(ex_name, all_exercises)
+                    if found:
+                        exercise_id = found.id
+
+                muscle_group = ex.get("muscle_group", "")
+                coaching_tip = ex.get("notes", "")
+                notes_str = f"{ex_name}|{muscle_group}|{coaching_tip}"
+
+                we = WorkoutExercise(
+                    id=cuid_generator.generate(),
+                    workout_id=routine_workout.id,
+                    exercise_id=exercise_id,
+                    order=i + 1,
+                    sets=ex.get("sets", 3),
+                    reps=ex.get("reps"),
+                    rest_seconds=ex.get("rest_seconds", 90),
+                    notes=notes_str,
+                )
+                db.add(we)
+            logger.info(f"[Program] Created routine '{routine_name}' (display #{next_display_id}) for program day {day.id}")
+
         program_days.append({
             "weekday": WEEKDAY_NAMES[weekday],
             "week_number": week_num,
@@ -1458,15 +1540,24 @@ async def handle_chat(
         }
 
     # Select model: use configured agent model (e.g. MiniMax) if base_url is set,
-    # otherwise use tier-based Anthropic model
-    if settings.agent_base_url:
+    # otherwise use tier-based Anthropic model.
+    # IMPORTANT: MiniMax does not support Anthropic-style image blocks — if there's
+    # an image, force the Anthropic client with a vision-capable Claude model.
+    use_anthropic_for_vision = bool(image_base64 and image_media_type)
+    if use_anthropic_for_vision:
+        active_model = "claude-sonnet-4-20250514"
+        active_client = vision_client
+        logger.info("[Coach] Image detected — routing to Anthropic vision model")
+    elif settings.agent_base_url:
         active_model = settings.agent_model
+        active_client = client
     else:
         active_model = await get_model_for_tier(db, user_id)
+        active_client = client
     request_id = str(uuid.uuid4())[:8]
 
     try:
-        response = await client.messages.create(
+        response = await active_client.messages.create(
             model=active_model,
             max_tokens=2048,
             system=system_blocks,
@@ -1518,7 +1609,7 @@ async def handle_chat(
             messages.append({"role": "assistant", "content": response.content})
             messages.append({"role": "user", "content": tool_results})
 
-            response = await client.messages.create(
+            response = await active_client.messages.create(
                 model=active_model,
                 max_tokens=2048,
                 system=system_blocks,
@@ -1550,7 +1641,7 @@ async def handle_chat(
                     "Do not respond with text — call the tool."
                 ),
             })
-            response = await client.messages.create(
+            response = await active_client.messages.create(
                 model=active_model,
                 max_tokens=2048,
                 system=system_blocks,
@@ -1584,7 +1675,7 @@ async def handle_chat(
                         })
                 messages.append({"role": "assistant", "content": response.content})
                 messages.append({"role": "user", "content": tool_results})
-                response = await client.messages.create(
+                response = await active_client.messages.create(
                     model=active_model,
                     max_tokens=2048,
                     system=system_blocks,

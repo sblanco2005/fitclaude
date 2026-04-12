@@ -8,7 +8,17 @@ export const GET = withAuth(async (_request, user) => {
     const program = await prisma.trainingProgram.findFirst({
       where: { userId: user.id, isActive: true },
       include: {
-        days: { orderBy: [{ weekNumber: 'asc' }, { weekday: 'asc' }] },
+        days: {
+          orderBy: [{ weekNumber: 'asc' }, { weekday: 'asc' }],
+          include: {
+            workouts: {
+              where: { completed: false },
+              select: { id: true, name: true, displayId: true },
+              orderBy: { createdAt: 'asc' },
+              take: 1,
+            },
+          },
+        },
       },
     });
 
@@ -21,15 +31,21 @@ export const GET = withAuth(async (_request, user) => {
       totalWeeks: program.totalWeeks,
       currentWeek: program.currentWeek,
       isActive: program.isActive,
-      days: program.days.map((d) => ({
-        id: d.id,
-        weekday: d.weekday,
-        weekNumber: d.weekNumber,
-        dayType: d.dayType,
-        dayLabel: d.dayLabel,
-        workoutType: d.workoutType,
-        exerciseTemplate: d.exerciseTemplate ? JSON.parse(d.exerciseTemplate) : null,
-      })),
+      days: program.days.map((d) => {
+        const routine = d.workouts?.[0] || null;
+        return {
+          id: d.id,
+          weekday: d.weekday,
+          weekNumber: d.weekNumber,
+          dayType: d.dayType,
+          dayLabel: d.dayLabel,
+          workoutType: d.workoutType,
+          exerciseTemplate: d.exerciseTemplate ? JSON.parse(d.exerciseTemplate) : null,
+          routineId: routine?.id || null,
+          routineName: routine?.name || null,
+          routineDisplayId: routine?.displayId || null,
+        };
+      }),
     });
   } catch (error) {
     console.error('Failed to fetch program:', error);

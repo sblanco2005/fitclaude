@@ -155,10 +155,7 @@ export function ChatDrawer() {
     }
   }, [input]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processImageFile = (file: File) => {
     // Compress image via canvas to reduce payload size
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -192,6 +189,27 @@ export function ChatDrawer() {
       reader.readAsDataURL(file);
     };
     img.src = objectUrl;
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processImageFile(file);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          processImageFile(file);
+          return;
+        }
+      }
+    }
   };
 
   const clearImage = () => {
@@ -430,6 +448,7 @@ export function ChatDrawer() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder={chatTopic === 'nutrition' ? 'Log food, snap a label...' : 'Message Coach Fit...'}
               rows={1}
               className="flex-1 bg-transparent text-white placeholder-slate-500 focus:outline-none resize-none text-[15px] leading-relaxed py-1.5 px-2 max-h-[120px]"
