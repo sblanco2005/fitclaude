@@ -273,37 +273,30 @@ export default function DashboardPage() {
 
       {/* ───────────────── BLOCK 2 — NUTRITION ───────────────────────────────── */}
       <Link href="/nutrition" className="block">
-        <Card className="p-4" hover>
-          <div className="flex items-center gap-1.5 mb-3">
-            <span className="text-base">🍽️</span>
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nutrition</h3>
+        <Card className="p-3" hover>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-base">🍽️</span>
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nutrition</h3>
+            </div>
+            {hasNutrition && (
+              <span className="text-[10px] text-muted">{mealCount} meal{mealCount !== 1 ? 's' : ''}</span>
+            )}
           </div>
           {hasNutrition && totals ? (
-            <div className="space-y-3">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-primary leading-none">{Math.round(totals.calories)}</div>
-                <div className="text-[10px] text-muted uppercase tracking-wide mt-1">kcal</div>
+            <div className="flex items-center justify-center gap-5 tabular-nums">
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-primary leading-none">{Math.round(totals.calories)}</span>
+                <span className="text-[10px] text-muted uppercase tracking-wide">kcal</span>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <div className="text-sm font-semibold text-blue-400">{Math.round(totals.proteinG)}g</div>
-                  <div className="text-[10px] text-muted">protein</div>
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-amber-400">{Math.round(totals.carbsG)}g</div>
-                  <div className="text-[10px] text-muted">carbs</div>
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-red-400">{Math.round(totals.fatG)}g</div>
-                  <div className="text-[10px] text-muted">fat</div>
-                </div>
-              </div>
-              <div className="text-xs text-muted text-center">
-                {mealCount} meal{mealCount !== 1 ? 's' : ''} logged
+              <div className="flex items-center gap-3.5 text-base">
+                <span className="text-blue-400 font-bold">{Math.round(totals.proteinG)}<span className="text-muted font-normal text-xs ml-0.5">P</span></span>
+                <span className="text-amber-400 font-bold">{Math.round(totals.carbsG)}<span className="text-muted font-normal text-xs ml-0.5">C</span></span>
+                <span className="text-red-400 font-bold">{Math.round(totals.fatG)}<span className="text-muted font-normal text-xs ml-0.5">F</span></span>
               </div>
             </div>
           ) : (
-            <p className="text-muted text-xs py-2">No meals logged — tap to add</p>
+            <p className="text-muted text-xs">No meals logged — tap to add</p>
           )}
         </Card>
       </Link>
