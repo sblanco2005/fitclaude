@@ -188,7 +188,7 @@ export default function ProgramPage() {
       const unchangedDays = classified.filter((c) => c.unchanged).map((c) => c.day);
       const changedDays = classified.filter((c) => !c.unchanged).map((c) => c.day);
 
-      let message = `Save my training program. Use the generate_program tool with total_weeks=${totalWeeks}.\n\n`;
+      let message = `Save my training program. Call ONLY the generate_program tool — do NOT call generate_workout or any other tool. Use total_weeks=${totalWeeks}.\n\n`;
 
       if (unchangedDays.length > 0) {
         message += `KEEP THESE DAYS EXACTLY AS THEY ARE (pass keep_existing=true for each, no exercises array needed — omit the 'exercises' field):\n`;
@@ -229,7 +229,10 @@ export default function ProgramPage() {
         }
       }
 
-      message += `\n\nCRITICAL: You must include BOTH the keep-existing days and the generate-new days in the same tool call, all in one 'days' array. Do not skip any day.`;
+      message += `\n\nCRITICAL:
+- Include BOTH the keep-existing days and the generate-new days in the same 'days' array in ONE generate_program tool call.
+- Do NOT call generate_workout. Do NOT create any standalone routines. The exercise templates inside generate_program are what become routines automatically.
+- After the generate_program tool returns, respond with a brief confirmation — do not list out every exercise.`;
 
       const res = await fetch('/api/chat', {
         method: 'POST',
