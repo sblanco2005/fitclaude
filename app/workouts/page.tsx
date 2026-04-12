@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -2622,6 +2622,12 @@ const SPIN_CONFIRMS = [
 function WorkoutsPageInner() {
   const { chatOpen, dataVersion, sendMessage, setChatOpen, setChatTopic, setCustomBack, profile } = useFitClaude();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  // Track if the current routine was opened via deep link (e.g. from / or /program)
+  const [routineOpenedViaDeepLink, setRoutineOpenedViaDeepLink] = useState(() => {
+    if (typeof window !== 'undefined') return !!searchParams.get('routine');
+    return false;
+  });
   const weightUnit = (profile?.weightUnit === 'kg' ? 'kg' : 'lb') as 'lb' | 'kg';
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2707,12 +2713,19 @@ function WorkoutsPageInner() {
   // Override Header back button when routine detail is open
   useEffect(() => {
     if (selectedRoutine) {
-      setCustomBack(() => setSelectedRoutine(null));
+      setCustomBack(() => {
+        if (routineOpenedViaDeepLink) {
+          setRoutineOpenedViaDeepLink(false);
+          router.back();
+        } else {
+          setSelectedRoutine(null);
+        }
+      });
     } else {
       setCustomBack(null);
     }
     return () => setCustomBack(null);
-  }, [selectedRoutine, setCustomBack]);
+  }, [selectedRoutine, routineOpenedViaDeepLink, setCustomBack, router]);
 
   const fetchWorkouts = useCallback(() => {
     fetch('/api/workouts?daysBack=90')
@@ -3195,7 +3208,15 @@ function WorkoutsPageInner() {
       <div className="h-full max-w-lg mx-auto flex flex-col">
         <RoutineDetail
           workouts={selectedGroup}
-          onBack={() => setSelectedRoutine(null)}
+          onBack={() => {
+            if (routineOpenedViaDeepLink) {
+              // Came from dashboard / program — go back to that page
+              setRoutineOpenedViaDeepLink(false);
+              router.back();
+            } else {
+              setSelectedRoutine(null);
+            }
+          }}
           onHitIt={() => addToHitIt(selectedRoutine)}
           isInHitIt={hitItQueue.includes(selectedRoutine)}
           onRename={handleRename}

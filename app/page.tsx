@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const [collections, setCollections] = useState<WorkoutCollection[]>([]);
   const [programToday, setProgramToday] = useState<TodayWorkout | null>(null);
   const [program, setProgram] = useState<TrainingProgram | null>(null);
+  const [programLoaded, setProgramLoaded] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -84,8 +85,12 @@ export default function DashboardPage() {
 
       fetch('/api/program')
         .then((res) => res.ok ? res.json() : null)
-        .then((data) => { if (data?.id) setProgram(data); else setProgram(null); })
-        .catch(() => {});
+        .then((data) => {
+          if (data?.id) setProgram(data);
+          else setProgram(null);
+          setProgramLoaded(true);
+        })
+        .catch(() => setProgramLoaded(true));
 
       fetch('/api/profile')
         .then((res) => res.ok ? res.json() : null)
@@ -215,7 +220,11 @@ export default function DashboardPage() {
       </h2>
 
       {/* ───────────────── BLOCK 1 — PROGRAM (weekly strip) ──────────────────── */}
-      {program ? (
+      {!programLoaded ? (
+        <Card className="p-4">
+          <div className="h-20 bg-slate-800/40 rounded animate-pulse" />
+        </Card>
+      ) : program ? (
         <Link href="/program" className="block">
           <Card className="p-4" hover>
             <div className="flex items-center justify-between mb-3">
