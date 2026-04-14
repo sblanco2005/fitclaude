@@ -12,7 +12,46 @@ function getMondayWeekday(date: Date): number {
   return d === 0 ? 6 : d - 1;
 }
 
-export const GET = withAuth(async (_request, user) => {
+// Get the Mon-indexed weekday AND Y/M/D parts for a given IANA tz.
+// Falls back to server-local time if tz is missing or invalid.
+function resolveLocalDayParts(tz: string | null): { weekday: number; year: number; month: number; day: number } {
+  const now = new Date();
+  if (!tz) {
+    return {
+      weekday: getMondayWeekday(now),
+      year: now.getFullYear(),
+      month: now.getMonth(),
+      day: now.getDate(),
+    };
+  }
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+    const wdMap: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+    const weekday = wdMap[get('weekday')] ?? getMondayWeekday(now);
+    return {
+      weekday,
+      year: parseInt(get('year'), 10),
+      month: parseInt(get('month'), 10) - 1,
+      day: parseInt(get('day'), 10),
+    };
+  } catch {
+    return {
+      weekday: getMondayWeekday(now),
+      year: now.getFullYear(),
+      month: now.getMonth(),
+      day: now.getDate(),
+    };
+  }
+}
+
+export const GET = withAuth(async (request, user) => {
   try {
     const program = await prisma.trainingProgram.findFirst({
       where: { userId: user.id, isActive: true },
@@ -22,7 +61,9 @@ export const GET = withAuth(async (_request, user) => {
       return NextResponse.json({ program: null });
     }
 
-    const todayWeekday = getMondayWeekday(new Date());
+    const tz = new URL(request.url).searchParams.get('tz');
+    const local = resolveLocalDayParts(tz);
+    const todayWeekday = local.weekday;
 
     const currentDay = await prisma.programDay.findFirst({
       where: {
@@ -95,9 +136,8 @@ export const GET = withAuth(async (_request, user) => {
     const routine = currentDay.workouts?.[0] || null;
 
     // Check if the user has already logged something for today
-    // (completed workout OR activity dated today)
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // (completed workout OR activity dated today) — use user's local day boundaries
+    const startOfDay = new Date(local.year, local.month, local.day);
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
     const [completedWorkoutToday, activityToday] = await Promise.all([

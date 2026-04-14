@@ -79,7 +79,7 @@ export default function DashboardPage() {
         .then((data) => setCollections(Array.isArray(data) ? data : []))
         .catch(() => {});
 
-      fetch('/api/program/today')
+      fetch(`/api/program/today?tz=${encodeURIComponent(tz)}`)
         .then((res) => res.ok ? res.json() : null)
         .then((data) => { if (data?.programDayId) setProgramToday(data); else setProgramToday(null); })
         .catch(() => {});
