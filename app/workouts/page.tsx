@@ -2295,6 +2295,10 @@ function ActiveWorkout({
             isRunning={isRunning}
             isPaused={isPaused}
             elapsed={elapsed}
+            onFinishWorkout={() => {
+              if (isRunning) pause();
+              setConfirmAction('save');
+            }}
           />
         </div>
 

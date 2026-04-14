@@ -102,6 +102,7 @@ interface FocusedExerciseViewProps {
   isRunning: boolean;
   isPaused: boolean;
   elapsed: number;
+  onFinishWorkout?: () => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ export default function FocusedExerciseView({
   isRunning,
   isPaused,
   elapsed,
+  onFinishWorkout,
 }: FocusedExerciseViewProps) {
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [showExerciseList, setShowExerciseList] = useState(false);
@@ -746,6 +748,19 @@ export default function FocusedExerciseView({
           <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
+        </button>
+      ) : onFinishWorkout ? (
+        <button
+          onClick={() => {
+            autoSaveCurrent();
+            onFinishWorkout();
+          }}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500/10 border-t border-emerald-500/30 active:bg-emerald-500/20 transition-colors"
+        >
+          <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Finish Workout</span>
         </button>
       ) : (
         <div className="flex items-center justify-center px-4 py-2.5 bg-primary/5 border-t border-primary/20">
