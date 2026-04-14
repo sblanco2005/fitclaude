@@ -354,7 +354,8 @@ export default function FocusedExerciseView({
       const lastForSet = lastSessionLogs.find((l) => l.set === setNum) ?? lastSessionLogs[lastSessionLogs.length - 1];
       if (lastForSet) return { weight: lastForSet.weight, reps: lastForSet.reps };
     }
-    const prescribedReps = parseInt(exercise.reps ?? '0') || 0;
+    const repNums = (exercise.reps ?? '').match(/\d+/g);
+    const prescribedReps = repNums ? parseInt(repNums[repNums.length - 1]) : 0;
     return { weight: 0, reps: prescribedReps || 8 };
   };
 

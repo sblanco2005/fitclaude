@@ -1720,7 +1720,8 @@ function ExerciseLogRow({
   const numSets = ex.sets || 3;
 
   // Parse prescribed reps (e.g. "8-10" → 8, "12" → 12)
-  const prescribedReps = parseInt(ex.reps ?? '0') || 0;
+  const repNums = (ex.reps ?? '').match(/\d+/g);
+  const prescribedReps = repNums ? parseInt(repNums[repNums.length - 1]) : 0;
 
   // Get default weight/reps for a given set number
   // No cross-set carry-forward — only use existing log or last session data
@@ -3022,7 +3023,10 @@ function WorkoutsPageInner() {
   const removeFromHitIt = (name: string) => {
     setHitItQueue((prev) => {
       const next = prev.filter((n) => n !== name);
-      if (next.length === 0) setTab('routines');
+      if (next.length === 0) {
+        setTab('routines');
+        router.push('/');
+      }
       return next;
     });
   };
@@ -3037,7 +3041,10 @@ function WorkoutsPageInner() {
     }
     setHitItQueue((prev) => {
       const next = prev.filter((n) => n !== name);
-      if (next.length === 0) setTab('history');
+      if (next.length === 0) {
+        setTab('history');
+        router.push('/');
+      }
       return next;
     });
     fetchWorkouts(); // Refresh to show updated logs
