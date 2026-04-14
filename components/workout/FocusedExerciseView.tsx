@@ -503,8 +503,8 @@ export default function FocusedExerciseView({
           </div>
         )}
 
-        {/* Set logging */}
-        {!exIsSkipped && !isShowingVideo && !isShowingGif && (
+        {/* Set logging — keep mounted even while video/gif is open so draft inputs aren't lost */}
+        {!exIsSkipped && (
           <div className="py-1">
             {/* Toolbar (only show on first exercise in group to avoid repetition) */}
             {(!isSuperset || exercise === currentGroup.exercises[0]) && (
