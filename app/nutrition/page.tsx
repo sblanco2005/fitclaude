@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/Toast';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { BarcodeScanner } from '@/components/nutrition/BarcodeScanner';
-import type { DailyNutrition, DailyNutritionSummary, NutritionLog } from '@/types';
+import type { DailyNutrition, DailyNutritionSummary, NutritionLog, RecentNutritionItem } from '@/types';
 
 /** Strip XML parameter tags that Claude sometimes injects into raw_text */
 function cleanRawInput(text: string): string {
@@ -558,6 +558,7 @@ function WeekGroup({
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 type Tab = 'today' | 'history';
+type MealView = 'meals' | 'recent';
 
 interface MacroTargets {
   calories: number;
@@ -570,6 +571,10 @@ export default function NutritionPage() {
   const { dataVersion } = useFitClaude();
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>('today');
+  const [mealView, setMealView] = useState<MealView>('meals');
+  const [recentItems, setRecentItems] = useState<RecentNutritionItem[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [loggingItem, setLoggingItem] = useState<string | null>(null);
   const [today, setToday] = useState<DailyNutrition | null>(null);
   const [summaries, setSummaries] = useState<DailyNutritionSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -618,6 +623,45 @@ export default function NutritionPage() {
       })
       .catch(() => setLoading(false));
   }, [userTz]);
+
+  const fetchRecentItems = useCallback(() => {
+    setRecentLoading(true);
+    fetch('/api/nutrition/recent-items?days=2&limit=30')
+      .then((res) => res.ok ? res.json() : { items: [] })
+      .then((data) => setRecentItems(Array.isArray(data?.items) ? data.items : []))
+      .catch(() => setRecentItems([]))
+      .finally(() => setRecentLoading(false));
+  }, []);
+
+  const handleQuickLog = useCallback(async (item: RecentNutritionItem) => {
+    if (loggingItem) return;
+    setLoggingItem(item.key);
+    try {
+      const res = await fetch('/api/nutrition/log-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          calories: item.calories ?? 0,
+          proteinG: item.proteinG,
+          carbsG: item.carbsG,
+          fatG: item.fatG,
+        }),
+      });
+      if (res.ok) {
+        toast(`Logged ${item.name}`);
+        fetchToday();
+      } else {
+        toast('Failed to log item', 'error');
+      }
+    } catch {
+      toast('Failed to log item', 'error');
+    } finally {
+      setLoggingItem(null);
+    }
+  }, [fetchToday, loggingItem, toast]);
 
   useEffect(() => {
     fetch('/api/nutrition/auto-close', {
@@ -675,6 +719,10 @@ export default function NutritionPage() {
   useEffect(() => {
     if (tab === 'history') fetchHistory();
   }, [tab, fetchHistory]);
+
+  useEffect(() => {
+    if (tab === 'today' && mealView === 'recent') fetchRecentItems();
+  }, [tab, mealView, fetchRecentItems, dataVersion]);
 
   const [closeDayConfirm, setCloseDayConfirm] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -784,31 +832,94 @@ export default function NutritionPage() {
 
           {/* Meal Log — lighter card, secondary feel (#2, #3, #4) */}
           <div className="rounded-xl bg-slate-800/20 border border-slate-800/40 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Meals
-              </h3>
-              {today?.logs && today.logs.length > 0 && (
-                <span className="text-xs text-slate-600 tabular-nums">
+            <div className="flex items-center gap-1 mb-3">
+              {(['meals', 'recent'] as MealView[]).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setMealView(v)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
+                    mealView === v
+                      ? 'bg-primary/20 text-primary'
+                      : 'text-slate-500 hover:text-white'
+                  }`}
+                >
+                  {v === 'meals' ? 'Meals' : 'Recent'}
+                </button>
+              ))}
+              {mealView === 'meals' && today?.logs && today.logs.length > 0 && (
+                <span className="ml-auto text-xs text-slate-600 tabular-nums">
                   cal | p | c | f
                 </span>
               )}
             </div>
-            {(!today?.logs || today.logs.length === 0) ? (
+
+            {mealView === 'meals' ? (
+              (!today?.logs || today.logs.length === 0) ? (
+                <div className="py-6 text-center">
+                  <p className="text-sm text-slate-500">No meals logged yet</p>
+                </div>
+              ) : (
+                <div className="max-h-[40vh] overflow-y-auto -mr-2 pr-2">
+                  {today.logs.map((log: NutritionLog, i: number) => (
+                    <MealRow
+                      key={log.id}
+                      log={log}
+                      onUpdate={fetchToday}
+                      onDelete={fetchToday}
+                      index={i}
+                    />
+                  ))}
+                </div>
+              )
+            ) : recentLoading ? (
               <div className="py-6 text-center">
-                <p className="text-sm text-slate-500">No meals logged yet</p>
+                <p className="text-sm text-slate-500">Loading recent items…</p>
+              </div>
+            ) : recentItems.length === 0 ? (
+              <div className="py-6 text-center">
+                <p className="text-sm text-slate-500">No recent items yet.</p>
+                <p className="text-xs text-slate-600 mt-1">
+                  Log meals through the coach and they&apos;ll appear here for one-tap reuse.
+                </p>
               </div>
             ) : (
-              <div className="max-h-[40vh] overflow-y-auto -mr-2 pr-2">
-                {today.logs.map((log: NutritionLog, i: number) => (
-                  <MealRow
-                    key={log.id}
-                    log={log}
-                    onUpdate={fetchToday}
-                    onDelete={fetchToday}
-                    index={i}
-                  />
-                ))}
+              <div className="max-h-[40vh] overflow-y-auto -mr-2 pr-2 space-y-1.5">
+                {recentItems.map((item) => {
+                  const isLogging = loggingItem === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => handleQuickLog(item)}
+                      disabled={isLogging}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 active:scale-[0.99] transition-all disabled:opacity-50 text-left"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-white truncate capitalize">
+                          {item.name}
+                        </div>
+                        <div className="text-xs text-slate-500 tabular-nums mt-0.5">
+                          {item.calories != null ? `${Math.round(item.calories)} kcal` : '—'}
+                          {item.proteinG != null && <span className="ml-2 text-blue-400">{Math.round(item.proteinG)}P</span>}
+                          {item.carbsG != null && <span className="ml-1.5 text-amber-400">{Math.round(item.carbsG)}C</span>}
+                          {item.fatG != null && <span className="ml-1.5 text-red-400">{Math.round(item.fatG)}F</span>}
+                          {item.useCount > 1 && <span className="ml-2 text-slate-600">·{item.useCount}x</span>}
+                        </div>
+                      </div>
+                      <span className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-primary/15 text-primary">
+                        {isLogging ? (
+                          <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+                            <path d="M12 2a10 10 0 0110 10" strokeLinecap="round" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

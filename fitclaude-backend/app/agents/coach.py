@@ -1069,6 +1069,7 @@ async def _tool_log_nutrition(
     protein_g = params.get("protein_g")
     carbs_g = params.get("carbs_g")
     fat_g = params.get("fat_g")
+    parsed_items_json: str | None = None
 
     try:
         agent_result = await nutrition_agent.extract_and_validate(raw_text)
@@ -1077,7 +1078,10 @@ async def _tool_log_nutrition(
             protein_g = agent_result["total_protein_g"]
             carbs_g = agent_result["total_carbs_g"]
             fat_g = agent_result["total_fat_g"]
-            logger.info(f"[Coach] Nutrition agent override: {calories} cal, {protein_g}g pro, {carbs_g}g carb, {fat_g}g fat")
+            items = agent_result.get("items") or []
+            if items:
+                parsed_items_json = json.dumps(items)
+            logger.info(f"[Coach] Nutrition agent override: {calories} cal, {protein_g}g pro, {carbs_g}g carb, {fat_g}g fat ({len(items)} items)")
     except Exception as e:
         logger.warning(f"[Coach] Nutrition agent failed in tool handler, using Claude estimates: {e}")
 
@@ -1088,6 +1092,7 @@ async def _tool_log_nutrition(
         date=user_now.astimezone(tz.utc).replace(tzinfo=None),
         meal_type=params.get("meal_type"),
         raw_input=raw_text,
+        parsed_items=parsed_items_json,
         calories=calories,
         protein_g=protein_g,
         carbs_g=carbs_g,

@@ -243,6 +243,19 @@ export interface NutritionLog {
   createdAt: string;
 }
 
+export interface RecentNutritionItem {
+  key: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  calories: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  lastUsed: string;
+  useCount: number;
+}
+
 export interface DailyNutrition {
   logs: NutritionLog[];
   totals: {
