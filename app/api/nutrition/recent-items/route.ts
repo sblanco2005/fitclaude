@@ -26,6 +26,8 @@ export type RecentItem = {
 };
 
 const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+const portionKey = (name: string, quantity: number, unit: string) =>
+  `${normalize(name)}|${quantity}|${normalize(unit)}`;
 
 export const GET = withAuth(async (request, user) => {
   const { searchParams } = new URL(request.url);
@@ -62,7 +64,9 @@ export const GET = withAuth(async (request, user) => {
       // Skip items we can't log meaningfully
       if (it.calories == null) continue;
 
-      const key = normalize(name);
+      const quantity = it.quantity ?? 1;
+      const unit = it.unit ?? 'serving';
+      const key = portionKey(name, quantity, unit);
       const existing = map.get(key);
       if (existing) {
         existing.useCount += 1;
@@ -72,8 +76,8 @@ export const GET = withAuth(async (request, user) => {
       map.set(key, {
         key,
         name,
-        quantity: it.quantity ?? 1,
-        unit: it.unit ?? 'serving',
+        quantity,
+        unit,
         calories: it.calories ?? null,
         proteinG: it.protein_g ?? null,
         carbsG: it.carbs_g ?? null,

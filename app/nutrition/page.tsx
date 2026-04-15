@@ -896,6 +896,13 @@ export default function NutritionPage() {
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-white truncate capitalize">
                           {item.name}
+                          {(() => {
+                            const unit = item.unit || '';
+                            const gramMatch = /^(\d+(?:\.\d+)?)\s*g$/i.test(unit);
+                            if (gramMatch) return <span className="ml-1.5 text-xs font-normal text-slate-400 normal-case">({unit})</span>;
+                            if (item.quantity && item.quantity !== 1) return <span className="ml-1.5 text-xs font-normal text-slate-400 normal-case">({item.quantity}{unit && unit !== 'serving' ? ` ${unit}` : 'x'})</span>;
+                            return null;
+                          })()}
                         </div>
                         <div className="text-xs text-slate-500 tabular-nums mt-0.5">
                           {item.calories != null ? `${Math.round(item.calories)} kcal` : '—'}
