@@ -102,16 +102,36 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   const perCarbs = Number(carbsG || 0);
   const perFat = Number(fatG || 0);
 
-  // Create NutritionLog directly — no UserFood intermediary
+  const totalCal = Math.round(perCal * qty * 10) / 10;
+  const totalPro = Math.round(perPro * qty * 10) / 10;
+  const totalCarbs = Math.round(perCarbs * qty * 10) / 10;
+  const totalFat = Math.round(perFat * qty * 10) / 10;
+
+  // Persist a single parsed item so the Recent Items view can surface this
+  // scanned product without the user rescanning.
+  const parsedItems = JSON.stringify([
+    {
+      name,
+      quantity: qty,
+      unit: servingUnit || 'serving',
+      calories: totalCal,
+      protein_g: totalPro,
+      carbs_g: totalCarbs,
+      fat_g: totalFat,
+      estimated: true,
+    },
+  ]);
+
   const log = await prisma.nutritionLog.create({
     data: {
       userId: user.id,
       date: new Date(),
       rawInput: `${qty === 1 ? '' : qty + 'x '}${name}`,
-      calories: Math.round(perCal * qty * 10) / 10,
-      proteinG: Math.round(perPro * qty * 10) / 10,
-      carbsG: Math.round(perCarbs * qty * 10) / 10,
-      fatG: Math.round(perFat * qty * 10) / 10,
+      parsedItems,
+      calories: totalCal,
+      proteinG: totalPro,
+      carbsG: totalCarbs,
+      fatG: totalFat,
     },
   });
 
