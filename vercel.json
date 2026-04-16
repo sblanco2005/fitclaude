@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/coach-notes", "schedule": "0 3 * * *" }
+  ]
+}

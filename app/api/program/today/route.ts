@@ -2,54 +2,9 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 import { estimateActivityKcal } from '@/lib/calorie-estimate';
+import { resolveLocalDayParts } from '@/lib/dates';
 
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-// JavaScript getDay(): 0=Sun, 1=Mon ... 6=Sat
-// We want: 0=Mon, 1=Tue ... 6=Sun
-function getMondayWeekday(date: Date): number {
-  const d = date.getDay();
-  return d === 0 ? 6 : d - 1;
-}
-
-// Get the Mon-indexed weekday AND Y/M/D parts for a given IANA tz.
-// Falls back to server-local time if tz is missing or invalid.
-function resolveLocalDayParts(tz: string | null): { weekday: number; year: number; month: number; day: number } {
-  const now = new Date();
-  if (!tz) {
-    return {
-      weekday: getMondayWeekday(now),
-      year: now.getFullYear(),
-      month: now.getMonth(),
-      day: now.getDate(),
-    };
-  }
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      weekday: 'short',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(now);
-    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
-    const wdMap: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
-    const weekday = wdMap[get('weekday')] ?? getMondayWeekday(now);
-    return {
-      weekday,
-      year: parseInt(get('year'), 10),
-      month: parseInt(get('month'), 10) - 1,
-      day: parseInt(get('day'), 10),
-    };
-  } catch {
-    return {
-      weekday: getMondayWeekday(now),
-      year: now.getFullYear(),
-      month: now.getMonth(),
-      day: now.getDate(),
-    };
-  }
-}
 
 export const GET = withAuth(async (request, user) => {
   try {
