@@ -6,6 +6,11 @@ import { resolveLocalDayParts, localMidnightToUtc, weekBounds } from '@/lib/date
 
 export const maxDuration = 60;
 
+// Runs at 03:00 UTC (see vercel.json). Good for ET/PT users (~10pm–midnight prior night).
+// TODO: for users in UTC+8 or later, 03:00 UTC is their afternoon — they'd get a mid-day
+// briefing based on yesterday's state. Acceptable at current scale; revisit if user base
+// spans Asia-Pacific.
+
 export async function POST(req: Request) {
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

@@ -131,8 +131,10 @@ export async function buildWeekSnapshot(userId: string, tz: string | null): Prom
   }
 
   // -- Strength progression --
-  // For each exercise done this week, find the most recent prior session
-  // of the same exercise (before this week) and compare top set.
+  // "Top set" = set with the highest estimated 1RM using the Epley formula:
+  //   e1RM = weight × (1 + reps / 30)
+  // This is compared across sessions (not just highest weight), so a 185×8
+  // correctly ranks above a 200×1 attempt.  The ±2% threshold avoids noise.
   const exerciseMap = new Map<string, { muscle: string | null; topSet: SetLog }>();
   for (const w of thisWeekWorkouts) {
     for (const ex of w.exercises) {
@@ -141,7 +143,9 @@ export async function buildWeekSnapshot(userId: string, tz: string | null): Prom
       const top = topSetByE1RM(logs);
       if (!top) continue;
       const existing = exerciseMap.get(name);
-      if (!existing || top.weight * (1 + top.reps / 30) > existing.topSet.weight * (1 + existing.topSet.reps / 30)) {
+      const newE1rm = top.weight * (1 + top.reps / 30);
+      const existingE1rm = existing ? existing.topSet.weight * (1 + existing.topSet.reps / 30) : -Infinity;
+      if (newE1rm > existingE1rm) {
         exerciseMap.set(name, { muscle: getMuscleName(ex), topSet: top });
       }
     }
@@ -221,7 +225,9 @@ export async function buildWeekSnapshot(userId: string, tz: string | null): Prom
   const avgNut = (startStr: string, endStr: string) => {
     let days = 0, cal = 0, pro = 0;
     for (const [dateStr, vals] of nutDayMap.entries()) {
-      if (dateStr >= startStr && dateStr < endStr) {
+      // Only count days with actual data — avoids deflating the average with an
+      // empty current day (cron runs at 3am; today's logs haven't happened yet).
+      if (dateStr >= startStr && dateStr < endStr && (vals.cal > 0 || vals.pro > 0)) {
         days++;
         cal += vals.cal;
         pro += vals.pro;
