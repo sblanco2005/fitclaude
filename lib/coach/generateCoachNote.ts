@@ -1,7 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { WeekSnapshot } from './weekSnapshot';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+// Primary: MiniMax-M2.7 via Anthropic-compatible endpoint
+const minimaxClient = process.env.MINIMAX_API_KEY
+  ? new Anthropic({
+      apiKey: process.env.MINIMAX_API_KEY,
+      baseURL: 'https://api.minimax.io/anthropic',
+    })
+  : null;
+
+// Fallback: Claude Haiku
+const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
 const SYS = `You are FitClaude's morning briefing coach. You receive a JSON snapshot covering this week vs last week of training and nutrition, strength progression, and what's coming up.
 
@@ -39,9 +48,21 @@ export type CoachNoteOutput = {
   tone: 'ok' | 'warn' | 'celebrate';
 };
 
-export async function generateCoachNote(snapshot: WeekSnapshot): Promise<CoachNoteOutput> {
+function parseNoteResponse(text: string): CoachNoteOutput {
+  const cleaned = text
+    .replace(/^```json\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  const parsed = JSON.parse(cleaned) as CoachNoteOutput;
+  if (!parsed.headline || !parsed.body) throw new Error('Missing fields');
+  if (!['ok', 'warn', 'celebrate'].includes(parsed.tone)) parsed.tone = 'ok';
+  return parsed;
+}
+
+async function callLLM(client: Anthropic, model: string, snapshot: WeekSnapshot): Promise<CoachNoteOutput> {
   const res = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model,
     max_tokens: 500,
     system: SYS,
     messages: [{ role: 'user', content: JSON.stringify(snapshot) }],
@@ -52,17 +73,22 @@ export async function generateCoachNote(snapshot: WeekSnapshot): Promise<CoachNo
     .map((b) => b.text)
     .join('');
 
-  // Strip code fences if present
-  const cleaned = text
-    .replace(/^```json\s*/i, '')
-    .replace(/\s*```$/i, '')
-    .trim();
+  return parseNoteResponse(text);
+}
 
+export async function generateCoachNote(snapshot: WeekSnapshot): Promise<CoachNoteOutput> {
+  // Try MiniMax-M2.7 first
+  if (minimaxClient) {
+    try {
+      return await callLLM(minimaxClient, 'MiniMax-M2.7', snapshot);
+    } catch (err) {
+      console.warn('[coach-notes] MiniMax failed, falling back to Anthropic:', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  // Fallback to Claude Haiku
   try {
-    const parsed = JSON.parse(cleaned) as CoachNoteOutput;
-    if (!parsed.headline || !parsed.body) throw new Error('Missing fields');
-    if (!['ok', 'warn', 'celebrate'].includes(parsed.tone)) parsed.tone = 'ok';
-    return parsed;
+    return await callLLM(anthropicClient, 'claude-haiku-4-5-20251001', snapshot);
   } catch {
     return {
       headline: 'Your coach is reviewing your week',
