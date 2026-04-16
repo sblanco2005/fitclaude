@@ -198,6 +198,17 @@ export interface TrainingProgram {
   days: ProgramDay[];
 }
 
+export interface CoachNote {
+  id: string;
+  headline: string;
+  body: string;
+  tone: 'ok' | 'warn' | 'celebrate';
+  generatedAt: string;
+  forDate: string;
+  periodStart: string;
+  periodEnd: string;
+}
+
 export interface TodayWorkout {
   programDayId: string | null;
   weekday: number;

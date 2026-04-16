@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useFitClaude } from '@/context/FitClaudeContext';
-import type { Activity, DailyNutrition, TodayWorkout, TrainingProgram, UserProfile, Workout, WorkoutCollection } from '@/types';
+import type { Activity, CoachNote, DailyNutrition, TodayWorkout, TrainingProgram, UserProfile, Workout, WorkoutCollection } from '@/types';
 import { estimateActivityKcal } from '@/lib/calorie-estimate';
 
 export default function DashboardPage() {
@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [programLoaded, setProgramLoaded] = useState(false);
   const [viewedWeek, setViewedWeek] = useState<number | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [coachNote, setCoachNote] = useState<CoachNote | null>(null);
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.isOnboarded === false) {
@@ -96,6 +97,11 @@ export default function DashboardPage() {
       fetch('/api/profile')
         .then((res) => res.ok ? res.json() : null)
         .then((data) => { if (data) setProfile(data); })
+        .catch(() => {});
+
+      fetch('/api/coach-notes/latest')
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => { if (data?.id) setCoachNote(data); })
         .catch(() => {});
     };
 
@@ -403,6 +409,59 @@ export default function DashboardPage() {
           </div>
         )}
       </Card>
+
+      {/* ───────────────── BLOCK 4 — COACH NOTES ──────────────────────── */}
+      {coachNote ? (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+              coachNote.tone === 'celebrate' ? 'bg-primary/20' :
+              coachNote.tone === 'warn' ? 'bg-amber-400/20' :
+              'bg-emerald-500/20'
+            }`}>
+              {coachNote.tone === 'celebrate' ? (
+                <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              ) : coachNote.tone === 'warn' ? (
+                <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Coach Notes</h3>
+            </div>
+          </div>
+          <p className={`text-sm font-semibold mb-1.5 ${
+            coachNote.tone === 'celebrate' ? 'text-primary' :
+            coachNote.tone === 'warn' ? 'text-amber-400' :
+            'text-white'
+          }`}>
+            {coachNote.headline}
+          </p>
+          <div className="text-xs text-slate-400 leading-relaxed space-y-0.5 [&>*]:before:content-['•_'] [&>*]:before:text-slate-600">
+            {coachNote.body.split('\n').filter(Boolean).map((line, i) => (
+              <p key={i}>{line.replace(/^[-•*]\s*/, '')}</p>
+            ))}
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center">
+              <svg className="w-3.5 h-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <p className="text-xs text-slate-600">Your first coach briefing arrives tomorrow morning.</p>
+          </div>
+        </Card>
+      )}
 
       {/* Collections / Routines (kept at bottom for quick access) */}
       {collections.length > 0 && (

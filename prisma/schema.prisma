@@ -56,6 +56,7 @@ model User {
   usageLimit           UserUsageLimit?
   collections          WorkoutCollection[]
   trainingProgram      TrainingProgram?
+  coachNotes           CoachNote[]
 
   @@map("users")
 }
@@ -260,6 +261,33 @@ model ConversationHistory {
   @@index([userId, createdAt])
   @@index([userId, topic])
   @@map("conversation_history")
+}
+
+// ============================================
+// Coach Notes — Nightly AI Briefing
+// ============================================
+
+model CoachNote {
+  id          String   @id @default(cuid())
+  userId      String
+  generatedAt DateTime @default(now())
+  // Local date the briefing is for (UTC midnight of user's local day).
+  forDate     DateTime
+  headline    String   @db.Text
+  body        String   @db.Text
+  // Raw snapshot the LLM saw, for debugging.
+  snapshot    String?  @db.Text
+  // Week window this note reasoned over (user's local tz, stored as UTC).
+  periodStart DateTime
+  periodEnd   DateTime
+  // "ok" | "warn" | "celebrate" — drives card styling.
+  tone        String   @default("ok")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, forDate])
+  @@index([userId, generatedAt])
+  @@map("coach_notes")
 }
 
 // ============================================
