@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 import { estimateActivityKcal } from '@/lib/calorie-estimate';
-import { resolveLocalDayParts } from '@/lib/dates';
+import { resolveLocalDayParts, localMidnightToUtc } from '@/lib/dates';
 
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -91,8 +91,10 @@ export const GET = withAuth(async (request, user) => {
     const routine = currentDay.workouts?.[0] || null;
 
     // Check if the user has already logged something for today
-    // (completed workout OR activity dated today) — use user's local day boundaries
-    const startOfDay = new Date(local.year, local.month, local.day);
+    // (completed workout OR activity dated today) — use user's local day boundaries.
+    // localMidnightToUtc gives us the correct UTC time for midnight in the user's tz,
+    // avoiding the bug where new Date(y,m,d) uses server UTC midnight instead.
+    const startOfDay = localMidnightToUtc(local, tz);
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
     const [completedWorkoutToday, activityToday] = await Promise.all([
