@@ -12,6 +12,28 @@ function getMondayWeekday(date: Date): number {
   return d === 0 ? 6 : d - 1;
 }
 
+// Convert the user's local calendar midnight to the correct UTC time.
+// new Date(y, m, d) uses SERVER timezone (UTC on Vercel) — wrong for users
+// in other timezones.  This computes the UTC offset at noon on that date
+// (noon avoids DST midnight edge cases) and shifts accordingly.
+function localMidnightToUtc(local: { year: number; month: number; day: number }, tz: string | null): Date {
+  if (!tz) return new Date(local.year, local.month, local.day);
+  try {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateStr = `${local.year}-${pad(local.month + 1)}-${pad(local.day)}`;
+    const noonUtc = new Date(`${dateStr}T12:00:00Z`);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour: 'numeric', minute: 'numeric', hour12: false,
+    }).formatToParts(noonUtc);
+    const localHour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '12', 10);
+    const localMin  = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+    const tzOffsetMs = (12 * 60 - (localHour * 60 + localMin)) * 60 * 1000;
+    return new Date(new Date(`${dateStr}T00:00:00Z`).getTime() + tzOffsetMs);
+  } catch {
+    return new Date(local.year, local.month, local.day);
+  }
+}
+
 // Get the Mon-indexed weekday AND Y/M/D parts for a given IANA tz.
 // Falls back to server-local time if tz is missing or invalid.
 function resolveLocalDayParts(tz: string | null): { weekday: number; year: number; month: number; day: number } {
@@ -136,8 +158,8 @@ export const GET = withAuth(async (request, user) => {
     const routine = currentDay.workouts?.[0] || null;
 
     // Check if the user has already logged something for today
-    // (completed workout OR activity dated today) — use user's local day boundaries
-    const startOfDay = new Date(local.year, local.month, local.day);
+    // (completed workout OR activity dated today) — use user's local day boundaries.
+    const startOfDay = localMidnightToUtc(local, tz);
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
     const [completedWorkoutToday, activityToday] = await Promise.all([
