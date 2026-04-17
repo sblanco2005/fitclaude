@@ -873,6 +873,7 @@ async def _tool_generate_workout(
 
     raw_name = params.get("name") or f"{params['workout_type'].replace('_', ' ')} day"
     workout_name = raw_name.lower().strip().rstrip("*")
+    is_manual = params.get("source") == "manual"
     workout = Workout(
         id=cuid_generator.generate(),
         user_id=user_id,
@@ -884,6 +885,8 @@ async def _tool_generate_workout(
         display_id=next_display_id,
         notes=tips or None,
         program_day_id=params.get("program_day_id"),
+        # Manual source = user logging a session they already completed — mark done immediately.
+        completed=is_manual,
     )
     db.add(workout)
     await db.flush()
@@ -1007,6 +1010,20 @@ async def _tool_generate_workout(
     await db.commit()
     logger.info(f"[Coach] Workout {workout.id} committed to DB with {len(stored)} exercises ({len(rejected)} rejected)")
 
+    if is_manual:
+        result_message = (
+            f"Session logged as #{workout.display_id} ({len(stored)} exercises, marked complete). "
+            "Confirm to the user that the session is saved. Do NOT refer to this as a routine. "
+            "IMPORTANT: Never show the workout_id to the user."
+        )
+    else:
+        result_message = (
+            f"Routine #{workout.display_id} created with {len(stored)} exercises stored. "
+            "Present the full workout to the user with coaching tips. "
+            f"The user can refer to this routine as #{workout.display_id}. "
+            "IMPORTANT: Never show the workout_id to the user — only refer to the routine by its display_number."
+        )
+
     result = {
         "workout_id": workout.id,
         "display_number": workout.display_id,
@@ -1015,12 +1032,7 @@ async def _tool_generate_workout(
         "name": workout.name,
         "exercises_stored": len(stored),
         "exercises": stored,
-        "message": (
-            f"Routine #{workout.display_id} created with {len(stored)} exercises stored. "
-            "Present the full workout to the user with coaching tips. "
-            f"The user can refer to this routine as #{workout.display_id}. "
-            "IMPORTANT: Never show the workout_id to the user — only refer to the routine by its display_number."
-        ),
+        "message": result_message,
     }
 
     if rejected:

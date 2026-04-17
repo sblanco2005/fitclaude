@@ -254,7 +254,11 @@ def build_user_context(user_data: dict, user_tz=None) -> str:
             if prog.get("last_session_summary"):
                 parts.append(f"- Last session (this day): {prog['last_session_summary']}")
         elif prog["today_day_type"] == "pt_session":
-            parts.append("- Today is a PT session day. Wait for the user to tell you what they did, then log it.")
+            parts.append(
+                "- Today is a PT session day. Wait for the user to tell you what they did, "
+                "then call generate_workout with source='manual' and program_day_id set to today's program day ID "
+                "so the session is linked to today's program day and marked as completed."
+            )
         elif prog["today_day_type"] == "class":
             parts.append(f"- Today is {prog['today_label']}. Wait for the user to log it when done.")
         else:
