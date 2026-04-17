@@ -177,7 +177,7 @@ export default function DashboardPage() {
       kcal: estimateActivityKcal(w.name || w.workoutType, w.durationMinutes || 50, weightKg),
       done: true,
       type: 'workout',
-      href: w.name ? `/workouts?tab=history&routine=${encodeURIComponent(w.name)}` : '/workouts?tab=history',
+      href: '/workouts?tab=history',
     });
   });
 
