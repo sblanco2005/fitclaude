@@ -162,12 +162,22 @@ export const GET = withAuth(async (request, user) => {
     const startOfDay = localMidnightToUtc(local, tz);
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
+    // 48h window as fallback: covers evening workouts stored as "next day" UTC
+    // and PT sessions linked via programDayId regardless of UTC date storage.
+    const twoDaysAgo = new Date(startOfDay.getTime() - 24 * 60 * 60 * 1000);
+
     const [completedWorkoutToday, activityToday] = await Promise.all([
       prisma.workout.findFirst({
         where: {
           userId: user.id,
           completed: true,
-          date: { gte: startOfDay, lt: endOfDay },
+          OR: [
+            { date: { gte: startOfDay, lt: endOfDay } },
+            // Fallback: workout linked to this exact program day logged in last 48h.
+            // Handles the case where an evening workout is stored as UTC "next day"
+            // and still falls outside the timezone-adjusted window.
+            { programDayId: currentDay.id, date: { gte: twoDaysAgo, lt: endOfDay } },
+          ],
         },
         select: { id: true, name: true, workoutType: true },
         orderBy: { date: 'desc' },
