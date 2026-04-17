@@ -50,7 +50,7 @@ vision_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 cuid_generator = Cuid()
 
 
-async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
+async def _load_user_context(db: AsyncSession, user_id: str, user_tz: "ZoneInfo | None" = None) -> dict:
     """Load user profile for context injection."""
     result = await db.execute(
         select(User).where(User.id == user_id)
@@ -95,9 +95,12 @@ async def _load_user_context(db: AsyncSession, user_id: str) -> dict:
     )
     program = prog_result.scalar_one_or_none()
     if program:
-        # Determine today's weekday (0=Mon ... 6=Sun)
+        # Determine today's weekday (0=Mon ... 6=Sun) in the user's local timezone.
+        # Using UTC here causes off-by-one-day errors for users logging in the evening
+        # when UTC has already rolled over to the next day.
         from datetime import datetime as _dt, timezone as _tz2
-        today_weekday = _dt.now(_tz2.utc).weekday()  # 0=Mon
+        _ref_tz = user_tz or _tz2.utc
+        today_weekday = _dt.now(_ref_tz).weekday()  # 0=Mon
 
         WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -871,6 +874,19 @@ async def _tool_generate_workout(
     max_id = max_result.scalar() or 0
     next_display_id = max_id + 1
 
+    # Validate program_day_id — LLM can pass a stale ID if the program was regenerated
+    # or if a timezone mismatch caused it to receive tomorrow's day ID.
+    raw_program_day_id = params.get("program_day_id")
+    if raw_program_day_id:
+        day_check = await db.execute(
+            select(ProgramDay.id).where(ProgramDay.id == raw_program_day_id)
+        )
+        program_day_id = day_check.scalar_one_or_none() or None
+        if not program_day_id:
+            logger.warning(f"[Coach] program_day_id '{raw_program_day_id}' not found — linking workout without it")
+    else:
+        program_day_id = None
+
     raw_name = params.get("name") or f"{params['workout_type'].replace('_', ' ')} day"
     workout_name = raw_name.lower().strip().rstrip("*")
     is_manual = params.get("source") == "manual"
@@ -884,7 +900,7 @@ async def _tool_generate_workout(
         date=datetime.now(user_tz).astimezone(tz.utc).replace(tzinfo=None) if user_tz else datetime.utcnow(),
         display_id=next_display_id,
         notes=tips or None,
-        program_day_id=params.get("program_day_id"),
+        program_day_id=program_day_id,
         # Manual source = user logging a session they already completed — mark done immediately.
         completed=is_manual,
     )
@@ -1576,8 +1592,8 @@ async def handle_chat(
             logger.warning(f"[Coach] Nutrition agent failed ({e}), falling through to general handler")
             # Fall through to general coach
 
-    # Load context
-    user_data = await _load_user_context(db, user_id)
+    # Load context (pass user_tz so today's program day uses local weekday, not UTC)
+    user_data = await _load_user_context(db, user_id, user_tz=user_tz)
     context = build_user_context(user_data, user_tz=user_tz)
     history = await _load_conversation_history(db, user_id, topic=topic)
 
