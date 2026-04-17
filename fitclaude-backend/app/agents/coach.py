@@ -889,19 +889,22 @@ async def _tool_generate_workout(
 
     raw_name = params.get("name") or f"{params['workout_type'].replace('_', ' ')} day"
     workout_name = raw_name.lower().strip().rstrip("*")
+    # source='manual' means the user is logging a session they already did.
+    # We mark it completed immediately so it goes straight to History.
+    # We store source='coach' so it doesn't get the "EXT" badge — it was
+    # coach-assisted logging, not an external import.
     is_manual = params.get("source") == "manual"
     workout = Workout(
         id=cuid_generator.generate(),
         user_id=user_id,
         workout_type=params["workout_type"],
         category=params.get("category", "lifting"),
-        source=params.get("source", "coach"),
+        source="coach",
         name=workout_name,
         date=datetime.now(user_tz).astimezone(tz.utc).replace(tzinfo=None) if user_tz else datetime.utcnow(),
         display_id=next_display_id,
         notes=tips or None,
         program_day_id=program_day_id,
-        # Manual source = user logging a session they already completed — mark done immediately.
         completed=is_manual,
     )
     db.add(workout)
