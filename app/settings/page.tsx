@@ -296,6 +296,35 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      {/* Personal Trainer */}
+      <Card>
+        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-1">Personal Trainer</h3>
+        <p className="text-xs text-slate-500 mb-4">
+          FitClaude sends your trainer a weekly training report every Sunday. Leave blank to disable.
+        </p>
+        <Input
+          type="email"
+          placeholder="trainer@example.com"
+          value={profile.trainerEmail || ''}
+          onChange={(e) => updateField('trainerEmail', e.target.value || null)}
+        />
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch('/api/trainer-email/send-test', { method: 'POST' });
+              const data = await res.json();
+              if (res.ok) toast(`Test report sent to ${data.sentTo}`);
+              else toast(data.error || 'Failed to send', 'error');
+            } catch {
+              toast('Failed to send test email', 'error');
+            }
+          }}
+          className="mt-3 text-xs text-primary hover:text-white transition-colors underline underline-offset-2"
+        >
+          Send test report to my email →
+        </button>
+      </Card>
+
       {/* Injuries */}
       <Card>
         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">Injuries & Notes</h3>

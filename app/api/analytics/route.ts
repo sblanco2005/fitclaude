@@ -167,11 +167,13 @@ export const GET = withAuth(async (request, user) => {
     for (const w of workouts) {
       const dateStr = w.date.toISOString().split('T')[0];
       for (const ex of w.exercises) {
-        // Accumulate sets per muscle group
+        // Accumulate sets per muscle group (only count when sets are actually logged)
         if (ex.exercise?.muscleGroup) {
           const mg = ex.exercise.muscleGroup;
           const logs = parseSetLogs(ex.setLogs);
-          muscleSetMap.set(mg, (muscleSetMap.get(mg) || 0) + logs.length);
+          if (logs.length > 0) {
+            muscleSetMap.set(mg, (muscleSetMap.get(mg) || 0) + logs.length);
+          }
         }
         if (!ex.exercise || ex.exercise.exerciseType !== 'compound') continue;
         const logs = parseSetLogs(ex.setLogs);
@@ -228,6 +230,15 @@ export const GET = withAuth(async (request, user) => {
     const setsByMuscle = Array.from(muscleSetMap.entries())
       .map(([muscleGroup, sets]) => ({ muscleGroup, sets }))
       .sort((a, b) => b.sets - a.sets);
+
+    // ── All muscle groups that appeared in any exercise (even without set data) ──
+    const workedMuscleGroupsSet = new Set<string>();
+    for (const w of workouts) {
+      for (const ex of w.exercises) {
+        if (ex.exercise?.muscleGroup) workedMuscleGroupsSet.add(ex.exercise.muscleGroup);
+      }
+    }
+    const workedMuscleGroups = Array.from(workedMuscleGroupsSet);
 
     // ── Conditioning activities (classes) ──
     const activityRows = await prisma.activity.findMany({
@@ -536,6 +547,7 @@ export const GET = withAuth(async (request, user) => {
       progressiveOverload,
       keyLifts,
       setsByMuscle,
+      workedMuscleGroups,
       conditioningActivities,
       restDays,
       personalRecords,

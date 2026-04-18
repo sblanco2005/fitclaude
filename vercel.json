@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/trainer-email", "schedule": "0 20 * * 0" }
+  ]
+}

@@ -17,6 +17,7 @@ export interface UserProfile {
   sex: string | null;
   trainingFrequency: number | null;
   weightUnit: string; // "lb" or "kg"
+  trainerEmail: string | null;
   isOnboarded: boolean;
   isAdmin: boolean;
   tier: string; // "free" | "pro" | "unlimited"
@@ -295,6 +296,7 @@ export interface AnalyticsData {
   keyLifts: KeyLift[];
   setsByMuscle: MuscleVolume[];
   conditioningActivities: ConditioningActivity[];
+  workedMuscleGroups: string[];
   restDays: number;
   personalRecords: PersonalRecord[];
   plateaus: PlateauAlert[];

@@ -211,6 +211,22 @@ export default function AnalyticsPage() {
   const isNutritionEmpty = !data.nutrition || data.nutrition.daysLogged === 0;
   const weekStart = weekStartLabel(data.sessions);
   const maxSets = data.setsByMuscle.length ? data.setsByMuscle[0].sets : 1;
+
+  // All primary muscles — always show in volume with three states:
+  // tracked (sets>0), worked-no-data (exercise present but no weight logged), not worked
+  const PRIMARY_MUSCLES = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'quadriceps', 'hamstrings', 'glutes', 'core', 'calves'];
+  const muscleSetLookup = Object.fromEntries(data.setsByMuscle.map(m => [m.muscleGroup, m.sets]));
+  const workedSet = new Set(data.workedMuscleGroups);
+  const allMuscleRows = PRIMARY_MUSCLES.map(mg => ({
+    muscleGroup: mg,
+    sets: muscleSetLookup[mg] ?? 0,
+    workedNoData: (muscleSetLookup[mg] ?? 0) === 0 && workedSet.has(mg),
+  })).sort((a, b) => {
+    // tracked first, then worked-no-data, then not worked; within each group sort by sets desc
+    const stateA = a.sets > 0 ? 0 : a.workedNoData ? 1 : 2;
+    const stateB = b.sets > 0 ? 0 : b.workedNoData ? 1 : 2;
+    return stateA !== stateB ? stateA - stateB : b.sets - a.sets;
+  });
   const totalCondMins = data.conditioningActivities.reduce((s, a) => s + (a.durationMinutes ?? 0), 0);
 
   return (
@@ -385,13 +401,14 @@ export default function AnalyticsPage() {
                 </div>
               )}
 
-              {/* VOLUME BY MUSCLE */}
-              {data.setsByMuscle.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">Volume</p>
-                  <div className="space-y-1.5">
-                    {data.setsByMuscle.map((m, i) => {
-                      const mev = MEV[m.muscleGroup] ?? MEV_DEFAULT;
+              {/* VOLUME BY MUSCLE — always show all primary muscles */}
+              <div>
+                <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">Volume</p>
+                <div className="space-y-1.5">
+                  {allMuscleRows.map((m, i) => {
+                    const mev = MEV[m.muscleGroup] ?? MEV_DEFAULT;
+                    if (m.sets > 0) {
+                      // Tracked: colored bar + set count
                       const { bar, num } = getVolumeColor(m.sets, mev);
                       const barWidth = Math.min(100, Math.round((m.sets / Math.max(maxSets, 1)) * 100));
                       return (
@@ -403,10 +420,41 @@ export default function AnalyticsPage() {
                           <span className={`text-right font-medium text-[11px] ${num}`}>{m.sets}s</span>
                         </div>
                       );
-                    })}
-                  </div>
+                    } else if (m.workedNoData) {
+                      // Worked but no weight data (PT session, reps-only)
+                      return (
+                        <div key={i} className="grid gap-2 text-xs items-center" style={{ gridTemplateColumns: '88px 1fr 44px' }}>
+                          <span className="text-slate-400">{muscleLabel(m.muscleGroup)}</span>
+                          <div className="h-1.5 bg-[#111118] rounded-full overflow-hidden">
+                            <div className="h-full w-2/5 rounded-full" style={{ background: '#334155' }} />
+                          </div>
+                          <span className="text-right text-[11px] text-slate-500">✓</span>
+                        </div>
+                      );
+                    } else {
+                      // Not worked
+                      return (
+                        <div key={i} className="grid gap-2 text-xs items-center" style={{ gridTemplateColumns: '88px 1fr 44px' }}>
+                          <span className="text-slate-600">{muscleLabel(m.muscleGroup)}</span>
+                          <div className="h-1.5 bg-[#111118] rounded-full overflow-hidden">
+                            <div className="h-full w-full" style={{ background: 'repeating-linear-gradient(90deg,#1f2937 0px,#1f2937 4px,transparent 4px,transparent 8px)' }} />
+                          </div>
+                          <span className="text-right text-[11px] text-red-600">—</span>
+                        </div>
+                      );
+                    }
+                  })}
                 </div>
-              )}
+                {/* Legend */}
+                <div className="flex gap-4 mt-2.5">
+                  {allMuscleRows.some(m => m.workedNoData) && (
+                    <span className="text-[10px] text-slate-600">✓ worked, no weight logged</span>
+                  )}
+                  {allMuscleRows.some(m => !m.workedNoData && m.sets === 0) && (
+                    <span className="text-[10px] text-red-800">— not worked</span>
+                  )}
+                </div>
+              </div>
 
               {/* FLAGS */}
               {flags.length > 0 && (

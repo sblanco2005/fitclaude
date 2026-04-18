@@ -24,6 +24,7 @@ export const GET = withAuth(async (_request, user) => {
       trainingFrequency: true,
       timezone: true,
       weightUnit: true,
+      trainerEmail: true,
       isOnboarded: true,
       isAdmin: true,
       tier: true,
@@ -41,7 +42,7 @@ export const PATCH = withAuth(async (request, user) => {
     'injuriesNotes', 'equipmentText', 'weightKg',
     'dailyCalorieTarget', 'dailyProteinTarget',
     'carbsPercent', 'fatPercent',
-    'sex', 'trainingFrequency', 'timezone', 'weightUnit', 'isOnboarded',
+    'sex', 'trainingFrequency', 'timezone', 'weightUnit', 'isOnboarded', 'trainerEmail',
   ];
 
   const updates: Record<string, unknown> = {};
