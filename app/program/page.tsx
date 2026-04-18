@@ -315,7 +315,34 @@ export default function ProgramPage() {
         {Object.keys(daysByWeek)
           .map(Number)
           .sort((a, b) => a - b)
-          .map((weekNum) => (
+          .map((weekNum) => {
+            // Mon-indexed weekday (0=Mon … 6=Sun) for today
+            const jsDay = new Date().getDay();
+            const todayWeekday = jsDay === 0 ? 6 : jsDay - 1;
+
+            const openBuilder = () => {
+              setTotalWeeks(program.totalWeeks);
+              const loaded = program.days.map((d) => {
+                const muscles = d.exerciseTemplate
+                  ? Array.from(new Set(d.exerciseTemplate.map((e) => e.muscle_group)))
+                  : [];
+                return {
+                  weekday: d.weekday,
+                  weekNumber: d.weekNumber,
+                  dayType: d.dayType,
+                  dayLabel: d.dayLabel,
+                  workoutType: d.workoutType ?? undefined,
+                  focusMuscles: muscles,
+                  exerciseCount: d.exerciseTemplate?.length || 5,
+                };
+              });
+              setDraftDays(loaded);
+              setOriginalDrafts(loaded);
+              setSelectedDay(null);
+              setBuilding(true);
+            };
+
+            return (
             <div key={weekNum} className="space-y-2">
               <h3 className={`text-xs font-bold uppercase tracking-widest px-1 ${
                 weekNum === program.currentWeek ? 'text-primary' : 'text-slate-500'
@@ -329,16 +356,11 @@ export default function ProgramPage() {
                   const exerciseCount = day?.exerciseTemplate?.length || 0;
                   const primaryLifts = day?.exerciseTemplate?.filter((e) => e.is_primary) || [];
                   const clickable = dayType !== 'rest' && !!day;
+                  const isToday = weekNum === program.currentWeek && wd === todayWeekday;
 
                   const handleDayClick = () => {
                     if (!clickable || !day) return;
-                    if (dayType === 'coached' && day.routineName) {
-                      // Navigate directly to the linked routine
-                      window.location.href = `/workouts?routine=${encodeURIComponent(day.routineName)}`;
-                    } else {
-                      // My Own / fallback → open detail modal with logging options
-                      setSelectedDay(day);
-                    }
+                    setSelectedDay(day);
                   };
 
                   return (
@@ -379,12 +401,44 @@ export default function ProgramPage() {
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
 
         {/* Day detail modal */}
-        {selectedDay && (
-          <DayDetailModal day={selectedDay} onClose={() => setSelectedDay(null)} />
-        )}
+        {selectedDay && (() => {
+          const jsDay = new Date().getDay();
+          const todayWeekday = jsDay === 0 ? 6 : jsDay - 1;
+          const isToday = selectedDay.weekNumber === program.currentWeek && selectedDay.weekday === todayWeekday;
+          const openBuilder = () => {
+            setTotalWeeks(program.totalWeeks);
+            const loaded = program.days.map((d) => {
+              const muscles = d.exerciseTemplate
+                ? Array.from(new Set(d.exerciseTemplate.map((e) => e.muscle_group)))
+                : [];
+              return {
+                weekday: d.weekday,
+                weekNumber: d.weekNumber,
+                dayType: d.dayType,
+                dayLabel: d.dayLabel,
+                workoutType: d.workoutType ?? undefined,
+                focusMuscles: muscles,
+                exerciseCount: d.exerciseTemplate?.length || 5,
+              };
+            });
+            setDraftDays(loaded);
+            setOriginalDrafts(loaded);
+            setSelectedDay(null);
+            setBuilding(true);
+          };
+          return (
+            <DayDetailModal
+              day={selectedDay}
+              isToday={isToday}
+              onClose={() => setSelectedDay(null)}
+              onEdit={openBuilder}
+            />
+          );
+        })()}
 
         <Card>
           <Button
@@ -723,7 +777,7 @@ function DayEditor({
 
 // ── Day detail modal (read-only view of a day's routine) ──────────────────────
 
-function DayDetailModal({ day, onClose }: { day: ProgramDay; onClose: () => void }) {
+function DayDetailModal({ day, isToday, onClose, onEdit }: { day: ProgramDay; isToday: boolean; onClose: () => void; onEdit: () => void }) {
   const exercises = day.exerciseTemplate || [];
   const primary = exercises.filter((e) => e.is_primary);
   const accessories = exercises.filter((e) => !e.is_primary);
@@ -792,36 +846,71 @@ function DayDetailModal({ day, onClose }: { day: ProgramDay; onClose: () => void
         )}
 
         {(day.dayType === 'pt_session' || day.dayType === 'class') && (
-          <div className="space-y-3">
-            <p className="text-sm text-slate-300">
-              Log this workout when you&apos;re done. You can:
-            </p>
-            <div className="space-y-2">
-              <Link
-                href="/workouts?chat=1"
-                className="flex items-center gap-3 rounded-lg bg-primary/15 text-primary px-4 py-3 hover:bg-primary/25 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                <div className="text-sm font-medium">Chat with Coach Fit</div>
-              </Link>
-              <Link
-                href="/workouts?chat=1"
-                className="flex items-center gap-3 rounded-lg bg-slate-800 text-slate-300 px-4 py-3 hover:bg-slate-700 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <div className="text-sm font-medium">Upload photo of your workout</div>
-              </Link>
-            </div>
-            <p className="text-xs text-muted">
-              Coach Fit will extract the exercises and save them to your history.
-            </p>
-          </div>
+          <p className="text-xs text-muted">
+            {isToday ? 'Log this session when you\'re done.' : 'My Own session — no Coach Fit exercises.'}
+          </p>
         )}
+
+        {/* ── Context-aware actions ── */}
+        <div className="space-y-2 pt-1">
+          {isToday ? (
+            /* TODAY: action-first */
+            <>
+              {day.dayType === 'coached' && day.routineName && (
+                <Link
+                  href={`/workouts?routine=${encodeURIComponent(day.routineName)}`}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary/90 active:scale-[0.98] shadow-[0_2px_12px_rgba(16,185,129,0.3)]"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Start Workout
+                </Link>
+              )}
+              {(day.dayType === 'pt_session' || day.dayType === 'class') && (
+                <Link
+                  href="/chat"
+                  className="flex items-center gap-3 rounded-xl bg-primary/15 text-primary px-4 py-3 hover:bg-primary/25 transition-colors"
+                >
+                  <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <span className="text-sm font-semibold">Chat with Coach Fit</span>
+                </Link>
+              )}
+              <button
+                onClick={onEdit}
+                className="w-full text-center text-xs text-slate-500 hover:text-slate-300 transition-colors py-1"
+              >
+                Edit program day →
+              </button>
+            </>
+          ) : (
+            /* OTHER DAY: edit-first */
+            <>
+              <button
+                onClick={onEdit}
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-slate-700 text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-slate-600 active:scale-[0.98]"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Day
+              </button>
+              {day.dayType === 'coached' && day.routineName && (
+                <Link
+                  href={`/workouts?routine=${encodeURIComponent(day.routineName)}`}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary/10 text-primary font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary/20 active:scale-[0.98]"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  View Routine
+                </Link>
+              )}
+            </>
+          )}
+        </div>
       </Card>
     </div>
   );

@@ -9,19 +9,23 @@ export const GET = withAuth(async (request, user) => {
     const daysBack = parseInt(searchParams.get('daysBack') || '30', 10);
     const workoutType = searchParams.get('workoutType');
     const timezone = searchParams.get('tz') || 'UTC';
+    const routinesOnly = searchParams.get('routinesOnly') === 'true';
 
-    // Compute "daysBack ago" in the user's timezone
-    const now = new Date();
-    const todayLocal = now.toLocaleDateString('en-CA', { timeZone: timezone }); // YYYY-MM-DD
-    const sinceDate = new Date(todayLocal + 'T00:00:00Z');
-    sinceDate.setDate(sinceDate.getDate() - daysBack);
-    const sinceStr = sinceDate.toISOString().split('T')[0];
-    const { start: since } = getUserDayBounds(timezone, sinceStr);
+    const where: Record<string, unknown> = { userId: user.id };
 
-    const where: Record<string, unknown> = {
-      userId: user.id,
-      date: { gte: since },
-    };
+    if (routinesOnly) {
+      // Fetch routine templates: incomplete workouts, no date restriction
+      where.completed = false;
+    } else {
+      // Compute "daysBack ago" in the user's timezone
+      const now = new Date();
+      const todayLocal = now.toLocaleDateString('en-CA', { timeZone: timezone }); // YYYY-MM-DD
+      const sinceDate = new Date(todayLocal + 'T00:00:00Z');
+      sinceDate.setDate(sinceDate.getDate() - daysBack);
+      const sinceStr = sinceDate.toISOString().split('T')[0];
+      const { start: since } = getUserDayBounds(timezone, sinceStr);
+      where.date = { gte: since };
+    }
 
     if (workoutType) {
       where.workoutType = workoutType;

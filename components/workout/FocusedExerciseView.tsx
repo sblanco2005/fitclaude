@@ -103,6 +103,8 @@ interface FocusedExerciseViewProps {
   isPaused: boolean;
   elapsed: number;
   onFinishWorkout?: () => void;
+  onSave?: () => void;
+  onDiscard?: () => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -119,6 +121,8 @@ export default function FocusedExerciseView({
   isPaused,
   elapsed,
   onFinishWorkout,
+  onSave,
+  onDiscard,
 }: FocusedExerciseViewProps) {
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [showExerciseList, setShowExerciseList] = useState(false);
@@ -614,12 +618,29 @@ export default function FocusedExerciseView({
           </svg>
         </button>
 
-        {/* Timer */}
-        <span className={`text-lg font-black tabular-nums tracking-tight ${
-          isPaused ? 'text-amber-400' : isRunning ? 'text-primary' : 'text-slate-400'
-        }`}>
-          {fmtTime(elapsed)}
-        </span>
+        {/* Timer — or Save/Discard when paused */}
+        {isPaused && onSave && onDiscard ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onSave}
+              className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-emerald-500/30 active:scale-[0.98]"
+            >
+              Save
+            </button>
+            <button
+              onClick={onDiscard}
+              className="px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-red-500/25 active:scale-[0.98]"
+            >
+              Discard
+            </button>
+          </div>
+        ) : (
+          <span className={`text-lg font-black tabular-nums tracking-tight ${
+            isPaused ? 'text-amber-400' : isRunning ? 'text-primary' : 'text-slate-400'
+          }`}>
+            {fmtTime(elapsed)}
+          </span>
+        )}
 
         {/* Completed count */}
         <span className="text-xs font-bold text-slate-500 tabular-nums">

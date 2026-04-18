@@ -433,19 +433,37 @@ function SessionLogCard({
           </svg>
         </button>
 
-        {/* Session ... button — expands card to reveal actions */}
-        <div className="pr-2 shrink-0">
-          <button
-            onClick={() => setExpanded(true)}
-            className="p-1.5 text-slate-600 hover:text-slate-400 transition-colors rounded-lg hover:bg-slate-800"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <circle cx="12" cy="6" r="1.5" fill="currentColor" />
-              <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-              <circle cx="12" cy="18" r="1.5" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
+        {/* Trash button — direct delete with inline confirm */}
+        {canDeleteSession && (
+          <div className="pr-2 shrink-0">
+            {confirmDeleteSession ? (
+              <div className="flex items-center gap-1.5 pr-1">
+                <button
+                  onClick={() => { onDeleteSession(workout.id); setConfirmDeleteSession(false); }}
+                  className="px-2.5 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 transition-colors"
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteSession(false)}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-colors"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteSession(true)}
+                className="p-1.5 text-slate-600 hover:text-red-400 transition-colors rounded-lg hover:bg-slate-800"
+                aria-label="Delete session"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Expanded: per-exercise breakdown */}
@@ -593,39 +611,8 @@ function SessionLogCard({
                       </button>
                     </div>
                   )}
-                  {canDeleteSession && !confirmDeleteSession && (
-                    <button
-                      onClick={() => setConfirmDeleteSession(true)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-red-400 text-xs font-bold transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      Delete
-                    </button>
-                  )}
                 </div>
               </div>
-              {confirmDeleteSession && (
-                <div className="flex items-center justify-end gap-1.5 mt-2">
-                  <span className="text-xs text-red-400 font-medium">Delete session?</span>
-                  <button
-                    onClick={() => {
-                      onDeleteSession(workout.id);
-                      setConfirmDeleteSession(false);
-                    }}
-                    className="px-3 py-2 rounded-md bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 active:scale-[0.95] transition-colors"
-                  >
-                    Yes
-                  </button>
-                  <button
-                    onClick={() => setConfirmDeleteSession(false)}
-                    className="px-3 py-2 rounded-md bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 active:scale-[0.95] transition-colors"
-                  >
-                    No
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -926,12 +913,14 @@ function SwapExerciseModal({
   onClose,
   onSelect,
   currentExerciseName,
+  defaultMuscle,
   title = 'Swap Exercise',
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (exercise: Exercise) => void;
   currentExerciseName: string;
+  defaultMuscle?: string | null;
   title?: string;
 }) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -951,7 +940,7 @@ function SwapExerciseModal({
     if (!isOpen) return;
     setLoading(true);
     setSearch('');
-    setMuscleFilter(null);
+    setMuscleFilter(defaultMuscle ?? null);
     setIdentifying(false);
     setAiMatches(null);
     setAiLabel(null);
@@ -1223,6 +1212,7 @@ function RoutineDetail({
   onBack,
   onHitIt,
   isInHitIt,
+  onPause,
   onRename,
   onDelete,
   onDeleteLogs,
@@ -1239,6 +1229,7 @@ function RoutineDetail({
   onBack: () => void;
   onHitIt: () => void;
   isInHitIt: boolean;
+  onPause?: () => void;
   onRename: (workoutIds: string[], newName: string) => void;
   onDelete: (workoutIds: string[]) => void;
   onDeleteLogs: (workoutId: string) => void;
@@ -1508,16 +1499,25 @@ function RoutineDetail({
           </svg>
           Swap
         </button>
-        <button
-          onClick={onHitIt}
-          className={`flex-1 py-2.5 rounded-lg text-sm font-bold tracking-wide uppercase transition-all duration-200 ${
-            isInHitIt
-              ? 'bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.3)]'
-              : 'bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.25)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.4)]'
-          }`}
-        >
-          {isInHitIt ? 'Queued' : 'Hit It'}
-        </button>
+        {isInHitIt && onPause ? (
+          <button
+            onClick={onPause}
+            className="flex-1 py-2.5 rounded-lg text-sm font-bold tracking-wide uppercase transition-all duration-200 bg-amber-500/90 text-white shadow-[0_2px_12px_rgba(245,158,11,0.3)] hover:bg-amber-600 active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="5" y="4" width="5" height="16" rx="1" />
+              <rect x="14" y="4" width="5" height="16" rx="1" />
+            </svg>
+            Pause
+          </button>
+        ) : (
+          <button
+            onClick={onHitIt}
+            className="flex-1 py-2.5 rounded-lg text-sm font-bold tracking-wide uppercase transition-all duration-200 bg-primary text-white shadow-[0_2px_12px_rgba(16,185,129,0.25)] hover:shadow-[0_4px_20px_rgba(16,185,129,0.4)]"
+          >
+            Hit It
+          </button>
+        )}
       </div>
 
       {/* Routine exercises */}
@@ -1649,6 +1649,7 @@ function RoutineDetail({
         isOpen={!!swappingExercise}
         onClose={() => setSwappingExercise(null)}
         currentExerciseName={swappingExercise ? getExerciseName(swappingExercise) : ''}
+        defaultMuscle={swappingExercise?.exercise?.muscleGroup ?? null}
         onSelect={async (exercise) => {
           if (!swappingExercise) return;
           await onSwapExercise(latest.id, swappingExercise.id, exercise.id);
@@ -1969,6 +1970,7 @@ function ActiveWorkout({
   onRemove,
   onSwapExercise,
   weightUnit = 'lb',
+  registerPause,
 }: {
   routineName: string;
   workouts: Workout[];
@@ -1977,6 +1979,7 @@ function ActiveWorkout({
   onRemove: (routineName: string) => void;
   onSwapExercise?: (workoutId: string, workoutExerciseId: string) => void;
   weightUnit?: 'lb' | 'kg';
+  registerPause?: (fn: () => void) => void;
 }) {
   const latest = workouts[0];
   const muscles = uniqueMuscles(latest);
@@ -2152,6 +2155,9 @@ function ActiveWorkout({
   // Keep stopRef in sync so tick can call it without stale closure
   stopRef.current = pause;
 
+  // Expose pause to parent so RoutineDetail can trigger it
+  useEffect(() => { registerPause?.(pause); }, [registerPause, pause]);
+
   // Recalculate elapsed when screen wakes up (visibilitychange)
   useEffect(() => {
     const onVisible = () => {
@@ -2271,15 +2277,33 @@ function ActiveWorkout({
   if (isActive || elapsed > 0) {
     return (
       <div className="flex flex-col h-full -mx-4 -mt-4">
-        {/* Routine name header (compact) */}
-        <div className="flex items-center justify-between px-4 py-2 bg-[#111118]">
-          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
+        {/* Routine name header — PAUSE/RESUME lives here */}
+        <div className="px-4 pt-2 pb-2.5 bg-[#111118] space-y-2">
+          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate text-center">
             {routineName.replace(/_/g, ' ')}
           </h4>
-          {isPaused && (
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-400/70">
-              Paused
-            </span>
+          {isRunning && !saving && !saveStatus && (
+            <button
+              onClick={pause}
+              className="w-full py-2.5 rounded-xl bg-amber-500/90 text-white font-bold text-sm tracking-wide uppercase flex items-center justify-center gap-2 hover:bg-amber-600 active:scale-[0.98] transition-all shadow-[0_2px_12px_rgba(245,158,11,0.25)]"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="5" y="4" width="5" height="16" rx="1" />
+                <rect x="14" y="4" width="5" height="16" rx="1" />
+              </svg>
+              Pause
+            </button>
+          )}
+          {isPaused && !saving && !saveStatus && (
+            <button
+              onClick={resume}
+              className="w-full py-2.5 rounded-xl bg-primary text-white font-bold text-sm tracking-wide uppercase flex items-center justify-center gap-2 hover:bg-primary-dark active:scale-[0.98] transition-all shadow-[0_2px_12px_rgba(16,185,129,0.25)]"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Resume
+            </button>
           )}
         </div>
 
@@ -2300,57 +2324,17 @@ function ActiveWorkout({
               if (isRunning) pause();
               setConfirmAction('save');
             }}
+            onSave={() => setConfirmAction('save')}
+            onDiscard={() => setConfirmAction('discard')}
           />
         </div>
 
-        {/* Action buttons */}
-        <div className="px-4 py-3 bg-[#111118] border-t border-slate-800/50 space-y-2 pb-[env(safe-area-inset-bottom)]">
-          {/* Running — Pause button */}
-          {isRunning && (
-            <button
-              onClick={pause}
-              className="w-full py-2.5 rounded-lg bg-amber-500/90 text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-amber-600 active:scale-[0.98] flex items-center justify-center gap-2"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="5" y="4" width="5" height="16" rx="1" />
-                <rect x="14" y="4" width="5" height="16" rx="1" />
-              </svg>
-              Pause
-            </button>
-          )}
-
-          {/* Paused — Resume + Save + Discard */}
-          {isPaused && !saving && !saveStatus && (
-            <>
-              {autoStopped && (
-                <p className="text-xs text-amber-400 font-bold text-center uppercase tracking-wider">
-                  Auto-paused after inactivity
-                </p>
-              )}
-              <button
-                onClick={resume}
-                className="w-full py-2.5 rounded-lg bg-primary text-white font-bold text-sm tracking-wide uppercase transition-all hover:bg-primary-dark active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Resume
-              </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmAction('save')}
-                  className="flex-1 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-emerald-500/30 active:scale-[0.98]"
-                >
-                  Save Workout
-                </button>
-                <button
-                  onClick={() => setConfirmAction('discard')}
-                  className="flex-1 py-2 rounded-lg bg-red-500/15 text-red-400 font-bold text-xs tracking-wide uppercase transition-all hover:bg-red-500/25 active:scale-[0.98]"
-                >
-                  Discard
-                </button>
-              </div>
-            </>
+        {/* Bottom bar — saving state + confirm popup only */}
+        <div className="px-4 bg-[#111118] border-t border-slate-800/50 pb-[env(safe-area-inset-bottom)]">
+          {autoStopped && isPaused && (
+            <p className="text-xs text-amber-400 font-bold text-center uppercase tracking-wider py-2">
+              Auto-paused after inactivity
+            </p>
           )}
 
           {/* Saving spinner */}
@@ -2681,8 +2665,8 @@ function WorkoutsPageInner() {
   const [finishedWorkouts, setFinishedWorkouts] = useState<
     { name: string; elapsed: number; finishedAt: Date; exerciseLogs: Map<string, SetLog[]>; workout: Workout }[]
   >([]);
-  const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
-  const [hitItSwapMenu, setHitItSwapMenu] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string } | null>(null);
+  const [hitItSwapping, setHitItSwapping] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string; muscleGroup?: string | null } | null>(null);
+  const [hitItSwapMenu, setHitItSwapMenu] = useState<{ workoutId: string; workoutExerciseId: string; exerciseName: string; muscleGroup?: string | null } | null>(null);
   const [hitItAiSwapping, setHitItAiSwapping] = useState(false);
   const [hitItReplaceConfirm, setHitItReplaceConfirm] = useState<string | null>(null); // name of routine trying to start
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -2697,6 +2681,7 @@ function WorkoutsPageInner() {
   const longPressFired = useRef(false);
   const [spunRoutineName, setSpunRoutineName] = useState<string | null>(null);
   const prevRoutineNamesRef = useRef<Set<string>>(new Set());
+  const hitItPauseRef = useRef<(() => void) | null>(null);
 
   // Persist Hit It queue and active tab to localStorage
   useEffect(() => {
@@ -3021,15 +3006,15 @@ function WorkoutsPageInner() {
   };
 
   const removeFromHitIt = (name: string) => {
-    setHitItQueue((prev) => {
-      const next = prev.filter((n) => n !== name);
-      if (next.length === 0) {
-        setTab('routines');
-        router.push('/');
-      }
-      return next;
-    });
+    setHitItQueue((prev) => prev.filter((n) => n !== name));
   };
+
+  useEffect(() => {
+    if (hitItQueue.length === 0 && tab === 'hit-it') {
+      setTab('routines');
+      router.push('/');
+    }
+  }, [hitItQueue, tab, router]);
 
   const handleFinish = (name: string, elapsed: number, exerciseLogs: Map<string, SetLog[]>) => {
     const group = routineGroups.find(([k]) => k === name)?.[1];
@@ -3230,6 +3215,7 @@ function WorkoutsPageInner() {
           }}
           onHitIt={() => addToHitIt(selectedRoutine)}
           isInHitIt={hitItQueue.includes(selectedRoutine)}
+          onPause={hitItQueue.includes(selectedRoutine) ? () => hitItPauseRef.current?.() : undefined}
           onRename={handleRename}
           onDelete={handleDeleteRoutine}
           onDeleteLogs={handleDeleteLogs}
@@ -3587,10 +3573,12 @@ function WorkoutsPageInner() {
                     allWorkouts={workouts}
                     onFinish={handleFinish}
                     onRemove={removeFromHitIt}
-                    onSwapExercise={(workoutId, workoutExerciseId) =>
-                      setHitItSwapMenu({ workoutId, workoutExerciseId, exerciseName: '' })
-                    }
+                    onSwapExercise={(workoutId, workoutExerciseId) => {
+                      const we = workouts.find((w) => w.id === workoutId)?.exercises?.find((e) => e.id === workoutExerciseId);
+                      setHitItSwapMenu({ workoutId, workoutExerciseId, exerciseName: we?.exercise?.name ?? '', muscleGroup: we?.exercise?.muscleGroup ?? null });
+                    }}
                     weightUnit={weightUnit}
+                    registerPause={(fn) => { hitItPauseRef.current = fn; }}
                   />
                 );
               })}
@@ -3773,6 +3761,7 @@ function WorkoutsPageInner() {
         isOpen={!!hitItSwapping}
         onClose={() => setHitItSwapping(null)}
         currentExerciseName={hitItSwapping?.exerciseName ?? ''}
+        defaultMuscle={hitItSwapping?.muscleGroup ?? null}
         onSelect={async (exercise) => {
           if (!hitItSwapping) return;
           await handleSwapExercise(hitItSwapping.workoutId, hitItSwapping.workoutExerciseId, exercise.id);
