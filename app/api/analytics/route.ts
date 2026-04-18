@@ -9,6 +9,10 @@ interface SetLog {
   reps: number;
 }
 
+function toLocalDate(date: Date, tz: string): string {
+  return date.toLocaleDateString('en-CA', { timeZone: tz });
+}
+
 function parseSetLogs(raw: string | null): SetLog[] {
   if (!raw) return [];
   try {
@@ -127,7 +131,7 @@ export const GET = withAuth(async (request, user) => {
       }
       totalVolume += sessionVolume;
       totalSets += sessionSets;
-      const dateStr = w.date.toISOString().split('T')[0];
+      const dateStr = toLocalDate(w.date, timezone);
       const sessionName = w.name || w.workoutType;
       volumeBySession.push({ date: dateStr, volume: Math.round(sessionVolume), name: sessionName });
       sessions.push({
@@ -165,7 +169,7 @@ export const GET = withAuth(async (request, user) => {
     const muscleSetMap = new Map<string, number>();
 
     for (const w of workouts) {
-      const dateStr = w.date.toISOString().split('T')[0];
+      const dateStr = toLocalDate(w.date, timezone);
       for (const ex of w.exercises) {
         // Accumulate sets per muscle group (only count when sets are actually logged)
         if (ex.exercise?.muscleGroup) {
@@ -251,7 +255,7 @@ export const GET = withAuth(async (request, user) => {
     });
     const conditioningActivities = activityRows.map((a) => ({
       id: a.id,
-      date: a.date.toISOString().split('T')[0],
+      date: toLocalDate(a.date, timezone),
       name: a.name,
       durationMinutes: a.durationMinutes,
       notes: a.notes,
@@ -262,8 +266,8 @@ export const GET = withAuth(async (request, user) => {
       ? Math.ceil((Date.now() - since.getTime()) / 86400000)
       : 7;
     const activeDays = new Set([
-      ...workouts.map((w) => w.date.toISOString().split('T')[0]),
-      ...activityRows.map((a) => a.date.toISOString().split('T')[0]),
+      ...workouts.map((w) => toLocalDate(w.date, timezone)),
+      ...activityRows.map((a) => toLocalDate(a.date, timezone)),
     ]);
     const restDays = Math.max(0, periodDays - activeDays.size);
 
@@ -287,7 +291,7 @@ export const GET = withAuth(async (request, user) => {
       { muscleGroup: string; prWeight: number; prReps: number; prDate: string }
     >();
     for (const w of allWorkouts) {
-      const dateStr = w.date.toISOString().split('T')[0];
+      const dateStr = toLocalDate(w.date, timezone);
       for (const ex of w.exercises) {
         if (!ex.exercise) continue;
         const logs = parseSetLogs(ex.setLogs);

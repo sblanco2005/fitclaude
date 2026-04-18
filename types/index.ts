@@ -17,6 +17,7 @@ export interface UserProfile {
   sex: string | null;
   trainingFrequency: number | null;
   weightUnit: string; // "lb" or "kg"
+  timezone: string;
   trainerEmail: string | null;
   isOnboarded: boolean;
   isAdmin: boolean;

@@ -8,6 +8,10 @@ import type { WorkoutSession, KeyLift, MuscleVolume, ConditioningActivity } from
 
 interface SetLog { set: number; weight: number; reps: number }
 
+function toLocalDate(date: Date, tz: string): string {
+  return date.toLocaleDateString('en-CA', { timeZone: tz });
+}
+
 function parseSetLogs(raw: string | null): SetLog[] {
   if (!raw) return [];
   try {
@@ -56,7 +60,7 @@ export const POST = withAuth(async (_request, user) => {
   const workedMuscleGroupsSet = new Set<string>();
 
   for (const w of workouts) {
-    const dateStr = w.date.toISOString().split('T')[0];
+    const dateStr = toLocalDate(w.date, tz);
     let sessVol = 0, sessSets = 0;
     const musclesHit = new Set<string>();
     for (const ex of w.exercises) {
@@ -102,19 +106,19 @@ export const POST = withAuth(async (_request, user) => {
     select: { id: true, name: true, durationMinutes: true, date: true, notes: true },
   });
   const conditioningActivities: ConditioningActivity[] = activityRows.map(a => ({
-    id: a.id, date: a.date.toISOString().split('T')[0], name: a.name, durationMinutes: a.durationMinutes, notes: a.notes,
+    id: a.id, date: toLocalDate(a.date, tz), name: a.name, durationMinutes: a.durationMinutes, notes: a.notes,
   }));
 
   const activeDays = new Set([
-    ...workouts.map(w => w.date.toISOString().split('T')[0]),
-    ...activityRows.map(a => a.date.toISOString().split('T')[0]),
+    ...workouts.map(w => toLocalDate(w.date, tz)),
+    ...activityRows.map(a => toLocalDate(a.date, tz)),
   ]);
   const periodDays = Math.ceil((Date.now() - since.getTime()) / 86400000);
   const restDays = Math.max(0, periodDays - activeDays.size);
 
   const prMap = new Map<string, { muscleGroup: string; prWeight: number; prReps: number; prDate: string }>();
   for (const w of workouts) {
-    const dateStr = w.date.toISOString().split('T')[0];
+    const dateStr = toLocalDate(w.date, tz);
     for (const ex of w.exercises) {
       if (!ex.exercise) continue;
       for (const log of parseSetLogs(ex.setLogs)) {

@@ -1,4 +1,5 @@
 import type { AnalyticsData } from '@/types';
+import { FRONT_PATHS, BACK_PATHS, BODY_OUTLINE_FRONT, BODY_OUTLINE_BACK, HEAD_PATH } from '@/components/workout/anatomy/muscleData';
 
 function fmtVolume(lbs: number): string {
   return lbs >= 1000 ? `${(lbs / 1000).toFixed(1)}K` : `${lbs}`;
@@ -33,6 +34,37 @@ function weekStartLabel(data: AnalyticsData): string {
   const sorted = [...data.sessions].sort((a, b) => a.date.localeCompare(b.date));
   const d = new Date(sorted[0].date + 'T12:00:00Z');
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function buildMusclesSvg(workedMuscles: string[]): string {
+  const worked = new Set(workedMuscles);
+
+  function pathAttrs(muscle: string): string {
+    return worked.has(muscle)
+      ? 'fill="#10b981" fill-opacity="0.4" stroke="#10b981" stroke-opacity="0.85" stroke-width="1.5"'
+      : 'fill="#ffffff" fill-opacity="0.04" stroke="#475569" stroke-opacity="0.25" stroke-width="1"';
+  }
+
+  const SKIP = new Set(['forearms', 'neck', 'traps']);
+  const outlineAttrs = 'fill="#1e293b" fill-opacity="0.8" stroke="#475569" stroke-opacity="0.4" stroke-width="1"';
+
+  const frontSvgPaths = FRONT_PATHS
+    .filter(p => !SKIP.has(p.muscle))
+    .map(p => `<path d="${p.d}" ${pathAttrs(p.muscle)}/>`)
+    .join('');
+
+  const backSvgPaths = BACK_PATHS
+    .filter(p => !SKIP.has(p.muscle))
+    .map(p => `<path d="${p.d}" ${pathAttrs(p.muscle)}/>`)
+    .join('');
+
+  const svgFront = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 420" width="130" height="273" style="display:block;margin:0 auto;"><path d="${BODY_OUTLINE_FRONT}" ${outlineAttrs}/><path d="${HEAD_PATH}" ${outlineAttrs}/>${frontSvgPaths}</svg>`;
+  const svgBack = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 420" width="130" height="273" style="display:block;margin:0 auto;"><path d="${BODY_OUTLINE_BACK}" ${outlineAttrs}/><path d="${HEAD_PATH}" ${outlineAttrs}/>${backSvgPaths}</svg>`;
+
+  return `<table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td width="50%" style="text-align:center;padding-bottom:6px;">${svgFront}<span style="font-size:10px;color:#475569;display:block;margin-top:4px;">Front</span></td>
+    <td width="50%" style="text-align:center;padding-bottom:6px;">${svgBack}<span style="font-size:10px;color:#475569;display:block;margin-top:4px;">Back</span></td>
+  </tr></table>`;
 }
 
 export function buildTrainerEmailHtml(userName: string, data: AnalyticsData): string {
@@ -89,6 +121,51 @@ export function buildTrainerEmailHtml(userName: string, data: AnalyticsData): st
     })
     .join('');
 
+  // ── Volume by muscle rows ──
+  const PRIMARY_MUSCLES = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'quadriceps', 'hamstrings', 'glutes', 'core', 'calves'];
+  const MUSCLE_LABELS: Record<string, string> = { chest: 'Chest', back: 'Back', shoulders: 'Shoulders', biceps: 'Biceps', triceps: 'Triceps', quadriceps: 'Quads', hamstrings: 'Hamstrings', glutes: 'Glutes', core: 'Core', calves: 'Calves' };
+  const MEV: Record<string, number> = { chest: 10, back: 10, shoulders: 8, biceps: 8, triceps: 8, quadriceps: 10, hamstrings: 10, glutes: 10, core: 8, calves: 8 };
+  const muscleSetLookup = Object.fromEntries(data.setsByMuscle.map(m => [m.muscleGroup, m.sets]));
+  const workedSet = new Set(data.workedMuscleGroups);
+  const maxSets = data.setsByMuscle.length ? data.setsByMuscle[0].sets : 1;
+
+  const volumeRows = PRIMARY_MUSCLES.map(mg => {
+    const sets = muscleSetLookup[mg] ?? 0;
+    const workedNoData = sets === 0 && workedSet.has(mg);
+    const notWorked = sets === 0 && !workedNoData;
+    const label = MUSCLE_LABELS[mg] ?? mg;
+    const mev = MEV[mg] ?? 8;
+
+    let barColor = '#1D9E75'; // green
+    if (sets > 0) {
+      const ratio = sets / mev;
+      if (ratio < 0.5) barColor = '#E24B4A';
+      else if (ratio < 0.8) barColor = '#BA7517';
+    }
+    const barPct = sets > 0 ? Math.min(100, Math.round((sets / maxSets) * 100)) : 0;
+
+    const labelColor = notWorked ? '#374151' : workedNoData ? '#6b7280' : '#cbd5e1';
+    const countStr = sets > 0 ? `${sets}s` : workedNoData ? '✓' : '—';
+    const countColor = notWorked ? '#7f1d1d' : workedNoData ? '#6b7280' : barColor;
+
+    // Simple inline bar using a table cell
+    const barBg = workedNoData ? '#1e293b' : '#111827';
+    const barFill = sets > 0
+      ? `<td width="${barPct}%" style="background:${barColor};height:6px;border-radius:3px;"></td><td style="background:transparent;"></td>`
+      : `<td colspan="2" style="background:${barBg};height:6px;border-radius:3px;"></td>`;
+
+    return `
+      <tr>
+        <td width="90" style="padding:4px 8px 4px 0;font-size:12px;color:${labelColor};white-space:nowrap;">${label}</td>
+        <td style="padding:4px 4px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="height:6px;">
+            <tr>${barFill}</tr>
+          </table>
+        </td>
+        <td width="36" style="padding:4px 0 4px 6px;font-size:11px;color:${countColor};text-align:right;font-weight:500;">${countStr}</td>
+      </tr>`;
+  }).join('');
+
   // ── Flags ──
   const flags: string[] = [];
   const totalLoad = data.sessions.length + data.conditioningActivities.length;
@@ -100,10 +177,9 @@ export function buildTrainerEmailHtml(userName: string, data: AnalyticsData): st
   const pullSets = data.setsByMuscle.filter(m => pullMuscles.includes(m.muscleGroup)).reduce((s, m) => s + m.sets, 0);
   if (pullSets > 0 && pushSets / pullSets > 1.5)
     flags.push(`Push:pull ratio is ${(pushSets / pullSets).toFixed(1)} this week.`);
-  const MEV: Record<string, number> = { chest: 10, back: 10, shoulders: 8, biceps: 8, triceps: 8, quadriceps: 10, hamstrings: 10, glutes: 10, core: 8, calves: 8 };
-  const lowMuscles = data.setsByMuscle.filter(m => m.sets > 0 && m.sets < (MEV[m.muscleGroup] ?? 8) * 0.5);
+  const lowMuscles = data.setsByMuscle.filter(m => m.sets > 0 && PRIMARY_MUSCLES.includes(m.muscleGroup) && m.sets < (MEV[m.muscleGroup] ?? 8) * 0.5);
   if (lowMuscles.length)
-    flags.push(`${lowMuscles.map(m => m.muscleGroup).join(', ')} below minimum lifting volume.`);
+    flags.push(`${lowMuscles.map(m => MUSCLE_LABELS[m.muscleGroup] ?? m.muscleGroup).join(', ')} below minimum lifting volume.`);
   const declining = data.keyLifts.filter(l => l.deltaPercent !== null && l.deltaPercent < -3);
   if (declining.length)
     flags.push(`${declining[0].exerciseName} e1RM down ${Math.abs(declining[0].deltaPercent!).toFixed(1)}% — fatigue or technique?`);
@@ -202,6 +278,21 @@ export function buildTrainerEmailHtml(userName: string, data: AnalyticsData): st
         <tbody>${liftRows}</tbody>
       </table>
     </div>` : ''}
+
+    <!-- Volume by muscle -->
+    <p style="font-size:11px;font-weight:600;color:#64748b;letter-spacing:1px;margin:0 0 8px;">VOLUME BY MUSCLE</p>
+    <div style="background:#111827;border-radius:10px;padding:10px 12px;margin-bottom:20px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tbody>${volumeRows}</tbody>
+      </table>
+      <p style="font-size:10px;color:#374151;margin:6px 0 0;">✓ worked, no weight logged &nbsp;·&nbsp; — not worked</p>
+    </div>
+
+    <!-- Muscles Worked (anatomy) -->
+    <p style="font-size:11px;font-weight:600;color:#64748b;letter-spacing:1px;margin:0 0 8px;">MUSCLES WORKED</p>
+    <div style="background:#111827;border-radius:10px;padding:16px 12px;margin-bottom:20px;">
+      ${buildMusclesSvg(data.workedMuscleGroups)}
+    </div>
 
     ${flags.length ? `
     <!-- Flags -->

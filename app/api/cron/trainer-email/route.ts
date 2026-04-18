@@ -7,6 +7,10 @@ import type { AnalyticsData, WorkoutSession, KeyLift, MuscleVolume, Conditioning
 
 interface SetLog { set: number; weight: number; reps: number }
 
+function toLocalDate(date: Date, tz: string): string {
+  return date.toLocaleDateString('en-CA', { timeZone: tz });
+}
+
 function parseSetLogs(raw: string | null): SetLog[] {
   if (!raw) return [];
   try {
@@ -50,7 +54,7 @@ async function buildWeekAnalytics(userId: string, tz: string): Promise<Analytics
     const overloadMap = new Map<string, { date: string; maxWeight: number; topReps: number; e1rm: number; muscleGroup: string }[]>();
 
     for (const w of workouts) {
-      const dateStr = w.date.toISOString().split('T')[0];
+      const dateStr = toLocalDate(w.date, tz);
       let sessVol = 0, sessSets = 0;
       const musclesHit = new Set<string>();
       for (const ex of w.exercises) {
@@ -102,12 +106,12 @@ async function buildWeekAnalytics(userId: string, tz: string): Promise<Analytics
       select: { id: true, name: true, durationMinutes: true, date: true, notes: true },
     });
     const conditioningActivities: ConditioningActivity[] = activityRows.map(a => ({
-      id: a.id, date: a.date.toISOString().split('T')[0], name: a.name, durationMinutes: a.durationMinutes, notes: a.notes,
+      id: a.id, date: toLocalDate(a.date, tz), name: a.name, durationMinutes: a.durationMinutes, notes: a.notes,
     }));
 
     const activeDays = new Set([
-      ...workouts.map(w => w.date.toISOString().split('T')[0]),
-      ...activityRows.map(a => a.date.toISOString().split('T')[0]),
+      ...workouts.map(w => toLocalDate(w.date, tz)),
+      ...activityRows.map(a => toLocalDate(a.date, tz)),
     ]);
     const periodDays = Math.ceil((Date.now() - since.getTime()) / 86400000);
     const restDays = Math.max(0, periodDays - activeDays.size);
@@ -118,7 +122,7 @@ async function buildWeekAnalytics(userId: string, tz: string): Promise<Analytics
     // PRs (all-time)
     const prMap = new Map<string, { muscleGroup: string; prWeight: number; prReps: number; prDate: string }>();
     for (const w of workouts) {
-      const dateStr = w.date.toISOString().split('T')[0];
+      const dateStr = toLocalDate(w.date, tz);
       for (const ex of w.exercises) {
         if (!ex.exercise) continue;
         const logs = parseSetLogs(ex.setLogs);

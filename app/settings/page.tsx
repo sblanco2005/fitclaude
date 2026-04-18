@@ -116,6 +116,44 @@ export default function SettingsPage() {
             </select>
           </div>
 
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-slate-300">Timezone</label>
+            <select
+              value={profile.timezone || 'UTC'}
+              onChange={(e) => updateField('timezone', e.target.value)}
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-base text-white focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              {[
+                ['Pacific/Honolulu', 'Hawaii (HST −10)'],
+                ['America/Anchorage', 'Alaska (AKST −9)'],
+                ['America/Los_Angeles', 'Pacific (PST −8)'],
+                ['America/Denver', 'Mountain (MST −7)'],
+                ['America/Mexico_City', 'Mexico City (CST −6)'],
+                ['America/Chicago', 'Central (CST −6)'],
+                ['America/New_York', 'Eastern (EST −5)'],
+                ['America/Bogota', 'Bogotá (COT −5)'],
+                ['America/Sao_Paulo', 'São Paulo (BRT −3)'],
+                ['America/Argentina/Buenos_Aires', 'Buenos Aires (ART −3)'],
+                ['Atlantic/Azores', 'Azores (AZOT −1)'],
+                ['UTC', 'UTC ±0'],
+                ['Europe/London', 'London (GMT ±0)'],
+                ['Europe/Paris', 'Central Europe (CET +1)'],
+                ['Europe/Helsinki', 'Eastern Europe (EET +2)'],
+                ['Africa/Nairobi', 'Nairobi (EAT +3)'],
+                ['Asia/Dubai', 'Dubai (GST +4)'],
+                ['Asia/Karachi', 'Pakistan (PKT +5)'],
+                ['Asia/Kolkata', 'India (IST +5:30)'],
+                ['Asia/Bangkok', 'Bangkok (ICT +7)'],
+                ['Asia/Singapore', 'Singapore (SGT +8)'],
+                ['Asia/Tokyo', 'Tokyo (JST +9)'],
+                ['Australia/Sydney', 'Sydney (AEST +10)'],
+                ['Pacific/Auckland', 'Auckland (NZST +12)'],
+              ].map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </select>
+          </div>
+
           {(() => {
             const unit = (profile.weightUnit || 'lb') as 'lb' | 'kg';
             const displayValue = profile.weightKg != null
