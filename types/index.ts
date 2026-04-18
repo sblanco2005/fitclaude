@@ -286,15 +286,43 @@ export interface AnalyticsData {
   period: string;
   totalWorkouts: number;
   totalVolume: number;
+  totalSets: number;
   avgVolumePerSession: number;
+  sessions: WorkoutSession[];
   volumeBySession: VolumeDataPoint[];
   volumeByWeek: WeeklyVolume[];
   progressiveOverload: ProgressiveOverloadSeries[];
+  keyLifts: KeyLift[];
+  setsByMuscle: MuscleVolume[];
   personalRecords: PersonalRecord[];
   plateaus: PlateauAlert[];
   repRangeAnalysis: RepRangeData[];
   musclesWorked: string[];
   nutrition: NutritionAnalytics;
+}
+
+export interface WorkoutSession {
+  date: string;
+  name: string;
+  volume: number;
+  totalSets: number;
+  exerciseCount: number;
+  fatigueRating: number | null;
+  musclesHit: string[];
+}
+
+export interface KeyLift {
+  exerciseName: string;
+  muscleGroup: string;
+  topSet: { weight: number; reps: number };
+  e1rm: number;
+  prevE1rm: number | null;
+  deltaPercent: number | null;
+}
+
+export interface MuscleVolume {
+  muscleGroup: string;
+  sets: number;
 }
 
 export interface VolumeDataPoint {

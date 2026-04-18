@@ -101,21 +101,43 @@ export const GET = withAuth(async (request, user) => {
 
     // ── Volume by session ──
     const volumeBySession: { date: string; volume: number; name: string }[] = [];
+    const sessions: {
+      date: string;
+      name: string;
+      volume: number;
+      totalSets: number;
+      exerciseCount: number;
+      fatigueRating: number | null;
+      musclesHit: string[];
+    }[] = [];
     let totalVolume = 0;
+    let totalSets = 0;
 
     for (const w of workouts) {
       let sessionVolume = 0;
+      let sessionSets = 0;
+      const musclesHit = new Set<string>();
       for (const ex of w.exercises) {
         const logs = parseSetLogs(ex.setLogs);
+        sessionSets += logs.length;
         for (const log of logs) {
           sessionVolume += log.weight * log.reps;
         }
+        if (ex.exercise?.muscleGroup) musclesHit.add(ex.exercise.muscleGroup);
       }
       totalVolume += sessionVolume;
-      volumeBySession.push({
-        date: w.date.toISOString().split('T')[0],
+      totalSets += sessionSets;
+      const dateStr = w.date.toISOString().split('T')[0];
+      const sessionName = w.name || w.workoutType;
+      volumeBySession.push({ date: dateStr, volume: Math.round(sessionVolume), name: sessionName });
+      sessions.push({
+        date: dateStr,
+        name: sessionName,
         volume: Math.round(sessionVolume),
-        name: w.name || w.workoutType,
+        totalSets: sessionSets,
+        exerciseCount: w.exercises.length,
+        fatigueRating: w.fatigueRating ?? null,
+        musclesHit: Array.from(musclesHit),
       });
     }
 
@@ -136,27 +158,76 @@ export const GET = withAuth(async (request, user) => {
       .map(([week, data]) => ({ week, weekStart: data.weekStart, volume: data.volume }))
       .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
 
-    // ── Progressive overload (compound exercises: max weight per session) ──
-    const overloadMap = new Map<string, { date: string; maxWeight: number }[]>();
+    // ── Progressive overload (compound exercises: best e1RM set per session) ──
+    const overloadMap = new Map<string, {
+      date: string; maxWeight: number; topReps: number; e1rm: number; muscleGroup: string;
+    }[]>();
+    const muscleSetMap = new Map<string, number>();
+
     for (const w of workouts) {
       const dateStr = w.date.toISOString().split('T')[0];
       for (const ex of w.exercises) {
+        // Accumulate sets per muscle group
+        if (ex.exercise?.muscleGroup) {
+          const mg = ex.exercise.muscleGroup;
+          const logs = parseSetLogs(ex.setLogs);
+          muscleSetMap.set(mg, (muscleSetMap.get(mg) || 0) + logs.length);
+        }
         if (!ex.exercise || ex.exercise.exerciseType !== 'compound') continue;
         const logs = parseSetLogs(ex.setLogs);
         if (logs.length === 0) continue;
-        const maxWeight = Math.max(...logs.map((l) => l.weight));
+        let bestE1rm = 0, bestWeight = 0, bestReps = 0;
+        for (const log of logs) {
+          const e1rm = log.weight * (1 + log.reps / 30);
+          if (e1rm > bestE1rm) { bestE1rm = e1rm; bestWeight = log.weight; bestReps = log.reps; }
+        }
         const name = ex.exercise.name;
         if (!overloadMap.has(name)) overloadMap.set(name, []);
-        overloadMap.get(name)!.push({ date: dateStr, maxWeight });
+        overloadMap.get(name)!.push({
+          date: dateStr,
+          maxWeight: bestWeight,
+          topReps: bestReps,
+          e1rm: Math.round(bestE1rm),
+          muscleGroup: ex.exercise.muscleGroup,
+        });
       }
     }
+
     const progressiveOverload = Array.from(overloadMap.entries())
       .filter(([, data]) => data.length >= 2)
       .map(([exerciseName, data]) => ({
         exerciseName,
-        data: data.sort((a, b) => a.date.localeCompare(b.date)),
+        data: data.sort((a, b) => a.date.localeCompare(b.date)).map(d => ({
+          date: d.date, maxWeight: d.maxWeight,
+        })),
       }))
       .sort((a, b) => b.data.length - a.data.length);
+
+    // ── Key lifts (top compound exercises with e1RM + delta) ──
+    const keyLifts = Array.from(overloadMap.entries())
+      .map(([exerciseName, data]) => {
+        const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
+        const latest = sorted[sorted.length - 1];
+        const oldest = sorted[0];
+        const deltaPercent = sorted.length >= 2
+          ? Math.round(((latest.e1rm - oldest.e1rm) / oldest.e1rm) * 1000) / 10
+          : null;
+        return {
+          exerciseName,
+          muscleGroup: latest.muscleGroup,
+          topSet: { weight: latest.maxWeight, reps: latest.topReps },
+          e1rm: latest.e1rm,
+          prevE1rm: sorted.length >= 2 ? oldest.e1rm : null,
+          deltaPercent,
+        };
+      })
+      .sort((a, b) => b.e1rm - a.e1rm)
+      .slice(0, 8);
+
+    // ── Sets by muscle group ──
+    const setsByMuscle = Array.from(muscleSetMap.entries())
+      .map(([muscleGroup, sets]) => ({ muscleGroup, sets }))
+      .sort((a, b) => b.sets - a.sets);
 
     // ── Personal records (all-time, not limited by period) ──
     const allWorkouts = since
@@ -249,14 +320,14 @@ export const GET = withAuth(async (request, user) => {
       }
     }
 
-    const totalSets = rangeCounts.reduce((sum, r) => sum + r.totalSets, 0);
+    const totalRepRangeSets = rangeCounts.reduce((sum, r) => sum + r.totalSets, 0);
     const repRangeAnalysis = rangeCounts
       .filter((r) => r.totalSets > 0)
       .map((r) => ({
         range: r.range,
         totalSets: r.totalSets,
         avgWeight: r.totalSets > 0 ? Math.round(r.totalWeight / r.totalSets) : 0,
-        percentage: totalSets > 0 ? Math.round((r.totalSets / totalSets) * 100) : 0,
+        percentage: totalRepRangeSets > 0 ? Math.round((r.totalSets / totalRepRangeSets) * 100) : 0,
       }));
 
     // ── Muscles worked in period ──
@@ -429,11 +500,15 @@ export const GET = withAuth(async (request, user) => {
       period,
       totalWorkouts,
       totalVolume: Math.round(totalVolume),
+      totalSets,
       avgVolumePerSession,
       musclesWorked,
+      sessions,
       volumeBySession,
       volumeByWeek,
       progressiveOverload,
+      keyLifts,
+      setsByMuscle,
       personalRecords,
       plateaus,
       repRangeAnalysis,

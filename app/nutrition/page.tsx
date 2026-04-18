@@ -626,7 +626,7 @@ export default function NutritionPage() {
 
   const fetchRecentItems = useCallback(() => {
     setRecentLoading(true);
-    fetch('/api/nutrition/recent-items?days=2&limit=30')
+    fetch('/api/nutrition/recent-items?days=14&limit=50')
       .then((res) => res.ok ? res.json() : { items: [] })
       .then((data) => setRecentItems(Array.isArray(data?.items) ? data.items : []))
       .catch(() => setRecentItems([]))
@@ -883,7 +883,7 @@ export default function NutritionPage() {
                 </p>
               </div>
             ) : (
-              <div className="max-h-[40vh] overflow-y-auto -mr-2 pr-2 space-y-1.5">
+              <div className="max-h-[65vh] overflow-y-auto -mr-1 pr-1 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                 {recentItems.map((item) => {
                   const isLogging = loggingItem === item.key;
                   return (
