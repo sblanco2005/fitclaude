@@ -39,6 +39,25 @@ function fmtDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+function fmtDuration(mins: number | null): string {
+  if (!mins) return '—';
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function deriveFocus(name: string, notes: string | null): string {
+  if (notes) return notes.slice(0, 20);
+  const n = name.toLowerCase();
+  if (n.includes('alpha x') || n.includes('alphax')) return 'legs + cond';
+  if (n.includes('alpha fit') || n.includes('alphafit')) return 'full body';
+  if (n.includes('upper')) return 'upper body';
+  if (n.includes('lower')) return 'lower body';
+  if (n.includes('run') || n.includes('cardio')) return 'cardio';
+  return '—';
+}
+
 function weekStartLabel(sessions: { date: string }[]): string {
   if (!sessions.length) return '';
   const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date));
@@ -72,9 +91,9 @@ export default function AnalyticsPage() {
 
   // Auto-generated TL;DR
   const tldr = useMemo(() => {
-    if (!data || !data.sessions.length) return null;
-    const { sessions, totalVolume, personalRecords, setsByMuscle, period: p } = data;
-    const periodStr = p === 'week' ? 'this week' : `in this period`;
+    if (!data || (!data.sessions.length && !data.conditioningActivities.length)) return null;
+    const { sessions, conditioningActivities, totalVolume, personalRecords, setsByMuscle, period: p } = data;
+    const periodStr = p === 'week' ? 'this week' : 'in this period';
 
     // PRs this period
     const prThisPeriod = personalRecords.filter(pr => {
@@ -94,23 +113,34 @@ export default function AnalyticsPage() {
       .slice(0, 2)
       .map(m => muscleLabel(m.muscleGroup));
 
-    const volStr = `${fmtVolume(totalVolume)} lb total`;
-    const sessionStr = `${sessions.length} session${sessions.length !== 1 ? 's' : ''}`;
+    const parts: string[] = [];
+    if (sessions.length) parts.push(`${sessions.length} lifting session${sessions.length !== 1 ? 's' : ''} (${fmtVolume(totalVolume)} lb)`);
+    if (conditioningActivities.length) {
+      const totalMins = conditioningActivities.reduce((s, a) => s + (a.durationMinutes ?? 0), 0);
+      parts.push(`${conditioningActivities.length} class${conditioningActivities.length !== 1 ? 'es' : ''} (~${fmtDuration(totalMins)} conditioning)`);
+    }
+    const base = parts.join(' + ') + '.';
     const prStr = prThisPeriod.length
-      ? ` Hit ${prThisPeriod.slice(0, 2).map(p => `${p.exerciseName} PR (${p.prWeight}×${p.prReps})`).join(' and ')}.`
+      ? ` Hit ${prThisPeriod.slice(0, 2).map(pr => `${pr.exerciseName} PR (${pr.prWeight}×${pr.prReps})`).join(' and ')}.`
       : '';
     const gapStr = muscleGaps.length
       ? ` ${muscleGaps.join(' and ')} below minimum volume ${periodStr}.`
       : '';
 
-    return `${sessionStr}, ${volStr}.${prStr}${gapStr}`;
+    return base + prStr + gapStr;
   }, [data]);
 
   // Auto-generated flags
   const flags = useMemo(() => {
     if (!data) return [];
     const result: string[] = [];
-    const { setsByMuscle, plateaus, keyLifts } = data;
+    const { setsByMuscle, plateaus, keyLifts, restDays, sessions, conditioningActivities } = data;
+
+    // Zero rest days
+    const totalLoad = sessions.length + conditioningActivities.length;
+    if (restDays === 0 && totalLoad >= 5) {
+      result.push(`Zero rest days this week — ${totalLoad} total sessions. Intentional push, or schedule recovery?`);
+    }
 
     // Push:pull balance
     const pushMuscles = ['chest', 'shoulders', 'triceps'];
@@ -121,13 +151,14 @@ export default function AnalyticsPage() {
       result.push(`Push:pull ratio is ${(pushSets / pullSets).toFixed(1)} — consider adding a pull session.`);
     }
 
-    // Low-volume muscle groups
+    // Low-volume muscle groups (from lifting only — classes may cover some)
     const lowMuscles = setsByMuscle.filter(m => {
       const mev = MEV[m.muscleGroup] ?? MEV_DEFAULT;
       return m.sets > 0 && m.sets < mev * 0.5;
     });
     if (lowMuscles.length) {
-      result.push(`${lowMuscles.map(m => muscleLabel(m.muscleGroup)).join(', ')} below minimum effective volume.`);
+      const classNote = conditioningActivities.length ? ' (classes may partly cover this)' : '';
+      result.push(`${lowMuscles.map(m => muscleLabel(m.muscleGroup)).join(', ')} below minimum lifting volume${classNote}.`);
     }
 
     // Plateau exercises
@@ -140,6 +171,12 @@ export default function AnalyticsPage() {
     const declining = keyLifts.filter(l => l.deltaPercent !== null && l.deltaPercent < -3);
     if (declining.length) {
       result.push(`${declining[0].exerciseName} e1RM down ${Math.abs(declining[0].deltaPercent!).toFixed(1)}% — fatigue or technique?`);
+    }
+
+    // High-RPE class on consecutive days with heavy lifting
+    const highRpeClasses = conditioningActivities.filter(a => a.notes?.toLowerCase().includes('hard') || false);
+    if (highRpeClasses.length > 0 && sessions.length >= 3) {
+      result.push(`${highRpeClasses.length} high-intensity class${highRpeClasses.length !== 1 ? 'es' : ''} combined with ${sessions.length} lifting sessions — monitor recovery.`);
     }
 
     return result;
@@ -170,10 +207,11 @@ export default function AnalyticsPage() {
     );
   }
 
-  const isTrainingEmpty = data.totalWorkouts === 0;
+  const isTrainingEmpty = data.totalWorkouts === 0 && data.conditioningActivities.length === 0;
   const isNutritionEmpty = !data.nutrition || data.nutrition.daysLogged === 0;
   const weekStart = weekStartLabel(data.sessions);
   const maxSets = data.setsByMuscle.length ? data.setsByMuscle[0].sets : 1;
+  const totalCondMins = data.conditioningActivities.reduce((s, a) => s + (a.durationMinutes ?? 0), 0);
 
   return (
     <div className="p-3 pb-1 space-y-3 max-w-lg mx-auto">
@@ -217,8 +255,11 @@ export default function AnalyticsPage() {
                 WEEKLY REPORT · {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()}
               </p>
               <p className="text-sm font-medium text-white leading-snug">
-                {weekStart ? `Week of ${weekStart}` : 'This period'} — {data.totalWorkouts} session{data.totalWorkouts !== 1 ? 's' : ''},{' '}
-                {fmtVolume(data.totalVolume)} lb,{' '}
+                {weekStart ? `Week of ${weekStart}` : 'This period'} —{' '}
+                {data.totalWorkouts > 0 && `${data.totalWorkouts} lift${data.totalWorkouts !== 1 ? 's' : ''}`}
+                {data.totalWorkouts > 0 && data.conditioningActivities.length > 0 && ' + '}
+                {data.conditioningActivities.length > 0 && `${data.conditioningActivities.length} class${data.conditioningActivities.length !== 1 ? 'es' : ''}`}
+                {',\u00A0'}
                 {data.personalRecords.length > 0 ? `${data.personalRecords.length} PRs` : 'no new PRs'}
               </p>
             </div>
@@ -247,6 +288,65 @@ export default function AnalyticsPage() {
                   ))}
                 </div>
               </div>
+
+              {/* CONDITIONING / CLASSES */}
+              {data.conditioningActivities.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">
+                    Conditioning / Classes — {data.conditioningActivities.length}
+                  </p>
+                  <div className="bg-[#111118] rounded-lg p-3">
+                    {/* Header */}
+                    <div className="grid gap-2 text-[10px] text-slate-500 pb-2 border-b border-border-dark mb-2"
+                      style={{ gridTemplateColumns: '84px 1fr 60px 44px' }}>
+                      <span>Day</span><span>Class</span><span>Focus</span><span className="text-right">Dur</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {data.conditioningActivities.map((a, i) => (
+                        <div key={i} className="grid gap-2 text-xs items-baseline"
+                          style={{ gridTemplateColumns: '84px 1fr 60px 44px' }}>
+                          <span className="text-slate-500">{fmtDate(a.date)}</span>
+                          <span className="text-slate-200 truncate">{a.name}</span>
+                          <span className="text-slate-500 truncate text-[11px]">{deriveFocus(a.name, a.notes)}</span>
+                          <span className="text-right text-slate-400">{fmtDuration(a.durationMinutes)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {totalCondMins > 0 && (
+                      <div className="mt-2.5 pt-2 border-t border-border-dark flex justify-between text-[10px] text-slate-500">
+                        <span>Total class time: {fmtDuration(totalCondMins)}</span>
+                        <span>{data.conditioningActivities.length} session{data.conditioningActivities.length !== 1 ? 's' : ''}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* COMBINED LOAD */}
+              {(data.sessions.length > 0 || data.conditioningActivities.length > 0) && (
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">Combined Load</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-[#111118] rounded-lg p-3">
+                      <p className="text-[10px] text-slate-500 mb-1">Strength</p>
+                      <p className="text-base font-semibold text-white">{data.sessions.length}</p>
+                      <p className="text-[10px] text-slate-500">sessions</p>
+                    </div>
+                    <div className="bg-[#111118] rounded-lg p-3">
+                      <p className="text-[10px] text-slate-500 mb-1">Conditioning</p>
+                      <p className="text-base font-semibold text-white">{data.conditioningActivities.length}</p>
+                      <p className="text-[10px] text-slate-500">classes</p>
+                    </div>
+                    <div className="bg-[#111118] rounded-lg p-3">
+                      <p className="text-[10px] text-slate-500 mb-1">Rest days</p>
+                      <p className={`text-base font-semibold ${data.restDays === 0 ? 'text-amber-400' : 'text-white'}`}>
+                        {data.restDays}
+                      </p>
+                      <p className="text-[10px] text-slate-500">days</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* KEY LIFTS */}
               {data.keyLifts.length > 0 && (

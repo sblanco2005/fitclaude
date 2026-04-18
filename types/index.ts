@@ -294,6 +294,8 @@ export interface AnalyticsData {
   progressiveOverload: ProgressiveOverloadSeries[];
   keyLifts: KeyLift[];
   setsByMuscle: MuscleVolume[];
+  conditioningActivities: ConditioningActivity[];
+  restDays: number;
   personalRecords: PersonalRecord[];
   plateaus: PlateauAlert[];
   repRangeAnalysis: RepRangeData[];
@@ -323,6 +325,14 @@ export interface KeyLift {
 export interface MuscleVolume {
   muscleGroup: string;
   sets: number;
+}
+
+export interface ConditioningActivity {
+  id: string;
+  date: string;
+  name: string;
+  durationMinutes: number | null;
+  notes: string | null;
 }
 
 export interface VolumeDataPoint {

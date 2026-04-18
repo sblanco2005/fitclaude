@@ -229,6 +229,33 @@ export const GET = withAuth(async (request, user) => {
       .map(([muscleGroup, sets]) => ({ muscleGroup, sets }))
       .sort((a, b) => b.sets - a.sets);
 
+    // ── Conditioning activities (classes) ──
+    const activityRows = await prisma.activity.findMany({
+      where: {
+        userId: user.id,
+        ...(dateFilter ? { date: dateFilter } : {}),
+      },
+      orderBy: { date: 'asc' },
+      select: { id: true, name: true, durationMinutes: true, date: true, notes: true },
+    });
+    const conditioningActivities = activityRows.map((a) => ({
+      id: a.id,
+      date: a.date.toISOString().split('T')[0],
+      name: a.name,
+      durationMinutes: a.durationMinutes,
+      notes: a.notes,
+    }));
+
+    // ── Rest days ──
+    const periodDays = since
+      ? Math.ceil((Date.now() - since.getTime()) / 86400000)
+      : 7;
+    const activeDays = new Set([
+      ...workouts.map((w) => w.date.toISOString().split('T')[0]),
+      ...activityRows.map((a) => a.date.toISOString().split('T')[0]),
+    ]);
+    const restDays = Math.max(0, periodDays - activeDays.size);
+
     // ── Personal records (all-time, not limited by period) ──
     const allWorkouts = since
       ? await prisma.workout.findMany({
@@ -509,6 +536,8 @@ export const GET = withAuth(async (request, user) => {
       progressiveOverload,
       keyLifts,
       setsByMuscle,
+      conditioningActivities,
+      restDays,
       personalRecords,
       plateaus,
       repRangeAnalysis,
