@@ -3004,9 +3004,7 @@ function WorkoutsPageInner() {
       return;
     }
 
-    // Ask whether this is a lifting session or conditioning class
-    setCondDuration('60');
-    setSessionTypePrompt(name);
+    await _startHitIt(name);
   };
 
   const removeFromHitIt = (name: string) => {

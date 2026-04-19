@@ -28,6 +28,8 @@ export default function DashboardPage() {
   const [ptRoutineView, setPtRoutineView] = useState(false);
   const [ptRoutines, setPtRoutines] = useState<{ id: string; name: string; displayId?: number | null }[]>([]);
   const [ptRoutinesLoading, setPtRoutinesLoading] = useState(false);
+  const [sessionTypeSheet, setSessionTypeSheet] = useState(false);
+  const [condDuration, setCondDuration] = useState('60');
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.isOnboarded === false) {
@@ -221,7 +223,7 @@ export default function DashboardPage() {
           ? `/workouts?routine=${encodeURIComponent(programToday.routineName)}`
           : undefined,
       onClick: isOwn
-        ? () => { setPtSheet(true); setPtRoutineView(false); setPtRoutines([]); }
+        ? () => { setCondDuration('60'); setSessionTypeSheet(true); }
         : undefined,
     });
   }
@@ -474,6 +476,83 @@ export default function DashboardPage() {
       )}
 
     </div>
+
+      {/* ───────── SESSION TYPE SHEET — Lifting or Conditioning? ───────── */}
+      {sessionTypeSheet && programToday && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setSessionTypeSheet(false)}>
+          <div
+            className="w-full max-w-lg mx-auto bg-slate-900 border border-slate-700/60 rounded-t-2xl p-5 pb-8 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white">{programToday.dayLabel}</h3>
+                <p className="text-xs text-slate-400">What type of session is this?</p>
+              </div>
+              <button onClick={() => setSessionTypeSheet(false)} className="text-slate-500 hover:text-white p-1">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => { setSessionTypeSheet(false); setPtSheet(true); setPtRoutineView(false); setPtRoutines([]); }}
+                className="flex flex-col items-center gap-2 p-5 rounded-2xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors"
+              >
+                <span className="text-3xl">🏋️</span>
+                <span className="text-sm font-bold text-white">Lifting</span>
+                <span className="text-xs text-slate-400 text-center">Track sets & reps</span>
+              </button>
+              <button
+                onClick={() => {/* stay open for duration input */}}
+                className="flex flex-col items-center gap-2 p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
+                disabled
+                style={{ cursor: 'default' }}
+              >
+                <span className="text-3xl">🏃</span>
+                <span className="text-sm font-bold text-white">Conditioning</span>
+                <span className="text-xs text-slate-400 text-center">Class / cardio</span>
+              </button>
+            </div>
+
+            <div className="pt-1 border-t border-slate-700/50">
+              <p className="text-xs text-slate-400 mb-2">Log as conditioning class</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={condDuration}
+                  onChange={(e) => setCondDuration(e.target.value)}
+                  className="w-24 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <span className="text-sm text-slate-400">minutes</span>
+              </div>
+              <button
+                onClick={async () => {
+                  setSessionTypeSheet(false);
+                  await fetch('/api/activities', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      name: programToday.dayLabel,
+                      durationMinutes: parseInt(condDuration) || null,
+                    }),
+                  });
+                  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                  fetch(`/api/program/today?tz=${encodeURIComponent(tz)}`)
+                    .then((res) => res.ok ? res.json() : null)
+                    .then((data) => { if (data?.programDayId) setProgramToday(data); else setProgramToday(null); })
+                    .catch(() => {});
+                }}
+                className="w-full mt-2 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 transition-colors"
+              >
+                Log as Conditioning ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ───────── PT / OWN SESSION SHEET ───────── */}
       {ptSheet && programToday && (
