@@ -81,12 +81,18 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (status !== 'authenticated') return;
-    setLoading(true);
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    fetch(`/api/analytics?period=${period}&tz=${encodeURIComponent(tz)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((d) => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+    const load = () => {
+      setLoading(true);
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      fetch(`/api/analytics?period=${period}&tz=${encodeURIComponent(tz)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((d) => { setData(d); setLoading(false); })
+        .catch(() => setLoading(false));
+    };
+    load();
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [status, period]);
 
   // Auto-generated TL;DR
