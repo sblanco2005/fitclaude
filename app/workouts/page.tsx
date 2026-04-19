@@ -2680,6 +2680,8 @@ function WorkoutsPageInner() {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFired = useRef(false);
   const [spunRoutineName, setSpunRoutineName] = useState<string | null>(null);
+  const [sessionTypePrompt, setSessionTypePrompt] = useState<string | null>(null); // routine name pending type selection
+  const [condDuration, setCondDuration] = useState('60');
   const prevRoutineNamesRef = useRef<Set<string>>(new Set());
   const hitItPauseRef = useRef<(() => void) | null>(null);
 
@@ -3002,7 +3004,9 @@ function WorkoutsPageInner() {
       return;
     }
 
-    await _startHitIt(name);
+    // Ask whether this is a lifting session or conditioning class
+    setCondDuration('60');
+    setSessionTypePrompt(name);
   };
 
   const removeFromHitIt = (name: string) => {
@@ -3967,6 +3971,59 @@ function WorkoutsPageInner() {
                 className="flex-1 py-2 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-50"
               >
                 {spinning ? 'Spinning...' : 'Let\'s go!'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Session type prompt — Lifting or Conditioning? */}
+      {sessionTypePrompt && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setSessionTypePrompt(null)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-full shadow-2xl">
+            <p className="text-sm font-bold text-white text-center">What type of session?</p>
+            <p className="text-xs text-slate-400 mt-1 text-center">{sessionTypePrompt.replace(/_/g, ' ')}</p>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={async () => {
+                  const name = sessionTypePrompt;
+                  setSessionTypePrompt(null);
+                  await _startHitIt(name);
+                }}
+                className="flex-1 py-3 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity flex flex-col items-center gap-1"
+              >
+                <span>🏋️</span>
+                <span>Lifting</span>
+              </button>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-700">
+              <p className="text-xs text-slate-400 text-center mb-2">Or log as conditioning class</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={condDuration}
+                  onChange={e => setCondDuration(e.target.value)}
+                  placeholder="Duration (min)"
+                  className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <span className="text-xs text-slate-400">min</span>
+              </div>
+              <button
+                onClick={async () => {
+                  const name = sessionTypePrompt;
+                  setSessionTypePrompt(null);
+                  await fetch('/api/activities', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, durationMinutes: parseInt(condDuration) || null }),
+                  });
+                  fetchActivities();
+                  setTab('history');
+                }}
+                className="w-full mt-2 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 transition-colors"
+              >
+                🏃 Log as Conditioning
               </button>
             </div>
           </div>

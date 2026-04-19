@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 
+export const POST = withAuth(async (request, user) => {
+  try {
+    const body = await request.json();
+    const { name, durationMinutes, notes } = body;
+    if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
+
+    const activity = await prisma.activity.create({
+      data: {
+        userId: user.id,
+        name,
+        durationMinutes: durationMinutes ?? null,
+        notes: notes ?? null,
+      },
+    });
+
+    return NextResponse.json(activity);
+  } catch (error) {
+    console.error('Failed to create activity:', error);
+    return NextResponse.json({ error: 'Failed to create activity' }, { status: 500 });
+  }
+});
+
 export const DELETE = withAuth(async (request, user) => {
   try {
     const { searchParams } = new URL(request.url);
