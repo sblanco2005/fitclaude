@@ -645,54 +645,29 @@ export default function DashboardPage() {
                     <span className="text-sm font-semibold text-white">Upload photo of your workout</span>
                   </button>
 
-                  {/* Mark as done (conditioning) or Link routine (lifting) */}
-                  {ptSessionType === 'conditioning' ? (
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left"
-                      onClick={async () => {
-                        setPtSheet(false);
-                        await fetch('/api/activities', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ name: programToday?.dayLabel }),
-                        });
-                        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                        fetch(`/api/program/today?tz=${encodeURIComponent(tz)}`)
-                          .then((res) => res.ok ? res.json() : null)
-                          .then((data) => { if (data?.programDayId) setProgramToday(data); else setProgramToday(null); })
-                          .catch(() => {});
-                      }}
-                    >
-                      <svg className="w-5 h-5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-sm font-semibold text-emerald-400">Mark as done</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-3 p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 transition-colors text-left"
-                      onClick={async () => {
-                        setPtRoutineView(true);
-                        setPtRoutinesLoading(true);
-                        try {
-                          const res = await fetch('/api/workouts?routinesOnly=true');
-                          const data = res.ok ? await res.json() : [];
-                          setPtRoutines(Array.isArray(data) ? data.map((w: Workout) => ({ id: w.id, name: w.name || 'Untitled', displayId: w.displayId })) : []);
-                        } catch {
-                          setPtRoutines([]);
-                        } finally {
-                          setPtRoutinesLoading(false);
-                        }
-                      }}
-                    >
-                      <svg className="w-5 h-5 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      <span className="text-sm font-semibold text-white">Link existing routine &amp; log as done</span>
-                    </button>
-                  )}
+                  {/* Link to routine — available for both lifting and conditioning */}
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left"
+                    onClick={async () => {
+                      setPtSheet(false);
+                      await fetch('/api/activities', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: programToday?.dayLabel }),
+                      });
+                      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                      fetch(`/api/program/today?tz=${encodeURIComponent(tz)}`)
+                        .then((res) => res.ok ? res.json() : null)
+                        .then((data) => { if (data?.programDayId) setProgramToday(data); else setProgramToday(null); })
+                        .catch(() => {});
+                    }}
+                  >
+                    <svg className="w-5 h-5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    <span className="text-sm font-semibold text-emerald-400">Link to routine</span>
+                  </button>
                 </div>
                 <p className="text-xs text-slate-500">Coach Fit will extract the exercises and save them to your history.</p>
               </>

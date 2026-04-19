@@ -319,18 +319,25 @@ export default function AnalyticsPage() {
                   </p>
                   <div className="bg-[#111118] rounded-lg p-3">
                     {/* Header */}
-                    <div className="grid gap-2 text-[10px] text-slate-500 pb-2 border-b border-border-dark mb-2"
-                      style={{ gridTemplateColumns: '84px 1fr 60px 44px' }}>
-                      <span>Day</span><span>Class</span><span>Focus</span><span className="text-right">Dur</span>
+                    <div className="grid gap-x-2 text-[10px] text-slate-500 pb-2 border-b border-border-dark mb-2"
+                      style={{ gridTemplateColumns: '84px 1fr 44px' }}>
+                      <span>Day</span><span>Class / Notes</span><span className="text-right">Dur</span>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-2.5">
                       {data.conditioningActivities.map((a, i) => (
-                        <div key={i} className="grid gap-2 text-xs items-baseline"
-                          style={{ gridTemplateColumns: '84px 1fr 60px 44px' }}>
-                          <span className="text-slate-500">{fmtDate(a.date)}</span>
-                          <span className="text-slate-200 truncate">{a.name}</span>
-                          <span className="text-slate-500 truncate text-[11px]">{deriveFocus(a.name, a.notes)}</span>
-                          <span className="text-right text-slate-400">{fmtDuration(a.durationMinutes)}</span>
+                        <div key={i} className="grid gap-x-2 text-xs items-start"
+                          style={{ gridTemplateColumns: '84px 1fr 44px' }}>
+                          <span className="text-slate-500 pt-0.5">{fmtDate(a.date)}</span>
+                          <div className="min-w-0">
+                            <span className="text-slate-200 block">{a.name}</span>
+                            {a.notes && (
+                              <span className="text-slate-500 text-[11px] block leading-snug mt-0.5">{a.notes}</span>
+                            )}
+                            {!a.notes && (
+                              <span className="text-slate-600 text-[11px] block leading-snug mt-0.5">{deriveFocus(a.name, null)}</span>
+                            )}
+                          </div>
+                          <span className="text-right text-slate-400 pt-0.5">{fmtDuration(a.durationMinutes)}</span>
                         </div>
                       ))}
                     </div>
