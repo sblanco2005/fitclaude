@@ -1634,27 +1634,12 @@ async def handle_chat(
     context = build_user_context(user_data, user_tz=user_tz)
     history = await _load_conversation_history(db, user_id, topic=topic)
 
-    # Build user content — if Qwen is available, extract image to text first so MiniMax can handle it.
-    # Otherwise fall back to Anthropic vision (requires Anthropic credits).
+    # Build user content — text only, or text + image for vision
     if image_base64 and image_media_type:
-        if _qwen_client:
-            try:
-                logger.info("[Coach] Image detected — extracting with Qwen vision")
-                extracted = await _extract_image_with_qwen(image_base64, image_media_type, user_message or "")
-                user_content = f"[Image analysis by Qwen vision]\n{extracted}\n\n{user_message or ''}".strip()
-                logger.info(f"[Coach] Qwen extracted {len(extracted)} chars from image")
-                image_base64 = None  # clear so MiniMax path is used below
-            except Exception as qwen_err:
-                logger.warning(f"[Coach] Qwen vision failed: {qwen_err}, falling back to Anthropic")
-                user_content = [
-                    {"type": "image", "source": {"type": "base64", "media_type": image_media_type, "data": image_base64}},
-                    {"type": "text", "text": user_message or "Analyze this image."},
-                ]
-        else:
-            user_content = [
-                {"type": "image", "source": {"type": "base64", "media_type": image_media_type, "data": image_base64}},
-                {"type": "text", "text": user_message or "Analyze this image and log the nutrition info."},
-            ]
+        user_content = [
+            {"type": "image", "source": {"type": "base64", "media_type": image_media_type, "data": image_base64}},
+            {"type": "text", "text": user_message or "Analyze this image and log the nutrition info."},
+        ]
     else:
         user_content = user_message
 
@@ -1682,8 +1667,6 @@ async def handle_chat(
             "model_used": None,
         }
 
-    # Select model: if image_base64 is still set (Qwen unavailable/failed), force Anthropic vision.
-    # Otherwise use MiniMax as normal.
     use_anthropic_for_vision = bool(image_base64 and image_media_type)
     if use_anthropic_for_vision:
         active_model = "claude-sonnet-4-20250514"
