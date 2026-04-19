@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const [ptRoutines, setPtRoutines] = useState<{ id: string; name: string; displayId?: number | null }[]>([]);
   const [ptRoutinesLoading, setPtRoutinesLoading] = useState(false);
   const [sessionTypeSheet, setSessionTypeSheet] = useState(false);
-  const [condDuration, setCondDuration] = useState('60');
+  const [ptSessionType, setPtSessionType] = useState<'lifting' | 'conditioning' | null>(null);
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.isOnboarded === false) {
@@ -223,7 +223,7 @@ export default function DashboardPage() {
           ? `/workouts?routine=${encodeURIComponent(programToday.routineName)}`
           : undefined,
       onClick: isOwn
-        ? () => { setCondDuration('60'); setSessionTypeSheet(true); }
+        ? () => { setSessionTypeSheet(true); }
         : undefined,
     });
   }
@@ -481,7 +481,7 @@ export default function DashboardPage() {
       {sessionTypeSheet && programToday && (
         <div className="fixed inset-0 z-50 flex items-end" onClick={() => setSessionTypeSheet(false)}>
           <div
-            className="w-full max-w-lg mx-auto bg-slate-900 border border-slate-700/60 rounded-t-2xl p-5 pb-8 space-y-4"
+            className="w-full max-w-lg mx-auto bg-slate-900 border border-slate-700/60 rounded-t-2xl p-5 pb-10 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -495,59 +495,22 @@ export default function DashboardPage() {
                 </svg>
               </button>
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => { setSessionTypeSheet(false); setPtSheet(true); setPtRoutineView(false); setPtRoutines([]); }}
+                onClick={() => { setSessionTypeSheet(false); setPtSessionType('lifting'); setPtSheet(true); setPtRoutineView(false); setPtRoutines([]); }}
                 className="flex flex-col items-center gap-2 p-5 rounded-2xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors"
               >
                 <span className="text-3xl">🏋️</span>
                 <span className="text-sm font-bold text-white">Lifting</span>
-                <span className="text-xs text-slate-400 text-center">Track sets & reps</span>
+                <span className="text-xs text-slate-400 text-center">Sets & reps</span>
               </button>
               <button
-                onClick={() => {/* stay open for duration input */}}
+                onClick={() => { setSessionTypeSheet(false); setPtSessionType('conditioning'); setPtSheet(true); setPtRoutineView(false); setPtRoutines([]); }}
                 className="flex flex-col items-center gap-2 p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
-                disabled
-                style={{ cursor: 'default' }}
               >
                 <span className="text-3xl">🏃</span>
                 <span className="text-sm font-bold text-white">Conditioning</span>
                 <span className="text-xs text-slate-400 text-center">Class / cardio</span>
-              </button>
-            </div>
-
-            <div className="pt-1 border-t border-slate-700/50">
-              <p className="text-xs text-slate-400 mb-2">Log as conditioning class</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={condDuration}
-                  onChange={(e) => setCondDuration(e.target.value)}
-                  className="w-24 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <span className="text-sm text-slate-400">minutes</span>
-              </div>
-              <button
-                onClick={async () => {
-                  setSessionTypeSheet(false);
-                  await fetch('/api/activities', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      name: programToday.dayLabel,
-                      durationMinutes: parseInt(condDuration) || null,
-                    }),
-                  });
-                  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                  fetch(`/api/program/today?tz=${encodeURIComponent(tz)}`)
-                    .then((res) => res.ok ? res.json() : null)
-                    .then((data) => { if (data?.programDayId) setProgramToday(data); else setProgramToday(null); })
-                    .catch(() => {});
-                }}
-                className="w-full mt-2 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 transition-colors"
-              >
-                Log as Conditioning ✓
               </button>
             </div>
           </div>
@@ -653,7 +616,9 @@ export default function DashboardPage() {
             ) : (
               /* ── Main options ── */
               <>
-                <p className="text-sm text-slate-400">Log this workout when you&apos;re done. You can:</p>
+                <p className="text-sm text-slate-400">
+                  {ptSessionType === 'conditioning' ? 'Log this conditioning session:' : 'Log this workout when you\'re done. You can:'}
+                </p>
                 <div className="space-y-2">
                   {/* Chat */}
                   <button
@@ -680,29 +645,57 @@ export default function DashboardPage() {
                     <span className="text-sm font-semibold text-white">Upload photo of your workout</span>
                   </button>
 
-                  {/* Link routine */}
-                  <button
-                    type="button"
-                    className="w-full flex items-center gap-3 p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 transition-colors text-left"
-                    onClick={async () => {
-                      setPtRoutineView(true);
-                      setPtRoutinesLoading(true);
-                      try {
-                        const res = await fetch('/api/workouts?routinesOnly=true');
-                        const data = res.ok ? await res.json() : [];
-                        setPtRoutines(Array.isArray(data) ? data.map((w: Workout) => ({ id: w.id, name: w.name || 'Untitled', displayId: w.displayId })) : []);
-                      } catch {
-                        setPtRoutines([]);
-                      } finally {
-                        setPtRoutinesLoading(false);
-                      }
-                    }}
-                  >
-                    <svg className="w-5 h-5 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    <span className="text-sm font-semibold text-white">Link existing routine &amp; log as done</span>
-                  </button>
+                  {/* Conditioning: quick log as activity */}
+                  {ptSessionType === 'conditioning' && (
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left"
+                      onClick={async () => {
+                        setPtSheet(false);
+                        await fetch('/api/activities', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: programToday?.dayLabel }),
+                        });
+                        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        fetch(`/api/program/today?tz=${encodeURIComponent(tz)}`)
+                          .then((res) => res.ok ? res.json() : null)
+                          .then((data) => { if (data?.programDayId) setProgramToday(data); else setProgramToday(null); })
+                          .catch(() => {});
+                      }}
+                    >
+                      <svg className="w-5 h-5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-sm font-semibold text-emerald-400">Mark as done</span>
+                    </button>
+                  )}
+
+                  {/* Lifting: link existing routine */}
+                  {ptSessionType !== 'conditioning' && (
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-3 p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 transition-colors text-left"
+                      onClick={async () => {
+                        setPtRoutineView(true);
+                        setPtRoutinesLoading(true);
+                        try {
+                          const res = await fetch('/api/workouts?routinesOnly=true');
+                          const data = res.ok ? await res.json() : [];
+                          setPtRoutines(Array.isArray(data) ? data.map((w: Workout) => ({ id: w.id, name: w.name || 'Untitled', displayId: w.displayId })) : []);
+                        } catch {
+                          setPtRoutines([]);
+                        } finally {
+                          setPtRoutinesLoading(false);
+                        }
+                      }}
+                    >
+                      <svg className="w-5 h-5 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      <span className="text-sm font-semibold text-white">Link existing routine &amp; log as done</span>
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500">Coach Fit will extract the exercises and save them to your history.</p>
               </>
