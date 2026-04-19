@@ -54,7 +54,7 @@ vision_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 _qwen_client: AsyncOpenAI | None = (
     AsyncOpenAI(
         api_key=settings.qwen_api_key,
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        base_url=settings.qwen_base_url,
     )
     if settings.qwen_api_key
     else None

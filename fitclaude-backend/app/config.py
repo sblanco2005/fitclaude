@@ -15,7 +15,8 @@ class Settings(BaseSettings):
 
     # Qwen vision
     qwen_api_key: str = ""
-    qwen_model: str = "qwen-vl-plus"
+    qwen_model: str = "qwen3-vl-plus"
+    qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
     # YouTube subagent
     youtube_api_key: str = ""
