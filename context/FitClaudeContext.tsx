@@ -23,6 +23,7 @@ interface FitClaudeState {
   fetchTodayNutrition: () => Promise<void>;
   fetchWorkouts: (daysBack?: number) => Promise<Workout[]>;
   sendMessage: (text: string, imageBase64?: string, imageMediaType?: string, useVision?: boolean) => Promise<string>;
+  setPendingSessionType: (type: 'lifting' | 'conditioning' | null) => void;
   loadChatHistory: (topic?: ChatTopic) => Promise<void>;
   setChatOpen: (open: boolean) => void;
   setChatTopic: (topic: ChatTopic) => void;
@@ -45,6 +46,10 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
   const [customBack, setCustomBackRaw] = useState<(() => void) | null>(null);
+  const pendingSessionTypeRef = useRef<'lifting' | 'conditioning' | null>(null);
+  const setPendingSessionType = useCallback((type: 'lifting' | 'conditioning' | null) => {
+    pendingSessionTypeRef.current = type;
+  }, []);
   // Wrap setter to avoid React treating function values as state updaters
   const setCustomBack = useCallback((handler: (() => void) | null) => {
     setCustomBackRaw(() => handler);
@@ -187,6 +192,8 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
     setChatLoading(true);
 
     try {
+      const sessionType = pendingSessionTypeRef.current;
+      pendingSessionTypeRef.current = null; // consume once
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -197,6 +204,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
           image_media_type: imageMediaType,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           use_vision: useVision || false,
+          session_type: sessionType,
         }),
       });
 
@@ -269,6 +277,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
         fetchTodayNutrition,
         fetchWorkouts,
         sendMessage,
+        setPendingSessionType,
         loadChatHistory,
         setChatOpen,
         setChatTopic,

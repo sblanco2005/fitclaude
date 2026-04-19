@@ -1479,6 +1479,7 @@ async def handle_chat(
     image_media_type: str | None = None,
     timezone: str | None = None,
     use_vision: bool = False,
+    session_type: str | None = None,
 ) -> dict:
     """
     Main agent entry point.
@@ -1494,6 +1495,16 @@ async def handle_chat(
             user_tz = ZoneInfo(timezone)
         except (KeyError, ValueError):
             logger.warning(f"Invalid timezone '{timezone}', falling back to UTC")
+
+    # ── Session type context injection ──
+    # When user explicitly chose "conditioning" from the home screen type picker,
+    # prepend a directive so the coach uses log_activity instead of generate_workout.
+    if session_type == "conditioning":
+        prefix = "[SYSTEM NOTE: The user is logging a conditioning / cardio class session. Use the log_activity tool to record it as an activity — do NOT use generate_workout or create a lifting workout.]\n\n"
+        user_message = prefix + (user_message or "")
+    elif session_type == "lifting":
+        prefix = "[SYSTEM NOTE: The user is logging a lifting/strength session.]\n\n"
+        user_message = prefix + (user_message or "")
 
     # ── Fast path: vision nutrition agent for food photos (Pro/Unlimited only) ──
     if (

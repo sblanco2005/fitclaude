@@ -11,6 +11,7 @@ class ChatRequest(BaseModel):
     image_media_type: Optional[str] = None
     timezone: Optional[str] = None  # e.g. "America/New_York"
     use_vision: bool = False  # Pro/Unlimited only — triggers vision nutrition agent for food photos
+    session_type: Optional[str] = None  # "lifting" | "conditioning" — set from home screen type picker
 
 
 class ChatResponse(BaseModel):

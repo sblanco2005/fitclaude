@@ -13,7 +13,7 @@ import { estimateActivityKcal } from '@/lib/calorie-estimate';
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { setChatOpen, setChatTopic, dataVersion } = useFitClaude();
+  const { setChatOpen, setChatTopic, dataVersion, setPendingSessionType } = useFitClaude();
   const [nutrition, setNutrition] = useState<DailyNutrition | null>(null);
   const [recentWorkouts, setRecentWorkouts] = useState<Workout[]>([]);
   const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
@@ -624,7 +624,7 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     className="w-full flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors text-left"
-                    onClick={() => { setPtSheet(false); setChatTopic('workout'); setChatOpen(true); }}
+                    onClick={() => { setPendingSessionType(ptSessionType); setPtSheet(false); setChatTopic('workout'); setChatOpen(true); }}
                   >
                     <svg className="w-5 h-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -636,7 +636,7 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     className="w-full flex items-center gap-3 p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 transition-colors text-left"
-                    onClick={() => { setPtSheet(false); setChatTopic('workout'); setChatOpen(true); }}
+                    onClick={() => { setPendingSessionType(ptSessionType); setPtSheet(false); setChatTopic('workout'); setChatOpen(true); }}
                   >
                     <svg className="w-5 h-5 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
