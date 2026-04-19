@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     minimax_api_key: str = ""
     minimax_model: str = "MiniMax-M2.7"
 
+    # Qwen vision
+    qwen_api_key: str = ""
+    qwen_model: str = "qwen-vl-plus"
+
     # YouTube subagent
     youtube_api_key: str = ""
     job_api_key: str = ""
