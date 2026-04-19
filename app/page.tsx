@@ -645,8 +645,8 @@ export default function DashboardPage() {
                     <span className="text-sm font-semibold text-white">Upload photo of your workout</span>
                   </button>
 
-                  {/* Conditioning: quick log as activity */}
-                  {ptSessionType === 'conditioning' && (
+                  {/* Mark as done (conditioning) or Link routine (lifting) */}
+                  {ptSessionType === 'conditioning' ? (
                     <button
                       type="button"
                       className="w-full flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left"
@@ -669,10 +669,7 @@ export default function DashboardPage() {
                       </svg>
                       <span className="text-sm font-semibold text-emerald-400">Mark as done</span>
                     </button>
-                  )}
-
-                  {/* Lifting: link existing routine */}
-                  {ptSessionType !== 'conditioning' && (
+                  ) : (
                     <button
                       type="button"
                       className="w-full flex items-center gap-3 p-4 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 transition-colors text-left"
