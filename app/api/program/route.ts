@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 
+function computeEffectiveWeek(createdAt: Date, totalWeeks: number): number {
+  const created = new Date(createdAt);
+  const createdDay = created.getUTCDay();
+  const daysToMonday = createdDay === 0 ? 6 : createdDay - 1;
+  const programStartMonday = new Date(created.getTime() - daysToMonday * 86400000);
+  const now = new Date();
+  const nowDay = now.getUTCDay();
+  const daysToTodayMonday = nowDay === 0 ? 6 : nowDay - 1;
+  const todayMonday = new Date(now.getTime() - daysToTodayMonday * 86400000);
+  const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
+  return (weeksElapsed % totalWeeks) + 1;
+}
+
 // GET — fetch user's active training program
 export const GET = withAuth(async (_request, user) => {
   try {
@@ -29,7 +42,7 @@ export const GET = withAuth(async (_request, user) => {
     return NextResponse.json({
       id: program.id,
       totalWeeks: program.totalWeeks,
-      currentWeek: program.currentWeek,
+      currentWeek: computeEffectiveWeek(program.createdAt, program.totalWeeks),
       isActive: program.isActive,
       days: program.days.map((d) => {
         const routine = d.workouts?.[0] || null;

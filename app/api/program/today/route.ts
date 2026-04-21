@@ -73,6 +73,35 @@ function resolveLocalDayParts(tz: string | null): { weekday: number; year: numbe
   }
 }
 
+// Compute which program week we're actually in based on calendar weeks elapsed
+// since the Monday of the week the program was created (in the user's tz).
+// This makes week advancement automatic — no manual DB writes needed.
+function computeEffectiveWeek(
+  programCreatedAt: Date,
+  totalWeeks: number,
+  local: { year: number; month: number; day: number },
+  tz: string | null,
+): number {
+  // Monday of the week the program was created (in user tz)
+  const createdLocal = new Date(
+    tz
+      ? new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(programCreatedAt) + 'T12:00:00Z'
+      : programCreatedAt.toISOString().split('T')[0] + 'T12:00:00Z'
+  );
+  const createdDay = createdLocal.getUTCDay(); // 0=Sun
+  const daysToMonday = createdDay === 0 ? 6 : createdDay - 1;
+  const programStartMonday = new Date(createdLocal.getTime() - daysToMonday * 86400000);
+
+  // Monday of the current local week
+  const todayLocal = new Date(`${local.year}-${String(local.month + 1).padStart(2, '0')}-${String(local.day).padStart(2, '0')}T12:00:00Z`);
+  const todayDay = todayLocal.getUTCDay();
+  const daysToTodayMonday = todayDay === 0 ? 6 : todayDay - 1;
+  const todayMonday = new Date(todayLocal.getTime() - daysToTodayMonday * 86400000);
+
+  const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
+  return (weeksElapsed % totalWeeks) + 1;
+}
+
 export const GET = withAuth(async (request, user) => {
   try {
     const program = await prisma.trainingProgram.findFirst({
@@ -87,11 +116,15 @@ export const GET = withAuth(async (request, user) => {
     const local = resolveLocalDayParts(tz);
     const todayWeekday = local.weekday;
 
+    // Derive the current week from the calendar rather than the static DB field,
+    // so week 2 starts automatically the Monday after week 1 ends.
+    const effectiveWeek = computeEffectiveWeek(program.createdAt, program.totalWeeks, local, tz);
+
     const currentDay = await prisma.programDay.findFirst({
       where: {
         programId: program.id,
         weekday: todayWeekday,
-        weekNumber: program.currentWeek,
+        weekNumber: effectiveWeek,
       },
       include: {
         workouts: {
@@ -108,7 +141,7 @@ export const GET = withAuth(async (request, user) => {
         programDayId: null,
         weekday: todayWeekday,
         weekdayName: WEEKDAY_NAMES[todayWeekday],
-        weekNumber: program.currentWeek,
+        weekNumber: effectiveWeek,
         dayType: 'rest',
         dayLabel: 'Rest',
         workoutType: null,
