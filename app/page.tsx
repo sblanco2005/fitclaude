@@ -256,7 +256,9 @@ export default function DashboardPage() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setViewedWeek(displayWeek > 1 ? displayWeek - 1 : program.totalWeeks);
+                    const next = displayWeek > 1 ? displayWeek - 1 : program.totalWeeks;
+                    setViewedWeek(next);
+                    fetch('/api/program', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentWeek: next }) }).catch(() => {});
                   }}
                   className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
                   aria-label="Previous week"
@@ -275,7 +277,9 @@ export default function DashboardPage() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setViewedWeek(displayWeek < program.totalWeeks ? displayWeek + 1 : 1);
+                    const next = displayWeek < program.totalWeeks ? displayWeek + 1 : 1;
+                    setViewedWeek(next);
+                    fetch('/api/program', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentWeek: next }) }).catch(() => {});
                   }}
                   className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
                   aria-label="Next week"

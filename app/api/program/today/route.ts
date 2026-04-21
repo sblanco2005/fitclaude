@@ -116,9 +116,10 @@ export const GET = withAuth(async (request, user) => {
     const local = resolveLocalDayParts(tz);
     const todayWeekday = local.weekday;
 
-    // Derive the current week from the calendar rather than the static DB field,
-    // so week 2 starts automatically the Monday after week 1 ends.
-    const effectiveWeek = computeEffectiveWeek(program.createdAt, program.totalWeeks, local, tz);
+    // Use whichever is higher: DB value (user manually advanced) or calendar (auto-advances weekly).
+    // This means the user tapping > on the home screen persists and is respected here.
+    const calendarWeek = computeEffectiveWeek(program.createdAt, program.totalWeeks, local, tz);
+    const effectiveWeek = Math.max(program.currentWeek, calendarWeek);
 
     const currentDay = await prisma.programDay.findFirst({
       where: {

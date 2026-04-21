@@ -66,6 +66,24 @@ export const GET = withAuth(async (_request, user) => {
   }
 });
 
+// PATCH — update currentWeek (called when user manually navigates weeks on home screen)
+export const PATCH = withAuth(async (request, user) => {
+  try {
+    const { currentWeek } = await request.json();
+    if (typeof currentWeek !== 'number') return NextResponse.json({ error: 'Invalid currentWeek' }, { status: 400 });
+
+    const program = await prisma.trainingProgram.findFirst({ where: { userId: user.id, isActive: true } });
+    if (!program) return NextResponse.json({ error: 'No active program' }, { status: 404 });
+
+    const clamped = Math.max(1, Math.min(currentWeek, program.totalWeeks));
+    await prisma.trainingProgram.update({ where: { id: program.id }, data: { currentWeek: clamped } });
+    return NextResponse.json({ ok: true, currentWeek: clamped });
+  } catch (error) {
+    console.error('Failed to update program week:', error);
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
+  }
+});
+
 // DELETE — remove user's training program
 export const DELETE = withAuth(async (_request, user) => {
   try {
