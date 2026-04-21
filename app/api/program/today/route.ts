@@ -73,39 +73,19 @@ function resolveLocalDayParts(tz: string | null): { weekday: number; year: numbe
   }
 }
 
-// Compute which program week we're actually in based on calendar weeks elapsed
-// since the Monday of the week the program was created (in the user's tz).
-// This makes week advancement automatic — no manual DB writes needed.
-function computeEffectiveWeek(
-  programCreatedAt: Date,
-  totalWeeks: number,
-  local: { year: number; month: number; day: number },
-  tz: string | null,
-): number {
-  // Monday of the week the program was created (in user tz)
-  const createdLocal = new Date(
-    tz
-      ? new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(programCreatedAt) + 'T12:00:00Z'
-      : programCreatedAt.toISOString().split('T')[0] + 'T12:00:00Z'
-  );
-  const createdDay = createdLocal.getUTCDay(); // 0=Sun
-  const daysToMonday = createdDay === 0 ? 6 : createdDay - 1;
-  const programStartMonday = new Date(createdLocal.getTime() - daysToMonday * 86400000);
-
-  // Monday of the current local week
-  const todayLocal = new Date(`${local.year}-${String(local.month + 1).padStart(2, '0')}-${String(local.day).padStart(2, '0')}T12:00:00Z`);
-  const todayDay = todayLocal.getUTCDay();
-  const daysToTodayMonday = todayDay === 0 ? 6 : todayDay - 1;
-  const todayMonday = new Date(todayLocal.getTime() - daysToTodayMonday * 86400000);
-
-  const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
-  return (weeksElapsed % totalWeeks) + 1;
+// Get the Monday (UTC noon) of the calendar week containing a given date string (YYYY-MM-DD).
+function getMondayOfWeek(dateStr: string): Date {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const day = d.getUTCDay(); // 0=Sun
+  const daysToMonday = day === 0 ? 6 : day - 1;
+  return new Date(d.getTime() - daysToMonday * 86400000);
 }
 
 export const GET = withAuth(async (request, user) => {
   try {
     const program = await prisma.trainingProgram.findFirst({
       where: { userId: user.id, isActive: true },
+      include: { days: { select: { id: true, weekNumber: true } } },
     });
 
     if (!program) {
@@ -116,9 +96,33 @@ export const GET = withAuth(async (request, user) => {
     const local = resolveLocalDayParts(tz);
     const todayWeekday = local.weekday;
 
-    // Use whichever is higher: DB value (user manually advanced) or calendar (auto-advances weekly).
-    // This means the user tapping > on the home screen persists and is respected here.
-    const calendarWeek = computeEffectiveWeek(program.createdAt, program.totalWeeks, local, tz);
+    // Anchor: the first completed workout for any programDay in this program.
+    // This is more accurate than createdAt because the user may have set up the
+    // program days before actually starting to train.
+    const allDayIds = program.days.map((d) => d.id);
+    const firstWorkout = allDayIds.length > 0
+      ? await prisma.workout.findFirst({
+          where: { programDayId: { in: allDayIds }, completed: true },
+          orderBy: { date: 'asc' },
+          select: { date: true },
+        })
+      : null;
+
+    const anchorDate = firstWorkout?.date ?? program.createdAt;
+    const anchorStr = tz
+      ? new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(anchorDate)
+      : anchorDate.toISOString().split('T')[0];
+    const programStartMonday = getMondayOfWeek(anchorStr);
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const todayStr = `${local.year}-${pad(local.month + 1)}-${pad(local.day)}`;
+    const todayMonday = getMondayOfWeek(todayStr);
+
+    const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
+    const calendarWeek = (weeksElapsed % program.totalWeeks) + 1;
+
+    // Respect a manual DB override (user tapped > on the home screen) if it's higher than
+    // what the calendar says. The calendar wins when it naturally advances to a new week.
     const effectiveWeek = Math.max(program.currentWeek, calendarWeek);
 
     const currentDay = await prisma.programDay.findFirst({

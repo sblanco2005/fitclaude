@@ -2,17 +2,26 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 
-function computeEffectiveWeek(createdAt: Date, totalWeeks: number): number {
-  const created = new Date(createdAt);
-  const createdDay = created.getUTCDay();
-  const daysToMonday = createdDay === 0 ? 6 : createdDay - 1;
-  const programStartMonday = new Date(created.getTime() - daysToMonday * 86400000);
-  const now = new Date();
-  const nowDay = now.getUTCDay();
-  const daysToTodayMonday = nowDay === 0 ? 6 : nowDay - 1;
-  const todayMonday = new Date(now.getTime() - daysToTodayMonday * 86400000);
+function getMondayOfWeek(dateStr: string): Date {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const day = d.getUTCDay();
+  const daysToMonday = day === 0 ? 6 : day - 1;
+  return new Date(d.getTime() - daysToMonday * 86400000);
+}
+
+async function computeEffectiveWeek(programId: string, anchorDate: Date, totalWeeks: number, currentWeek: number): Promise<number> {
+  const allDayIds = (await prisma.programDay.findMany({ where: { programId }, select: { id: true } })).map(d => d.id);
+  const firstWorkout = allDayIds.length > 0
+    ? await prisma.workout.findFirst({ where: { programDayId: { in: allDayIds }, completed: true }, orderBy: { date: 'asc' }, select: { date: true } })
+    : null;
+  const anchor = firstWorkout?.date ?? anchorDate;
+  const anchorStr = anchor.toISOString().split('T')[0];
+  const programStartMonday = getMondayOfWeek(anchorStr);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayMonday = getMondayOfWeek(todayStr);
   const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
-  return (weeksElapsed % totalWeeks) + 1;
+  const calendarWeek = (weeksElapsed % totalWeeks) + 1;
+  return Math.max(currentWeek, calendarWeek);
 }
 
 // GET — fetch user's active training program
@@ -42,7 +51,7 @@ export const GET = withAuth(async (_request, user) => {
     return NextResponse.json({
       id: program.id,
       totalWeeks: program.totalWeeks,
-      currentWeek: computeEffectiveWeek(program.createdAt, program.totalWeeks),
+      currentWeek: await computeEffectiveWeek(program.id, program.createdAt, program.totalWeeks, program.currentWeek),
       isActive: program.isActive,
       days: program.days.map((d) => {
         const routine = d.workouts?.[0] || null;
