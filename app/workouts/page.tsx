@@ -670,8 +670,8 @@ function RoutineExerciseRow({
   tip,
   lastLog,
   pr,
-  onSwap,
   onUpdate,
+  onRemove,
   onMoveUp,
   onMoveDown,
   canMoveUp,
@@ -684,8 +684,8 @@ function RoutineExerciseRow({
   tip: string | null;
   lastLog: SetLog[] | null;
   pr: { weight: number; reps: number } | null;
-  onSwap: () => void;
   onUpdate: (updates: { sets?: number; reps?: string; restSeconds?: number }) => void;
+  onRemove: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   canMoveUp?: boolean;
@@ -804,13 +804,27 @@ function RoutineExerciseRow({
                     </svg>
                   </button>
                 )}
+                {/* Inline set count +/− */}
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onUpdate({ sets: Math.max(1, ex.sets - 1) }); }}
+                    className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-white hover:bg-slate-700 transition-colors text-sm font-bold"
+                    title="Remove set"
+                  >−</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onUpdate({ sets: ex.sets + 1 }); }}
+                    className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-emerald-400 hover:bg-slate-700 transition-colors text-sm font-bold"
+                    title="Add set"
+                  >+</button>
+                </div>
+                {/* Remove exercise */}
                 <button
-                  onClick={onSwap}
-                  className="shrink-0 p-1.5 rounded transition-colors text-slate-600 hover:text-amber-400"
-                  title="Swap exercise"
+                  onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                  className="shrink-0 p-1.5 rounded transition-colors text-slate-700 hover:text-red-400"
+                  title="Remove exercise"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
               </div>
@@ -1218,8 +1232,8 @@ function RoutineDetail({
   onDeleteLogs,
   onEditLog,
   onDeleteSession,
-  onSwapExercise,
   onAddExercise,
+  onRemoveExercise,
   onUpdateExercise,
   onReorderExercises,
   onSpin,
@@ -1235,8 +1249,8 @@ function RoutineDetail({
   onDeleteLogs: (workoutId: string) => void;
   onEditLog: (workoutId: string, exerciseId: string, logs: SetLog[]) => void;
   onDeleteSession: (workoutId: string) => void;
-  onSwapExercise: (workoutId: string, workoutExerciseId: string, newExerciseId: string) => Promise<void>;
   onAddExercise: (workoutId: string, exerciseId: string) => Promise<void>;
+  onRemoveExercise: (workoutId: string, workoutExerciseId: string) => Promise<void>;
   onUpdateExercise: (workoutId: string, workoutExerciseId: string, updates: { sets?: number; reps?: string; restSeconds?: number }) => Promise<void>;
   onReorderExercises: (workoutId: string, orderedIds: string[]) => Promise<void>;
   onSpin: () => void;
@@ -1246,10 +1260,8 @@ function RoutineDetail({
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [swappingExercise, setSwappingExercise] = useState<WorkoutExercise | null>(null);
-  const [swapMenuExercise, setSwapMenuExercise] = useState<WorkoutExercise | null>(null);
-  const [aiSwapping, setAiSwapping] = useState(false);
   const [addingExercise, setAddingExercise] = useState(false);
+  const [confirmRemoveExercise, setConfirmRemoveExercise] = useState<WorkoutExercise | null>(null);
   const renameRef = useRef<HTMLInputElement>(null);
 
   const latest = workouts[0];
@@ -1330,24 +1342,6 @@ function RoutineDetail({
     setConfirmDelete(false);
   };
 
-  const handleAiSwap = async (ex: WorkoutExercise) => {
-    setSwapMenuExercise(null);
-    setAiSwapping(true);
-    try {
-      const res = await fetch(`/api/workouts/${latest.id}/exercises/${ex.id}/suggest`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || 'No alternatives found');
-        return;
-      }
-      const suggestion = await res.json();
-      await onSwapExercise(latest.id, ex.id, suggestion.id);
-    } catch {
-      alert('Failed to get suggestion');
-    } finally {
-      setAiSwapping(false);
-    }
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -1533,7 +1527,7 @@ function RoutineDetail({
                   tip={getCoachingTip(ex)}
                   lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                   pr={getPRForExercise(workouts, getExerciseName(ex))}
-                  onSwap={() => setSwapMenuExercise(ex)}
+                  onRemove={() => setConfirmRemoveExercise(ex)}
                   onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                   onMoveUp={() => moveExercise(ex.id, 'up')}
                   onMoveDown={() => moveExercise(ex.id, 'down')}
@@ -1561,7 +1555,7 @@ function RoutineDetail({
                       tip={getCoachingTip(ex)}
                       lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                       pr={getPRForExercise(workouts, getExerciseName(ex))}
-                      onSwap={() => setSwapMenuExercise(ex)}
+                      onRemove={() => setConfirmRemoveExercise(ex)}
                       onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                       onMoveUp={() => moveExercise(ex.id, 'up')}
                       onMoveDown={() => moveExercise(ex.id, 'down')}
@@ -1589,73 +1583,44 @@ function RoutineDetail({
               </div>
             </div>
           )}
+
+          {/* Add Exercise button */}
+          <button
+            type="button"
+            onClick={() => setAddingExercise(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-slate-700 text-slate-500 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span className="text-sm font-medium">Add exercise</span>
+          </button>
         </div>
 
-      {/* Swap Method Action Sheet */}
-      {swapMenuExercise && !aiSwapping && (
+      {/* Remove exercise confirmation */}
+      {confirmRemoveExercise && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setSwapMenuExercise(null)} />
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setConfirmRemoveExercise(null)} />
           <div className="fixed left-1/2 bottom-24 -translate-x-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-4 w-[280px] shadow-2xl">
-            <p className="text-xs text-muted uppercase tracking-[0.15em] font-bold mb-3 text-center">
-              Swap {getExerciseName(swapMenuExercise)}
-            </p>
-            <div className="space-y-2">
+            <p className="text-sm font-bold text-white text-center mb-1">Remove exercise?</p>
+            <p className="text-xs text-slate-400 text-center mb-4">{getExerciseName(confirmRemoveExercise)}</p>
+            <div className="flex gap-2">
               <button
-                onClick={() => {
-                  const ex = swapMenuExercise;
-                  setSwapMenuExercise(null);
-                  setSwappingExercise(ex);
+                onClick={() => setConfirmRemoveExercise(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-700 text-sm font-medium text-slate-300 hover:bg-slate-600 transition-colors"
+              >Cancel</button>
+              <button
+                onClick={async () => {
+                  const ex = confirmRemoveExercise;
+                  setConfirmRemoveExercise(null);
+                  await onRemoveExercise(latest.id, ex.id);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700/50 hover:bg-slate-700 transition-colors text-left"
-              >
-                <svg className="w-5 h-5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-bold text-white">Pick manually</p>
-                  <p className="text-xs text-muted">Browse exercises</p>
-                </div>
-              </button>
-              <button
-                onClick={() => handleAiSwap(swapMenuExercise)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 transition-colors text-left"
-              >
-                <svg className="w-5 h-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <div>
-                  <p className="text-sm font-bold text-primary">Regenerate</p>
-                  <p className="text-xs text-muted">New exercise, same muscle</p>
-                </div>
-              </button>
+                className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-sm font-medium text-red-400 hover:bg-red-500/30 transition-colors"
+              >Remove</button>
             </div>
           </div>
         </>
       )}
-
-      {/* AI Swap Loading Overlay */}
-      {aiSwapping && (
-        <>
-          <div className="fixed inset-0 bg-black/60 z-50" />
-          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-bold text-white">Finding a new exercise...</p>
-          </div>
-        </>
-      )}
-
-      {/* Swap Exercise Modal */}
-      <SwapExerciseModal
-        isOpen={!!swappingExercise}
-        onClose={() => setSwappingExercise(null)}
-        currentExerciseName={swappingExercise ? getExerciseName(swappingExercise) : ''}
-        defaultMuscle={swappingExercise?.exercise?.muscleGroup ?? null}
-        onSelect={async (exercise) => {
-          if (!swappingExercise) return;
-          await onSwapExercise(latest.id, swappingExercise.id, exercise.id);
-          setSwappingExercise(null);
-        }}
-      />
 
       {/* Add Exercise Modal */}
       <SwapExerciseModal
@@ -3105,6 +3070,11 @@ function WorkoutsPageInner() {
     }
   };
 
+  const handleRemoveExercise = async (workoutId: string, workoutExerciseId: string) => {
+    await fetch(`/api/workouts/${workoutId}/exercises/${workoutExerciseId}`, { method: 'DELETE' });
+    fetchWorkouts();
+  };
+
   const handleUpdateExercise = async (
     workoutId: string,
     workoutExerciseId: string,
@@ -3223,7 +3193,7 @@ function WorkoutsPageInner() {
           onDeleteLogs={handleDeleteLogs}
           onEditLog={handleEditLog}
           onDeleteSession={handleDeleteSession}
-          onSwapExercise={handleSwapExercise}
+          onRemoveExercise={handleRemoveExercise}
           onAddExercise={handleAddExercise}
           onUpdateExercise={handleUpdateExercise}
           onReorderExercises={handleReorderExercises}
