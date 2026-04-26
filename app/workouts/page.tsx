@@ -672,6 +672,7 @@ function RoutineExerciseRow({
   pr,
   onUpdate,
   onRemove,
+  onSwap,
   onMoveUp,
   onMoveDown,
   canMoveUp,
@@ -686,6 +687,7 @@ function RoutineExerciseRow({
   pr: { weight: number; reps: number } | null;
   onUpdate: (updates: { sets?: number; reps?: string; restSeconds?: number }) => void;
   onRemove: () => void;
+  onSwap?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   canMoveUp?: boolean;
@@ -804,19 +806,18 @@ function RoutineExerciseRow({
                     </svg>
                   </button>
                 )}
-                {/* Inline set count +/− */}
-                <div className="flex items-center gap-0.5">
+                {/* Swap exercise */}
+                {onSwap && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); onUpdate({ sets: Math.max(1, ex.sets - 1) }); }}
-                    className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-white hover:bg-slate-700 transition-colors text-sm font-bold"
-                    title="Remove set"
-                  >−</button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onUpdate({ sets: ex.sets + 1 }); }}
-                    className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-emerald-400 hover:bg-slate-700 transition-colors text-sm font-bold"
-                    title="Add set"
-                  >+</button>
-                </div>
+                    onClick={(e) => { e.stopPropagation(); onSwap(); }}
+                    className="shrink-0 p-1.5 rounded transition-colors text-slate-600 hover:text-emerald-400"
+                    title="Swap exercise"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                )}
                 {/* Remove exercise */}
                 <button
                   onClick={(e) => { e.stopPropagation(); onRemove(); }}
@@ -1234,6 +1235,7 @@ function RoutineDetail({
   onDeleteSession,
   onAddExercise,
   onRemoveExercise,
+  onSwapExercise,
   onUpdateExercise,
   onReorderExercises,
   onSpin,
@@ -1251,6 +1253,7 @@ function RoutineDetail({
   onDeleteSession: (workoutId: string) => void;
   onAddExercise: (workoutId: string, exerciseId: string) => Promise<void>;
   onRemoveExercise: (workoutId: string, workoutExerciseId: string) => Promise<void>;
+  onSwapExercise: (workoutId: string, workoutExerciseId: string, newExerciseId: string) => Promise<void>;
   onUpdateExercise: (workoutId: string, workoutExerciseId: string, updates: { sets?: number; reps?: string; restSeconds?: number }) => Promise<void>;
   onReorderExercises: (workoutId: string, orderedIds: string[]) => Promise<void>;
   onSpin: () => void;
@@ -1261,6 +1264,7 @@ function RoutineDetail({
   const [renameValue, setRenameValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addingExercise, setAddingExercise] = useState(false);
+  const [swappingExercise, setSwappingExercise] = useState<WorkoutExercise | null>(null);
   const [confirmRemoveExercise, setConfirmRemoveExercise] = useState<WorkoutExercise | null>(null);
   const renameRef = useRef<HTMLInputElement>(null);
 
@@ -1519,6 +1523,7 @@ function RoutineDetail({
                   lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                   pr={getPRForExercise(workouts, getExerciseName(ex))}
                   onRemove={() => setConfirmRemoveExercise(ex)}
+                  onSwap={() => setSwappingExercise(ex)}
                   onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                   onMoveUp={() => moveExercise(ex.id, 'up')}
                   onMoveDown={() => moveExercise(ex.id, 'down')}
@@ -1547,6 +1552,7 @@ function RoutineDetail({
                       lastLog={getLastLogForExercise(workouts, getExerciseName(ex))}
                       pr={getPRForExercise(workouts, getExerciseName(ex))}
                       onRemove={() => setConfirmRemoveExercise(ex)}
+                      onSwap={() => setSwappingExercise(ex)}
                       onUpdate={(updates) => onUpdateExercise(latest.id, ex.id, updates)}
                       onMoveUp={() => moveExercise(ex.id, 'up')}
                       onMoveDown={() => moveExercise(ex.id, 'down')}
@@ -1622,6 +1628,19 @@ function RoutineDetail({
         onSelect={async (exercise) => {
           await onAddExercise(latest.id, exercise.id);
           setAddingExercise(false);
+        }}
+      />
+
+      {/* Swap Exercise Modal */}
+      <SwapExerciseModal
+        isOpen={!!swappingExercise}
+        onClose={() => setSwappingExercise(null)}
+        currentExerciseName={swappingExercise ? getExerciseName(swappingExercise) : ''}
+        title="Swap Exercise"
+        onSelect={async (exercise) => {
+          if (!swappingExercise) return;
+          await onSwapExercise(latest.id, swappingExercise.id, exercise.id);
+          setSwappingExercise(null);
         }}
       />
     </div>
@@ -3185,6 +3204,7 @@ function WorkoutsPageInner() {
           onEditLog={handleEditLog}
           onDeleteSession={handleDeleteSession}
           onRemoveExercise={handleRemoveExercise}
+          onSwapExercise={handleSwapExercise}
           onAddExercise={handleAddExercise}
           onUpdateExercise={handleUpdateExercise}
           onReorderExercises={handleReorderExercises}
