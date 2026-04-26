@@ -83,3 +83,19 @@ export const PATCH = withAuth(async (request: NextRequest, user, params) => {
 
   return NextResponse.json(updated);
 });
+
+// DELETE /api/workouts/[id]/exercises/[exerciseId] — remove exercise from routine
+export const DELETE = withAuth(async (_request: NextRequest, user, params) => {
+  const workoutId = params?.id;
+  const workoutExerciseId = params?.exerciseId;
+  if (!workoutId || !workoutExerciseId) return AuthErrors.notFound('WorkoutExercise');
+
+  const owns = await verifyWorkoutOwnership(workoutId, user.id);
+  if (!owns) return AuthErrors.notFound('Workout');
+
+  await prisma.workoutExercise.deleteMany({
+    where: { id: workoutExerciseId, workoutId },
+  });
+
+  return NextResponse.json({ ok: true });
+});
