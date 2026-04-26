@@ -1636,6 +1636,7 @@ function RoutineDetail({
         isOpen={!!swappingExercise}
         onClose={() => setSwappingExercise(null)}
         currentExerciseName={swappingExercise ? getExerciseName(swappingExercise) : ''}
+        defaultMuscle={swappingExercise?.exercise?.muscleGroup ?? null}
         title="Swap Exercise"
         onSelect={async (exercise) => {
           if (!swappingExercise) return;
