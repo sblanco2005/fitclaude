@@ -11,21 +11,38 @@ function getMondayOfWeek(dateStr: string): Date {
 
 async function computeEffectiveWeek(programId: string, anchorDate: Date, totalWeeks: number, currentWeek: number): Promise<number> {
   const allDayIds = (await prisma.programDay.findMany({ where: { programId }, select: { id: true } })).map(d => d.id);
-  const firstWorkout = allDayIds.length > 0
-    ? await prisma.workout.findFirst({ where: { programDayId: { in: allDayIds }, completed: true }, orderBy: { date: 'asc' }, select: { date: true } })
-    : null;
-  const anchor = firstWorkout?.date ?? anchorDate;
-  const anchorStr = anchor.toISOString().split('T')[0];
-  const programStartMonday = getMondayOfWeek(anchorStr);
+
   const todayStr = new Date().toISOString().split('T')[0];
   const todayMonday = getMondayOfWeek(todayStr);
+
+  if (allDayIds.length > 0) {
+    // Anchor from the most recent completed workout's known weekNumber.
+    // Rolling forward by N calendar weeks from that week gives the correct
+    // current week even across multiple cycle wraps, regardless of totalWeeks.
+    const mostRecent = await prisma.workout.findFirst({
+      where: { programDayId: { in: allDayIds }, completed: true },
+      orderBy: { date: 'desc' },
+      select: { date: true, programDay: { select: { weekNumber: true } } },
+    });
+
+    if (mostRecent?.programDay) {
+      const lastWeek = mostRecent.programDay.weekNumber;
+      const lastMonday = getMondayOfWeek(mostRecent.date.toISOString().split('T')[0]);
+      const weeksSince = Math.max(0, Math.round((todayMonday.getTime() - lastMonday.getTime()) / (7 * 86400000)));
+      const totalOffset = lastWeek - 1 + weeksSince;
+      const calendarWeek = (totalOffset % totalWeeks) + 1;
+      // If we've crossed a cycle boundary, the DB currentWeek is stale — trust the calendar.
+      // Otherwise let a manual advance (currentWeek > calendarWeek) take effect.
+      return totalOffset >= totalWeeks ? calendarWeek : Math.max(currentWeek, calendarWeek);
+    }
+  }
+
+  // Fallback: no linked completed workouts — anchor to createdAt
+  const anchorStr = anchorDate.toISOString().split('T')[0];
+  const programStartMonday = getMondayOfWeek(anchorStr);
   const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
   const calendarWeek = (weeksElapsed % totalWeeks) + 1;
-  // When a new cycle starts (weeksElapsed is an exact multiple of totalWeeks),
-  // the DB currentWeek may still hold a value from the previous cycle.
-  // Treat the calendar as authoritative at cycle boundaries so it resets properly.
-  const isNewCycleStart = weeksElapsed > 0 && weeksElapsed % totalWeeks === 0;
-  return isNewCycleStart ? calendarWeek : Math.max(currentWeek, calendarWeek);
+  return Math.max(currentWeek, calendarWeek);
 }
 
 // GET — fetch user's active training program

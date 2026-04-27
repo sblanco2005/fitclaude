@@ -96,36 +96,49 @@ export const GET = withAuth(async (request, user) => {
     const local = resolveLocalDayParts(tz);
     const todayWeekday = local.weekday;
 
-    // Anchor: the first completed workout for any programDay in this program.
-    // This is more accurate than createdAt because the user may have set up the
-    // program days before actually starting to train.
     const allDayIds = program.days.map((d) => d.id);
-    const firstWorkout = allDayIds.length > 0
-      ? await prisma.workout.findFirst({
-          where: { programDayId: { in: allDayIds }, completed: true },
-          orderBy: { date: 'asc' },
-          select: { date: true },
-        })
-      : null;
-
-    const anchorDate = firstWorkout?.date ?? program.createdAt;
-    const anchorStr = tz
-      ? new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(anchorDate)
-      : anchorDate.toISOString().split('T')[0];
-    const programStartMonday = getMondayOfWeek(anchorStr);
 
     const pad = (n: number) => String(n).padStart(2, '0');
     const todayStr = `${local.year}-${pad(local.month + 1)}-${pad(local.day)}`;
     const todayMonday = getMondayOfWeek(todayStr);
 
-    const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
-    const calendarWeek = (weeksElapsed % program.totalWeeks) + 1;
+    let effectiveWeek = program.currentWeek;
 
-    // At cycle boundaries the DB currentWeek is stale (e.g. still 2 when the 2-week
-    // cycle has just wrapped back to 1). Trust the calendar at cycle starts;
-    // otherwise let a manual DB override (user tapped >) take precedence.
-    const isNewCycleStart = weeksElapsed > 0 && weeksElapsed % program.totalWeeks === 0;
-    const effectiveWeek = isNewCycleStart ? calendarWeek : Math.max(program.currentWeek, calendarWeek);
+    if (allDayIds.length > 0) {
+      // Anchor from the most recent completed workout's known weekNumber.
+      // Rolling forward by N calendar weeks correctly handles any number of
+      // cycle wraps regardless of totalWeeks.
+      const mostRecent = await prisma.workout.findFirst({
+        where: { programDayId: { in: allDayIds }, completed: true },
+        orderBy: { date: 'desc' },
+        select: {
+          date: true,
+          programDay: { select: { weekNumber: true } },
+        },
+      });
+
+      if (mostRecent?.programDay) {
+        const lastWeek = mostRecent.programDay.weekNumber;
+        const lastDateStr = tz
+          ? new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(mostRecent.date)
+          : mostRecent.date.toISOString().split('T')[0];
+        const lastMonday = getMondayOfWeek(lastDateStr);
+        const weeksSince = Math.max(0, Math.round((todayMonday.getTime() - lastMonday.getTime()) / (7 * 86400000)));
+        const totalOffset = lastWeek - 1 + weeksSince;
+        const calendarWeek = (totalOffset % program.totalWeeks) + 1;
+        effectiveWeek = totalOffset >= program.totalWeeks
+          ? calendarWeek
+          : Math.max(program.currentWeek, calendarWeek);
+      } else {
+        // No linked completed workouts — fall back to createdAt anchor
+        const anchorStr = tz
+          ? new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(program.createdAt)
+          : program.createdAt.toISOString().split('T')[0];
+        const programStartMonday = getMondayOfWeek(anchorStr);
+        const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
+        effectiveWeek = Math.max(program.currentWeek, (weeksElapsed % program.totalWeeks) + 1);
+      }
+    }
 
     const currentDay = await prisma.programDay.findFirst({
       where: {
