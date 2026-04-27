@@ -81,6 +81,16 @@ function getMondayOfWeek(dateStr: string): Date {
   return new Date(d.getTime() - daysToMonday * 86400000);
 }
 
+// First Monday on-or-after the given date. Programs set up on a weekend
+// should anchor to the following Monday, not the previous one.
+function getFirstProgramMonday(dateStr: string): Date {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const day = d.getUTCDay();
+  if (day === 1) return d;
+  const daysForward = day === 0 ? 1 : 8 - day;
+  return new Date(d.getTime() + daysForward * 86400000);
+}
+
 export const GET = withAuth(async (request, user) => {
   try {
     const program = await prisma.trainingProgram.findFirst({
@@ -130,11 +140,13 @@ export const GET = withAuth(async (request, user) => {
           ? calendarWeek
           : Math.max(program.currentWeek, calendarWeek);
       } else {
-        // No linked completed workouts — fall back to createdAt anchor
+        // No linked completed workouts — fall back to createdAt anchor.
+        // Use first Monday on-or-after createdAt so a program set up on a
+        // weekend doesn't roll back one extra week.
         const anchorStr = tz
           ? new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(program.createdAt)
           : program.createdAt.toISOString().split('T')[0];
-        const programStartMonday = getMondayOfWeek(anchorStr);
+        const programStartMonday = getFirstProgramMonday(anchorStr);
         const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
         effectiveWeek = Math.max(program.currentWeek, (weeksElapsed % program.totalWeeks) + 1);
       }
