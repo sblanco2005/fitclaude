@@ -131,6 +131,8 @@ export default function FocusedExerciseView({
   const [showVideo, setShowVideo] = useState<string | null>(null); // exercise id showing video
   const [showGif, setShowGif] = useState<string | null>(null); // exercise id showing gif
   const [skippedExercises, setSkippedExercises] = useState<Set<string>>(new Set());
+  // Per-exercise set count overrides (add/remove sets during workout)
+  const [localSets, setLocalSets] = useState<Map<string, number>>(new Map());
 
   // Group exercises by supersetGroup
   const groups = useMemo(() => groupExercises(exercises), [exercises]);
@@ -381,7 +383,7 @@ export default function FocusedExerciseView({
     const exLogs = exerciseLogs.get(exercise.id) ?? [];
     const last = exLogs[exLogs.length - 1];
     if (!last) return;
-    const numSets = exercise.sets || 3;
+    const numSets = localSets.get(exercise.id) ?? exercise.sets ?? 3;
     const filled = [...exLogs];
     for (let i = 1; i <= numSets; i++) {
       if (!filled.find((l) => l.set === i)) {
@@ -394,7 +396,18 @@ export default function FocusedExerciseView({
   // Render a single exercise card (used for both standalone and superset items)
   const renderExerciseCard = (exercise: WorkoutExercise, supersetLabel?: string) => {
     const exLogs = exerciseLogs.get(exercise.id) ?? [];
-    const numSets = exercise.sets || 3;
+    const numSets = localSets.get(exercise.id) ?? exercise.sets ?? 3;
+
+    const addSet = () => setLocalSets((prev) => new Map(prev).set(exercise.id, numSets + 1));
+    const removeSet = () => {
+      if (numSets <= 1) return;
+      // Also remove the log for the last set if it exists
+      const updatedLogs = exLogs.filter((l) => l.set !== numSets);
+      if (updatedLogs.length !== exLogs.length) {
+        onUpdateLogs(exercise.id, updatedLogs);
+      }
+      setLocalSets((prev) => new Map(prev).set(exercise.id, numSets - 1));
+    };
     const allDone = exLogs.length >= numSets;
     const muscle = getExerciseMuscle(exercise);
     const muscleCls = MUSCLE_COLORS[muscle?.toLowerCase() ?? ''] ?? 'bg-slate-500/20 text-slate-300';
@@ -599,6 +612,23 @@ export default function FocusedExerciseView({
                 Fill ({formatWeight(exLogs[exLogs.length - 1].weight, unit)} &times; {exLogs[exLogs.length - 1].reps})
               </button>
             )}
+
+            {/* Add / remove set */}
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={removeSet}
+                disabled={numSets <= 1}
+                className="flex-1 py-1.5 rounded-lg text-xs font-bold text-slate-400 bg-slate-800 hover:bg-slate-700 active:scale-[0.98] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                − Remove set
+              </button>
+              <button
+                onClick={addSet}
+                className="flex-1 py-1.5 rounded-lg text-xs font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-[0.98] transition-colors"
+              >
+                + Add set
+              </button>
+            </div>
           </div>
         )}
       </div>
