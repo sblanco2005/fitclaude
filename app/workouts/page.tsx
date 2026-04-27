@@ -1945,6 +1945,7 @@ function ActiveWorkout({
   onFinish,
   onRemove,
   onSwapExercise,
+  onRemoveExercise,
   weightUnit = 'lb',
   registerPause,
 }: {
@@ -1954,6 +1955,7 @@ function ActiveWorkout({
   onFinish: (routineName: string, elapsed: number, exerciseLogs: Map<string, SetLog[]>) => void;
   onRemove: (routineName: string) => void;
   onSwapExercise?: (workoutId: string, workoutExerciseId: string) => void;
+  onRemoveExercise?: (workoutId: string, workoutExerciseId: string) => void;
   weightUnit?: 'lb' | 'kg';
   registerPause?: (fn: () => void) => void;
 }) {
@@ -2292,6 +2294,7 @@ function ActiveWorkout({
             allWorkouts={allWorkouts}
             latestWorkoutId={latest.id}
             onSwapExercise={onSwapExercise ? (exId) => onSwapExercise(latest.id, exId) : undefined}
+            onRemoveExercise={onRemoveExercise ? (exId) => onRemoveExercise(latest.id, exId) : undefined}
             weightUnit={weightUnit}
             isRunning={isRunning}
             isPaused={isPaused}
@@ -3561,6 +3564,7 @@ function WorkoutsPageInner() {
                       const we = workouts.find((w) => w.id === workoutId)?.exercises?.find((e) => e.id === workoutExerciseId);
                       setHitItSwapMenu({ workoutId, workoutExerciseId, exerciseName: we?.exercise?.name ?? '', muscleGroup: we?.exercise?.muscleGroup ?? null });
                     }}
+                    onRemoveExercise={handleRemoveExercise}
                     weightUnit={weightUnit}
                     registerPause={(fn) => { hitItPauseRef.current = fn; }}
                   />

@@ -121,9 +121,11 @@ export const GET = withAuth(async (request, user) => {
     const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
     const calendarWeek = (weeksElapsed % program.totalWeeks) + 1;
 
-    // Respect a manual DB override (user tapped > on the home screen) if it's higher than
-    // what the calendar says. The calendar wins when it naturally advances to a new week.
-    const effectiveWeek = Math.max(program.currentWeek, calendarWeek);
+    // At cycle boundaries the DB currentWeek is stale (e.g. still 2 when the 2-week
+    // cycle has just wrapped back to 1). Trust the calendar at cycle starts;
+    // otherwise let a manual DB override (user tapped >) take precedence.
+    const isNewCycleStart = weeksElapsed > 0 && weeksElapsed % program.totalWeeks === 0;
+    const effectiveWeek = isNewCycleStart ? calendarWeek : Math.max(program.currentWeek, calendarWeek);
 
     const currentDay = await prisma.programDay.findFirst({
       where: {

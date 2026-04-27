@@ -21,7 +21,11 @@ async function computeEffectiveWeek(programId: string, anchorDate: Date, totalWe
   const todayMonday = getMondayOfWeek(todayStr);
   const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
   const calendarWeek = (weeksElapsed % totalWeeks) + 1;
-  return Math.max(currentWeek, calendarWeek);
+  // When a new cycle starts (weeksElapsed is an exact multiple of totalWeeks),
+  // the DB currentWeek may still hold a value from the previous cycle.
+  // Treat the calendar as authoritative at cycle boundaries so it resets properly.
+  const isNewCycleStart = weeksElapsed > 0 && weeksElapsed % totalWeeks === 0;
+  return isNewCycleStart ? calendarWeek : Math.max(currentWeek, calendarWeek);
 }
 
 // GET — fetch user's active training program
