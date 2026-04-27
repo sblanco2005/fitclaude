@@ -148,7 +148,8 @@ export const GET = withAuth(async (request, user) => {
           : program.createdAt.toISOString().split('T')[0];
         const programStartMonday = getFirstProgramMonday(anchorStr);
         const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
-        effectiveWeek = Math.max(program.currentWeek, (weeksElapsed % program.totalWeeks) + 1);
+        const calendarWeek = (weeksElapsed % program.totalWeeks) + 1;
+        effectiveWeek = weeksElapsed >= program.totalWeeks ? calendarWeek : Math.max(program.currentWeek, calendarWeek);
       }
     }
 
