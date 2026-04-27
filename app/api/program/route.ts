@@ -9,19 +9,56 @@ function getMondayOfWeek(dateStr: string): Date {
   return new Date(d.getTime() - daysToMonday * 86400000);
 }
 
+// Returns the Monday that starts the week containing dateStr,
+// or the next Monday if dateStr is not itself a Monday.
+// Used to anchor a program that was set up on a weekend before
+// training actually began on Monday.
+function getFirstProgramMonday(dateStr: string): Date {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  if (day === 1) return d; // already Monday
+  const daysForward = day === 0 ? 1 : 8 - day;
+  return new Date(d.getTime() + daysForward * 86400000);
+}
+
 async function computeEffectiveWeek(programId: string, anchorDate: Date, totalWeeks: number, currentWeek: number): Promise<number> {
   const allDayIds = (await prisma.programDay.findMany({ where: { programId }, select: { id: true } })).map(d => d.id);
-  const firstWorkout = allDayIds.length > 0
-    ? await prisma.workout.findFirst({ where: { programDayId: { in: allDayIds }, completed: true }, orderBy: { date: 'asc' }, select: { date: true } })
-    : null;
-  const anchor = firstWorkout?.date ?? anchorDate;
-  const anchorStr = anchor.toISOString().split('T')[0];
-  const programStartMonday = getMondayOfWeek(anchorStr);
+
   const todayStr = new Date().toISOString().split('T')[0];
   const todayMonday = getMondayOfWeek(todayStr);
+
+  if (allDayIds.length > 0) {
+    // Anchor from the most recent completed workout's known weekNumber.
+    // Rolling forward by N calendar weeks from that week gives the correct
+    // current week even across multiple cycle wraps, regardless of totalWeeks.
+    const mostRecent = await prisma.workout.findFirst({
+      where: { programDayId: { in: allDayIds }, completed: true },
+      orderBy: { date: 'desc' },
+      select: { date: true, programDay: { select: { weekNumber: true } } },
+    });
+
+    if (mostRecent?.programDay) {
+      const lastWeek = mostRecent.programDay.weekNumber;
+      const lastMonday = getMondayOfWeek(mostRecent.date.toISOString().split('T')[0]);
+      const weeksSince = Math.max(0, Math.round((todayMonday.getTime() - lastMonday.getTime()) / (7 * 86400000)));
+      const totalOffset = lastWeek - 1 + weeksSince;
+      const calendarWeek = (totalOffset % totalWeeks) + 1;
+      console.log('[week-debug] mostRecent date:', mostRecent.date.toISOString(), 'weekNumber:', lastWeek, 'weeksSince:', weeksSince, 'totalOffset:', totalOffset, 'calendarWeek:', calendarWeek, 'currentWeek:', currentWeek, 'totalWeeks:', totalWeeks);
+      return totalOffset >= totalWeeks ? calendarWeek : Math.max(currentWeek, calendarWeek);
+    }
+  }
+
+  // Fallback: no linked completed workouts.
+  // Use the first Monday on-or-after createdAt as the program start.
+  // Programs are typically set up on the weekend before training begins,
+  // so getMondayOfWeek(createdAt) would go back one extra week.
+  const anchorStr = anchorDate.toISOString().split('T')[0];
+  const programStartMonday = getFirstProgramMonday(anchorStr);
   const weeksElapsed = Math.max(0, Math.round((todayMonday.getTime() - programStartMonday.getTime()) / (7 * 86400000)));
   const calendarWeek = (weeksElapsed % totalWeeks) + 1;
-  return Math.max(currentWeek, calendarWeek);
+  // Same cycle-crossing guard: if we've completed at least one full cycle,
+  // trust the calendar over the stale DB currentWeek.
+  return weeksElapsed >= totalWeeks ? calendarWeek : Math.max(currentWeek, calendarWeek);
 }
 
 // GET — fetch user's active training program
