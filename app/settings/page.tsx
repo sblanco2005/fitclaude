@@ -359,7 +359,7 @@ export default function SettingsPage() {
           }}
           className="mt-3 text-xs text-primary hover:text-white transition-colors underline underline-offset-2"
         >
-          Send test report to my email →
+          Send test report to trainer →
         </button>
       </Card>
 
