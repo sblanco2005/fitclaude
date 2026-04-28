@@ -298,6 +298,18 @@ def _looks_like_food_log(message: str) -> bool:
     return bool(_FOOD_LOG_KEYWORDS.search(message))
 
 
+_RESPONSE_CLAIMED_LOG_RE = re.compile(
+    r"\b(logged|tracking|recorded|added to your (log|diary|journal))\b",
+    re.IGNORECASE,
+)
+
+
+def _response_claims_logged(text: str) -> bool:
+    """True when the model response text claims it logged food but no tool was called.
+    Catches MiniMax / fallback hallucinations that say 'Logged X cal' without calling log_nutrition."""
+    return bool(_RESPONSE_CLAIMED_LOG_RE.search(text))
+
+
 # Keywords that suggest the user wants a new workout generated
 _WORKOUT_GEN_KEYWORDS = re.compile(
     r"\b(generate|create|make|build|give me|new workout|new routine|spin|replace|"
@@ -1758,12 +1770,15 @@ async def handle_chat(
             block.text for block in response.content if hasattr(block, "text") and block.text
         )
 
-        # Safety net: if the topic is nutrition and the user mentioned food but
-        # the model didn't call log_nutrition, retry once with a forced instruction.
+        # Safety net: if the topic is nutrition and the model didn't call log_nutrition,
+        # retry once with a forced instruction.  Fires when either:
+        #   a) the user message looks like food logging (keyword match), OR
+        #   b) the model response text claims it logged something without calling the tool
+        #      (catches MiniMax/fallback hallucinations like "Logged 5x Cantaloupe — 50 cal").
         if (
             topic == "nutrition"
             and not nutrition_logged_this_turn
-            and _looks_like_food_log(user_message)
+            and (_looks_like_food_log(user_message) or _response_claims_logged(assistant_text))
             and response.stop_reason == "end_turn"
         ):
             logger.warning("[Coach] Model skipped log_nutrition tool — retrying with forced instruction")
