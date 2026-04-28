@@ -31,7 +31,7 @@ export const POST = withAuth(async (_request, user) => {
     return NextResponse.json({ error: 'AGENTMAIL_API_KEY not configured' }, { status: 503 });
   }
 
-  const userProfile = await prisma.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
+  const userProfile = await prisma.user.findUnique({ where: { id: user.id }, select: { timezone: true, trainerEmail: true } });
   const tz = userProfile?.timezone || 'UTC';
   const now = new Date();
   const todayLocal = now.toLocaleDateString('en-CA', { timeZone: tz });
@@ -146,7 +146,7 @@ export const POST = withAuth(async (_request, user) => {
     ? new Date(sessions[0].date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : 'this week';
 
-  const toEmail = user.email!;
+  const toEmail = userProfile?.trainerEmail || user.email!;
   await sendEmail({
     to: toEmail,
     subject: `[TEST] ${userName} — Weekly Training Report (${weekStart})`,
