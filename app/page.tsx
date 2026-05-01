@@ -656,19 +656,12 @@ export default function DashboardPage() {
                     onClick={() => {
                       setPtRoutineView(true);
                       setPtRoutinesLoading(true);
-                      const conditioningTypes = new Set(['hiit', 'cardio', 'conditioning']);
                       fetch('/api/workouts?routinesOnly=true')
                         .then((res) => res.ok ? res.json() : [])
                         .then((data: { id: string; name: string; displayId?: number | null; workoutType?: string | null }[]) => {
                           if (!Array.isArray(data)) { setPtRoutines([]); return; }
-                          // Filter by session type; 'custom' always shows in both
-                          const byType = data.filter((r) => {
-                            const type = r.workoutType?.toLowerCase() ?? '';
-                            if (type === 'custom') return true;
-                            return ptSessionType === 'conditioning'
-                              ? conditioningTypes.has(type)
-                              : !conditioningTypes.has(type);
-                          });
+                          // Show all routines regardless of session type
+                          const byType = data;
                           // Deduplicate by name: keep only the entry with the highest displayId per unique name
                           const byName = new Map<string, typeof byType[0]>();
                           for (const r of byType) {
