@@ -653,18 +653,14 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     className="w-full flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left"
-                    onClick={async () => {
-                      setPtSheet(false);
-                      await fetch('/api/activities', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: programToday?.dayLabel }),
-                      });
-                      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                      fetch(`/api/program/today?tz=${encodeURIComponent(tz)}`)
-                        .then((res) => res.ok ? res.json() : null)
-                        .then((data) => { if (data?.programDayId) setProgramToday(data); else setProgramToday(null); })
-                        .catch(() => {});
+                    onClick={() => {
+                      setPtRoutineView(true);
+                      setPtRoutinesLoading(true);
+                      fetch('/api/workouts?routinesOnly=true')
+                        .then((res) => res.ok ? res.json() : [])
+                        .then((data) => setPtRoutines(Array.isArray(data) ? data : []))
+                        .catch(() => setPtRoutines([]))
+                        .finally(() => setPtRoutinesLoading(false));
                     }}
                   >
                     <svg className="w-5 h-5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
