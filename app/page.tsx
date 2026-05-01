@@ -660,15 +660,28 @@ export default function DashboardPage() {
                       fetch('/api/workouts?routinesOnly=true')
                         .then((res) => res.ok ? res.json() : [])
                         .then((data: { id: string; name: string; displayId?: number | null; workoutType?: string | null }[]) => {
-                          const filtered = Array.isArray(data) ? data.filter((r) => {
+                          if (!Array.isArray(data)) { setPtRoutines([]); return; }
+                          // Filter by session type
+                          const byType = data.filter((r) => {
                             const type = r.workoutType?.toLowerCase() ?? '';
                             return ptSessionType === 'conditioning'
                               ? conditioningTypes.has(type)
                               : !conditioningTypes.has(type);
-                          }) : [];
-                          // Most-recently-created first (highest displayId)
-                          filtered.sort((a, b) => (b.displayId ?? 0) - (a.displayId ?? 0));
-                          setPtRoutines(filtered);
+                          });
+                          // Deduplicate by name: keep only the entry with the highest displayId per unique name
+                          const byName = new Map<string, typeof byType[0]>();
+                          for (const r of byType) {
+                            const key = r.name.trim().toLowerCase();
+                            const existing = byName.get(key);
+                            if (!existing || (r.displayId ?? 0) > (existing.displayId ?? 0)) {
+                              byName.set(key, r);
+                            }
+                          }
+                          // Only show routines that have a displayId, sorted newest first
+                          const deduped = Array.from(byName.values())
+                            .filter((r) => r.displayId != null)
+                            .sort((a, b) => (b.displayId ?? 0) - (a.displayId ?? 0));
+                          setPtRoutines(deduped);
                         })
                         .catch(() => setPtRoutines([]))
                         .finally(() => setPtRoutinesLoading(false));
