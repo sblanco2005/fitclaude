@@ -581,15 +581,21 @@ export default function DashboardPage() {
                         type="button"
                         className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 transition-colors text-left"
                         onClick={async () => {
-                          await fetch(`/api/workouts/${r.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              completed: true,
-                              date: new Date().toISOString(),
-                              programDayId: programToday.programDayId,
-                            }),
-                          });
+                          // Duplicate the template first so the template itself stays intact,
+                          // then mark the copy as completed.
+                          const dupRes = await fetch(`/api/workouts/${r.id}/duplicate`, { method: 'POST' });
+                          if (dupRes.ok) {
+                            const dup = await dupRes.json();
+                            await fetch(`/api/workouts/${dup.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                completed: true,
+                                date: new Date().toISOString(),
+                                programDayId: programToday.programDayId,
+                              }),
+                            });
+                          }
                           setPtSheet(false);
                           setPtRoutineView(false);
                           // Refresh dashboard data
