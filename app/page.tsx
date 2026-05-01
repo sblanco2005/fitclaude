@@ -661,9 +661,10 @@ export default function DashboardPage() {
                         .then((res) => res.ok ? res.json() : [])
                         .then((data: { id: string; name: string; displayId?: number | null; workoutType?: string | null }[]) => {
                           if (!Array.isArray(data)) { setPtRoutines([]); return; }
-                          // Filter by session type
+                          // Filter by session type; 'custom' always shows in both
                           const byType = data.filter((r) => {
                             const type = r.workoutType?.toLowerCase() ?? '';
+                            if (type === 'custom') return true;
                             return ptSessionType === 'conditioning'
                               ? conditioningTypes.has(type)
                               : !conditioningTypes.has(type);
