@@ -656,9 +656,20 @@ export default function DashboardPage() {
                     onClick={() => {
                       setPtRoutineView(true);
                       setPtRoutinesLoading(true);
+                      const conditioningTypes = new Set(['hiit', 'cardio', 'conditioning']);
                       fetch('/api/workouts?routinesOnly=true')
                         .then((res) => res.ok ? res.json() : [])
-                        .then((data) => setPtRoutines(Array.isArray(data) ? data : []))
+                        .then((data: { id: string; name: string; displayId?: number | null; workoutType?: string | null }[]) => {
+                          const filtered = Array.isArray(data) ? data.filter((r) => {
+                            const type = r.workoutType?.toLowerCase() ?? '';
+                            return ptSessionType === 'conditioning'
+                              ? conditioningTypes.has(type)
+                              : !conditioningTypes.has(type);
+                          }) : [];
+                          // Most-recently-created first (highest displayId)
+                          filtered.sort((a, b) => (b.displayId ?? 0) - (a.displayId ?? 0));
+                          setPtRoutines(filtered);
+                        })
                         .catch(() => setPtRoutines([]))
                         .finally(() => setPtRoutinesLoading(false));
                     }}
