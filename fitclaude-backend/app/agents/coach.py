@@ -1838,9 +1838,71 @@ async def handle_chat(
                 block.text for block in response.content if hasattr(block, "text") and block.text
             )
 
-        # Safety net: if the topic is workout and the user asked for a workout but
-        # the model didn't call generate_workout, parse exercises from the text and save directly.
-        # This avoids a costly retry API call and is deterministic.
+        # Safety net 1: the model (often MiniMax) wrote the workout as plain text and
+        # ended the turn instead of calling generate_workout. Retry once with a forced
+        # instruction so it calls the tool and the routine actually gets persisted.
+        # Mirrors the nutrition forced-retry above. The deterministic text-parser below
+        # remains as a last resort if this retry still doesn't produce a tool call.
+        if (
+            topic == "workout"
+            and workout_id is None
+            and _looks_like_workout_request(user_message)
+            and response.stop_reason == "end_turn"
+        ):
+            logger.warning("[Coach] Model skipped generate_workout tool — retrying with forced instruction")
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({
+                "role": "user",
+                "content": (
+                    "SYSTEM: You did NOT call the generate_workout tool, so the routine was "
+                    "NOT saved and the user can't see it. You MUST call generate_workout now "
+                    "with the exact workout you just described (same name and exercises). "
+                    "Do not respond with text — call the tool."
+                ),
+            })
+            response = await active_client.messages.create(
+                model=active_model,
+                max_tokens=2048,
+                system=system_blocks,
+                messages=messages,
+                tools=cached_tools,
+            )
+            await log_token_usage(db, user_id, "chat_retry", active_model, response.usage, request_id=request_id)
+            while response.stop_reason == "tool_use":
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        logger.info(f"[Coach] Retry tool call: {block.name}")
+                        result = await _execute_tool(block.name, block.input, user_id, db, user_tz=user_tz)
+                        if "workout_id" in result:
+                            workout_id = result["workout_id"]
+                        if "nutrition_log_id" in result:
+                            nutrition_log_id = result["nutrition_log_id"]
+                        claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id")}
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": json.dumps(claude_result),
+                        })
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "user", "content": tool_results})
+                response = await active_client.messages.create(
+                    model=active_model,
+                    max_tokens=2048,
+                    system=system_blocks,
+                    messages=messages,
+                    tools=cached_tools,
+                )
+                await log_token_usage(db, user_id, "chat_retry", active_model, response.usage, request_id=request_id)
+            if workout_id is not None:
+                logger.info(f"[Coach] Forced retry saved workout {workout_id}")
+            # Refresh the final text from the retry response
+            assistant_text = "".join(
+                block.text for block in response.content if hasattr(block, "text") and block.text
+            )
+
+        # Safety net 2: if the forced retry still didn't persist a routine, parse exercises
+        # from the text and save directly. Deterministic, no extra API call.
         if (
             topic == "workout"
             and workout_id is None
