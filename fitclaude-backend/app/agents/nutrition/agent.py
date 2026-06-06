@@ -38,8 +38,10 @@ class NutritionAgent(BaseAgent):
             logger.error(f"[NutritionAgent] API call failed: {e}")
             raise
 
+        # Guard on `block.text` truthiness too — MiniMax emits blocks (e.g. thinking)
+        # whose .text is None, which would crash the join.
         raw = "".join(
-            block.text for block in response.content if hasattr(block, "text")
+            block.text for block in response.content if hasattr(block, "text") and block.text
         )
 
         # Strip markdown fences if present
