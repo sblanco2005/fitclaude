@@ -1657,6 +1657,28 @@ async def handle_chat(
     context = build_user_context(user_data, user_tz=user_tz)
     history = await _load_conversation_history(db, user_id, topic=topic)
 
+    # Image handling: when running on MiniMax (no Anthropic credits), Anthropic
+    # vision is unreachable, so extract the image to text with Qwen vision and let
+    # the normal MiniMax tool-use loop handle it (log_activity / generate_workout).
+    # This is what _extract_image_with_qwen was built for. The nutrition food-photo
+    # fast path returns earlier, so any image still here is a workout/general photo.
+    if image_base64 and image_media_type and _qwen_client and settings.agent_base_url:
+        try:
+            logger.info("[Coach] Image detected — extracting with Qwen vision (MiniMax mode)")
+            image_description = await _extract_image_with_qwen(
+                image_base64, image_media_type, user_text=user_message or ""
+            )
+            user_message = (
+                (f"{user_message}\n\n" if user_message else "")
+                + f"[Image contents, extracted by a vision model]:\n{image_description}"
+            )
+            # Folded into text — clear the image so the rest of the flow uses MiniMax tools.
+            image_base64 = None
+            image_media_type = None
+        except Exception as e:
+            logger.error(f"[Coach] Qwen image extraction failed: {e}")
+            # Fall through to the Anthropic vision path below, which reports a clean error.
+
     # Build user content — text only, or text + image for vision
     if image_base64 and image_media_type:
         user_content = [
