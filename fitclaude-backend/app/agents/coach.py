@@ -10,7 +10,6 @@ from zoneinfo import ZoneInfo
 logger = logging.getLogger(__name__)
 
 from anthropic import APIConnectionError, APIStatusError, AsyncAnthropic
-from openai import AsyncOpenAI
 from cuid2 import Cuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,43 +44,12 @@ client = AsyncAnthropic(
     api_key=settings.minimax_api_key or settings.anthropic_api_key,
     base_url=settings.agent_base_url or None,
 )
-# Dedicated Anthropic client (no base_url override) for vision requests —
-# MiniMax doesn't support Anthropic-style image content blocks.
+# Dedicated Anthropic client (no base_url override) for vision requests when
+# Anthropic credits exist. When MiniMax is configured, images route through the
+# MiniMax client above instead — its endpoint is vision-capable.
 vision_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
-# Qwen vision client — used to extract image content when Anthropic credits are unavailable.
-# Qwen is OpenAI-compatible via DashScope.
-_qwen_client: AsyncOpenAI | None = (
-    AsyncOpenAI(
-        api_key=settings.qwen_api_key,
-        base_url=settings.qwen_base_url,
-    )
-    if settings.qwen_api_key
-    else None
-)
-
 cuid_generator = Cuid()
-
-
-async def _extract_image_with_qwen(image_base64: str, media_type: str, user_text: str) -> str:
-    """Use Qwen vision to describe image contents as text, then hand off to MiniMax for tool-use."""
-    if not _qwen_client:
-        raise RuntimeError("Qwen API key not configured")
-
-    prompt = user_text or "Describe what you see in this image in detail. If it's a workout whiteboard or class schedule, list every exercise, set, rep, and weight shown."
-
-    response = await _qwen_client.chat.completions.create(
-        model=settings.qwen_model,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{image_base64}"}},
-                {"type": "text", "text": prompt},
-            ],
-        }],
-        max_tokens=1024,
-    )
-    return response.choices[0].message.content or ""
 
 
 async def _load_user_context(db: AsyncSession, user_id: str, user_tz: "ZoneInfo | None" = None) -> dict:
@@ -1657,28 +1625,6 @@ async def handle_chat(
     context = build_user_context(user_data, user_tz=user_tz)
     history = await _load_conversation_history(db, user_id, topic=topic)
 
-    # Image handling: when running on MiniMax (no Anthropic credits), Anthropic
-    # vision is unreachable, so extract the image to text with Qwen vision and let
-    # the normal MiniMax tool-use loop handle it (log_activity / generate_workout).
-    # This is what _extract_image_with_qwen was built for. The nutrition food-photo
-    # fast path returns earlier, so any image still here is a workout/general photo.
-    if image_base64 and image_media_type and _qwen_client and settings.agent_base_url:
-        try:
-            logger.info("[Coach] Image detected — extracting with Qwen vision (MiniMax mode)")
-            image_description = await _extract_image_with_qwen(
-                image_base64, image_media_type, user_text=user_message or ""
-            )
-            user_message = (
-                (f"{user_message}\n\n" if user_message else "")
-                + f"[Image contents, extracted by a vision model]:\n{image_description}"
-            )
-            # Folded into text — clear the image so the rest of the flow uses MiniMax tools.
-            image_base64 = None
-            image_media_type = None
-        except Exception as e:
-            logger.error(f"[Coach] Qwen image extraction failed: {e}")
-            # Fall through to the Anthropic vision path below, which reports a clean error.
-
     # Build user content — text only, or text + image for vision
     if image_base64 and image_media_type:
         user_content = [
@@ -1712,7 +1658,11 @@ async def handle_chat(
             "model_used": None,
         }
 
-    use_anthropic_for_vision = bool(image_base64 and image_media_type)
+    # MiniMax is vision-capable via its Anthropic-compatible endpoint, so when it's
+    # configured (no Anthropic credits) route images through it — it handles vision
+    # AND tool-use in one. Only fall back to the Anthropic vision model when MiniMax
+    # isn't configured (i.e. credits exist).
+    use_anthropic_for_vision = bool(image_base64 and image_media_type) and not settings.agent_base_url
     if use_anthropic_for_vision:
         active_model = "claude-sonnet-4-20250514"
         active_client = vision_client
@@ -1720,6 +1670,8 @@ async def handle_chat(
     elif settings.agent_base_url:
         active_model = settings.agent_model
         active_client = client
+        if image_base64 and image_media_type:
+            logger.info("[Coach] Image detected — routing to MiniMax (vision-capable)")
     else:
         active_model = await get_model_for_tier(db, user_id)
         active_client = client
