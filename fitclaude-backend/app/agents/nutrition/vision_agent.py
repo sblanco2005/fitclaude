@@ -9,6 +9,7 @@ import logging
 import re
 
 from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI
 
 from app.agents.base import BaseAgent
 from app.agents.nutrition.schemas import FoodItem
@@ -18,8 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class VisionNutritionAgent(BaseAgent):
-    def __init__(self, client: AsyncAnthropic, model: str = "claude-sonnet-4-20250514"):
+    def __init__(
+        self,
+        client: AsyncAnthropic,
+        model: str = "claude-sonnet-4-20250514",
+        qwen_client: AsyncOpenAI | None = None,
+        qwen_model: str = "qwen3-vl-plus",
+    ):
         super().__init__(client, model)
+        # When set, vision runs on Qwen (OpenAI-compatible) instead of Anthropic —
+        # used when there are no Anthropic credits.
+        self.qwen_client = qwen_client
+        self.qwen_model = qwen_model
 
     async def handle(self, user_message: str, **kwargs) -> dict:
         """Main entry point."""
@@ -41,38 +52,58 @@ class VisionNutritionAgent(BaseAgent):
         Call Sonnet with the food photo to extract food items.
         Returns (items, usage) where usage is the API response usage object.
         """
-        # Build multimodal message
-        content = [
-            {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": image_media_type,
-                    "data": image_base64,
-                },
-            },
-        ]
-        if user_text:
-            content.append({"type": "text", "text": user_text})
-
         prompt = get_vision_nutrition_prompt(weight_unit)
 
-        try:
-            response = await self.client.messages.create(
-                model=self.model,
-                max_tokens=1024,
-                system=prompt,
-                messages=[{"role": "user", "content": content}],
+        if self.qwen_client:
+            # Qwen vision (OpenAI-compatible) — used when Anthropic has no credits.
+            qwen_content: list[dict] = [
+                {"type": "image_url", "image_url": {"url": f"data:{image_media_type};base64,{image_base64}"}},
+            ]
+            if user_text:
+                qwen_content.append({"type": "text", "text": user_text})
+            try:
+                response = await self.qwen_client.chat.completions.create(
+                    model=self.qwen_model,
+                    max_tokens=1024,
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": qwen_content},
+                    ],
+                )
+            except Exception as e:
+                logger.error(f"[VisionNutritionAgent] Qwen API call failed: {e}")
+                raise
+            raw = response.choices[0].message.content or ""
+            # Qwen usage shape differs from Anthropic's — skip token logging for it.
+            usage = None
+        else:
+            # Anthropic vision path (only reachable with credits).
+            content = [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": image_media_type,
+                        "data": image_base64,
+                    },
+                },
+            ]
+            if user_text:
+                content.append({"type": "text", "text": user_text})
+            try:
+                response = await self.client.messages.create(
+                    model=self.model,
+                    max_tokens=1024,
+                    system=prompt,
+                    messages=[{"role": "user", "content": content}],
+                )
+            except Exception as e:
+                logger.error(f"[VisionNutritionAgent] API call failed: {e}")
+                raise
+            usage = response.usage
+            raw = "".join(
+                block.text for block in response.content if hasattr(block, "text")
             )
-        except Exception as e:
-            logger.error(f"[VisionNutritionAgent] API call failed: {e}")
-            raise
-
-        usage = response.usage
-
-        raw = "".join(
-            block.text for block in response.content if hasattr(block, "text")
-        )
 
         # Strip markdown fences if present
         raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
