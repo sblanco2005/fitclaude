@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, AuthErrors } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
+import { setActiveProgram } from '@/lib/social/recreate';
 
 function getMondayOfWeek(dateStr: string): Date {
   const d = new Date(dateStr + 'T12:00:00Z');
@@ -112,10 +113,19 @@ export const GET = withAuth(async (_request, user) => {
   }
 });
 
-// PATCH — update currentWeek (called when user manually navigates weeks on home screen)
+// PATCH — either promote a program to active ({ programId }) or update the
+// active program's currentWeek ({ currentWeek }, from the home-screen week nav).
 export const PATCH = withAuth(async (request, user) => {
   try {
-    const { currentWeek } = await request.json();
+    const body = await request.json();
+
+    if (typeof body.programId === 'string') {
+      const ok = await setActiveProgram(user.id, body.programId);
+      if (!ok) return AuthErrors.notFound('Program');
+      return NextResponse.json({ ok: true, activeProgramId: body.programId });
+    }
+
+    const { currentWeek } = body;
     if (typeof currentWeek !== 'number') return NextResponse.json({ error: 'Invalid currentWeek' }, { status: 400 });
 
     const program = await prisma.trainingProgram.findFirst({ where: { userId: user.id, isActive: true } });
@@ -125,16 +135,20 @@ export const PATCH = withAuth(async (request, user) => {
     await prisma.trainingProgram.update({ where: { id: program.id }, data: { currentWeek: clamped } });
     return NextResponse.json({ ok: true, currentWeek: clamped });
   } catch (error) {
-    console.error('Failed to update program week:', error);
+    console.error('Failed to update program:', error);
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
 });
 
-// DELETE — remove user's training program
-export const DELETE = withAuth(async (_request, user) => {
+// DELETE — remove a training program. With ?programId= removes that specific
+// program (must be owned); otherwise removes the active program.
+export const DELETE = withAuth(async (request, user) => {
   try {
+    const programId = new URL(request.url).searchParams.get('programId');
+
     const program = await prisma.trainingProgram.findFirst({
-      where: { userId: user.id },
+      where: programId ? { id: programId, userId: user.id } : { userId: user.id, isActive: true },
+      select: { id: true, isActive: true },
     });
 
     if (!program) {
