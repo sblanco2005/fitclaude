@@ -24,39 +24,50 @@ model User {
   age                Int?
   weightKg           Float?
   heightCm           Float?
-  fitnessGoal        String?   // build_muscle, lose_fat, maintain, endurance, flexibility
-  experienceLevel    String?   // beginner, intermediate, advanced
-  gymType            String?   // own_gym, public_gym
-  injuriesNotes      String?   @db.Text
-  equipmentText      String?   @db.Text
+  fitnessGoal        String? // build_muscle, lose_fat, maintain, endurance, flexibility
+  experienceLevel    String? // beginner, intermediate, advanced
+  gymType            String? // own_gym, public_gym
+  injuriesNotes      String? @db.Text
+  equipmentText      String? @db.Text
   dailyCalorieTarget Int?
   dailyProteinTarget Float?
-  carbsPercent       Int?      // % of remaining cals after protein for carbs
-  fatPercent         Int?      // % of remaining cals after protein for fat
-  sex                String?   // male, female, other, prefer_not_to_say
-  trainingFrequency  Int?      // days per week, 1–7
-  timezone           String    @default("UTC") // IANA timezone e.g. "America/New_York"
-  weightUnit         String    @default("lb")  // "lb" or "kg" — user's preferred unit for logging
-  trainerEmail       String?                   // optional personal trainer email for weekly reports
-  isOnboarded        Boolean   @default(false)
-  isAdmin            Boolean   @default(false)
-  tier               String    @default("free") // free, pro, unlimited
+  carbsPercent       Int? // % of remaining cals after protein for carbs
+  fatPercent         Int? // % of remaining cals after protein for fat
+  sex                String? // male, female, other, prefer_not_to_say
+  trainingFrequency  Int? // days per week, 1–7
+  timezone           String  @default("UTC") // IANA timezone e.g. "America/New_York"
+  weightUnit         String  @default("lb") // "lb" or "kg" — user's preferred unit for logging
+  trainerEmail       String? // optional personal trainer email for weekly reports
+  isOnboarded        Boolean @default(false)
+  isAdmin            Boolean @default(false)
+  tier               String  @default("free") // free, pro, unlimited
+
+  // Social / discovery
+  username String? @unique // public handle for discovery, e.g. "alex_lifts"
+  bio      String? @db.Text
+  isPublic Boolean @default(true) // discoverable in user search
 
   // NextAuth relations
-  accounts      Account[]
-  sessions      Session[]
+  accounts Account[]
+  sessions Session[]
 
   // FitClaude relations
-  workouts             Workout[]
-  nutritionLogs        NutritionLog[]
-  nutritionSummaries   DailyNutritionSummary[]
-  conversations        ConversationHistory[]
-  apiTokens            ApiToken[]
-  activities           Activity[]
-  tokenUsages          TokenUsage[]
-  usageLimit           UserUsageLimit?
-  collections          WorkoutCollection[]
-  trainingProgram      TrainingProgram?
+  workouts           Workout[]
+  nutritionLogs      NutritionLog[]
+  nutritionSummaries DailyNutritionSummary[]
+  conversations      ConversationHistory[]
+  apiTokens          ApiToken[]
+  activities         Activity[]
+  tokenUsages        TokenUsage[]
+  usageLimit         UserUsageLimit?
+  collections        WorkoutCollection[]
+  trainingPrograms   TrainingProgram[]
+
+  // Social relations
+  following        Follow[]          @relation("Following") // rows where this user is the follower
+  followers        Follow[]          @relation("Followers") // rows where this user is followed
+  sharePosts       SharePost[]
+  shareRecreations ShareRecreation[]
 
   @@map("users")
 }
@@ -108,16 +119,16 @@ model VerificationToken {
 // ============================================
 
 model Exercise {
-  id               String   @id @default(cuid())
-  name             String   @unique
-  muscleGroup      String
-  secondaryMuscles String?
+  id                String   @id @default(cuid())
+  name              String   @unique
+  muscleGroup       String
+  secondaryMuscles  String?
   equipmentRequired String?
-  difficulty       String   @default("intermediate")
-  exerciseType     String   // compound, isolation, cardio, stretch, plyometric
-  instructions     String?  @db.Text
-  gifUrl           String?
-  createdAt        DateTime @default(now())
+  difficulty        String   @default("intermediate")
+  exerciseType      String // compound, isolation, cardio, stretch, plyometric
+  instructions      String?  @db.Text
+  gifUrl            String?
+  createdAt         DateTime @default(now())
 
   variations       ExerciseVariation[]
   workoutExercises WorkoutExercise[]
@@ -131,8 +142,8 @@ model ExerciseVariation {
   id                  String  @id @default(cuid())
   baseExerciseId      String
   name                String
-  spicyLevel          Int     // 1-3
-  modificationType    String  // tempo, grip, stance, load_curve, intensity, angle, unilateral, pause
+  spicyLevel          Int // 1-3
+  modificationType    String // tempo, grip, stance, load_curve, intensity, angle, unilateral, pause
   description         String  @db.Text
   additionalEquipment String?
 
@@ -150,15 +161,15 @@ model ExerciseVariation {
 model Workout {
   id              String   @id @default(cuid())
   userId          String
-  displayId       Int?     // user-facing routine number (e.g. #45)
+  displayId       Int? // user-facing routine number (e.g. #45)
   date            DateTime @default(now())
   name            String?
-  workoutType     String   // push, pull, legs, upper, lower, full_body, cardio, custom
+  workoutType     String // push, pull, legs, upper, lower, full_body, cardio, custom
   category        String   @default("lifting") // lifting, hiit, cardio, mobility, calisthenics, sport
-  source          String   @default("coach")   // "coach" = AI-generated, "manual" = user-logged external
+  source          String   @default("coach") // "coach" = AI-generated, "manual" = user-logged external
   durationMinutes Int?
   notes           String?  @db.Text
-  fatigueRating   Int?     // 1-10
+  fatigueRating   Int? // 1-10
   completed       Boolean  @default(false)
   isFavorite      Boolean  @default(false)
   programDayId    String?
@@ -174,19 +185,19 @@ model Workout {
 }
 
 model WorkoutExercise {
-  id          String  @id @default(cuid())
-  workoutId   String
-  exerciseId  String?
-  variationId String?
-  order       Int
-  sets        Int
-  reps        String? // e.g. "8-12" or "10"
-  weightKg    Float?
-  restSeconds Int?
-  notes       String?
-  setLogs     String?  @db.Text // JSON: [{"set":1,"weight":195,"reps":4},...]
-  wasSpicy       Boolean @default(false)
-  supersetGroup  String? // "A", "B", etc. — exercises with same group form a superset pair
+  id            String  @id @default(cuid())
+  workoutId     String
+  exerciseId    String?
+  variationId   String?
+  order         Int
+  sets          Int
+  reps          String? // e.g. "8-12" or "10"
+  weightKg      Float?
+  restSeconds   Int?
+  notes         String?
+  setLogs       String? @db.Text // JSON: [{"set":1,"weight":195,"reps":4},...]
+  wasSpicy      Boolean @default(false)
+  supersetGroup String? // "A", "B", etc. — exercises with same group form a superset pair
 
   workout   Workout            @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   exercise  Exercise?          @relation(fields: [exerciseId], references: [id])
@@ -204,7 +215,7 @@ model NutritionLog {
   id          String   @id @default(cuid())
   userId      String
   date        DateTime @default(now())
-  mealType    String?  // breakfast, lunch, dinner, snack
+  mealType    String? // breakfast, lunch, dinner, snack
   rawInput    String   @db.Text
   parsedItems String?  @db.Text // JSON string of parsed food items
   calories    Float?
@@ -212,7 +223,7 @@ model NutritionLog {
   carbsG      Float?
   fatG        Float?
   fiberG      Float?
-  imageUrl    String?  // meal photo reference
+  imageUrl    String? // meal photo reference
   createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -223,16 +234,16 @@ model NutritionLog {
 }
 
 model DailyNutritionSummary {
-  id         String   @id @default(cuid())
-  userId     String
-  date       DateTime @db.Date
-  calories   Float    @default(0)
-  proteinG   Float    @default(0)
-  carbsG     Float    @default(0)
-  fatG       Float    @default(0)
-  fiberG     Float    @default(0)
-  mealCount  Int      @default(0)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  calories  Float    @default(0)
+  proteinG  Float    @default(0)
+  carbsG    Float    @default(0)
+  fatG      Float    @default(0)
+  fiberG    Float    @default(0)
+  mealCount Int      @default(0)
+  createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -248,11 +259,11 @@ model DailyNutritionSummary {
 model ConversationHistory {
   id        String   @id @default(cuid())
   userId    String
-  role      String   // user, assistant
+  role      String // user, assistant
   content   String   @db.Text
   topic     String   @default("workout") // workout, nutrition
   toolUse   String?  @db.Text // JSON string of tool calls
-  imageUrl  String?  // if message included an image
+  imageUrl  String? // if message included an image
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -274,7 +285,7 @@ model PendingExercise {
   secondaryMuscles  String?
   equipmentRequired String?
   difficulty        String    @default("intermediate")
-  exerciseType      String    // compound, isolation, cardio, stretch, plyometric
+  exerciseType      String // compound, isolation, cardio, stretch, plyometric
   instructions      String?   @db.Text
   youtubeVideoId    String?
   youtubeUrl        String?
@@ -314,7 +325,7 @@ model ExerciseVideo {
   title          String
   channelName    String?
   thumbnailUrl   String?
-  duration       String?   // ISO 8601 e.g. "PT5M30S"
+  duration       String? // ISO 8601 e.g. "PT5M30S"
   viewCount      Int?
   status         String    @default("pending") // pending, approved, rejected
   videoType      String    @default("tutorial") // tutorial (form-specific), reference (general/compilation)
@@ -380,14 +391,14 @@ model Activity {
 model TokenUsage {
   id                  String   @id @default(cuid())
   userId              String
-  endpoint            String   // "chat", "analytics", "chat_retry"
-  model               String   // e.g. "claude-sonnet-4-20250514"
+  endpoint            String // "chat", "analytics", "chat_retry"
+  model               String // e.g. "claude-sonnet-4-20250514"
   inputTokens         Int      @default(0)
   outputTokens        Int      @default(0)
   cacheCreationTokens Int      @default(0)
   cacheReadTokens     Int      @default(0)
   estimatedCostUsd    Float    @default(0)
-  requestId           String?  // groups multiple API calls from one chat message
+  requestId           String? // groups multiple API calls from one chat message
   createdAt           DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -403,7 +414,7 @@ model UserUsageLimit {
   maxCallsPerDay   Int?
   maxCallsPerWeek  Int?
   maxCallsPerMonth Int?
-  maxCostPerMonth  Float?   // USD
+  maxCostPerMonth  Float? // USD
   isThrottled      Boolean  @default(false)
   updatedAt        DateTime @updatedAt
 
@@ -425,7 +436,7 @@ model WorkoutCollection {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 
-  user     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   workouts WorkoutCollectionWorkout[]
 
   @@unique([userId, name])
@@ -450,30 +461,34 @@ model WorkoutCollectionWorkout {
 // ============================================
 
 model TrainingProgram {
-  id              String   @id @default(cuid())
-  userId          String   @unique          // one active program per user
-  totalWeeks      Int      @default(2)      // how many weeks before rotation repeats
-  currentWeek     Int      @default(1)      // which week we're on (1-based)
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String // a user may hold up to 3 programs; exactly one isActive
+  name          String? // display name, esp. for recreated programs
+  totalWeeks    Int      @default(2) // how many weeks before rotation repeats
+  currentWeek   Int      @default(1) // which week we're on (1-based)
+  isActive      Boolean  @default(true)
+  sourceUserId  String? // if recreated: the original sharer's user id
+  sourceShareId String? // if recreated: the SharePost it came from
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   days ProgramDay[]
 
   @@index([userId])
+  @@index([userId, isActive])
   @@map("training_programs")
 }
 
 model ProgramDay {
   id               String  @id @default(cuid())
   programId        String
-  weekday          Int               // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+  weekday          Int // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
   weekNumber       Int     @default(1) // which week in the rotation (1-based)
-  dayType          String            // "coached", "pt_session", "class", "rest"
-  dayLabel         String            // "Deadlifts + Glutes", "PT Session", "Alpha X", "Rest"
-  workoutType      String?           // push, pull, legs, upper, lower, full_body, custom (null for rest/class/pt)
-  exerciseTemplate String? @db.Text  // JSON: [{name, muscle_group, sets, reps, is_primary, notes}] — only for coached days
+  dayType          String // "coached", "pt_session", "class", "rest"
+  dayLabel         String // "Deadlifts + Glutes", "PT Session", "Alpha X", "Rest"
+  workoutType      String? // push, pull, legs, upper, lower, full_body, custom (null for rest/class/pt)
+  exerciseTemplate String? @db.Text // JSON: [{name, muscle_group, sets, reps, is_primary, notes}] — only for coached days
 
   program  TrainingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
   workouts Workout[]
@@ -481,4 +496,59 @@ model ProgramDay {
   @@unique([programId, weekday, weekNumber])
   @@index([programId])
   @@map("program_days")
+}
+
+// ============================================
+// SOCIAL — follow graph + shared routines/programs
+// ============================================
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String // user who initiated the follow
+  followingId String // user being followed
+  status      String   @default("pending") // "pending" | "accepted" (approval-based / private)
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@index([followingId, status])
+  @@map("follows")
+}
+
+model SharePost {
+  id            String   @id @default(cuid())
+  userId        String // sharer
+  itemType      String // "routine" | "program"
+  title         String
+  caption       String?  @db.Text
+  snapshot      String   @db.Text // immutable JSON copy used to recreate (decoupled from source)
+  sourceId      String? // soft backref to the original Workout/TrainingProgram id
+  recreateCount Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recreations ShareRecreation[]
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("share_posts")
+}
+
+model ShareRecreation {
+  id          String   @id @default(cuid())
+  sharePostId String
+  userId      String // recipient who recreated it
+  newItemId   String // the cloned Workout/TrainingProgram id in the recipient's account
+  createdAt   DateTime @default(now())
+
+  sharePost SharePost @relation(fields: [sharePostId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sharePostId, userId])
+  @@index([userId])
+  @@map("share_recreations")
 }

@@ -8,6 +8,7 @@ from app.models.conversation import ConversationHistory
 from app.models.activity import Activity
 from app.models.token_usage import TokenUsage, UserUsageLimit
 from app.models.training_program import TrainingProgram, ProgramDay
+from app.models.social import Follow, SharePost, ShareRecreation
 
 __all__ = [
     "User",
@@ -26,4 +27,7 @@ __all__ = [
     "UserUsageLimit",
     "TrainingProgram",
     "ProgramDay",
+    "Follow",
+    "SharePost",
+    "ShareRecreation",
 ]
