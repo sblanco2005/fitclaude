@@ -2029,6 +2029,11 @@ function ActiveWorkout({
   const [saveStatus, setSaveStatus] = useState<null | 'success' | 'error'>(null);
   const [autoStopped, setAutoStopped] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | 'save' | 'discard'>(null);
+  // Post-save "share with your contacts?" prompt
+  const [shareWorkoutId, setShareWorkoutId] = useState<string | null>(null);
+  const [shareCaption, setShareCaption] = useState('');
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
   const pausedAtRef = useRef<number>(restored?.pausedAt ?? 0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(restored?.startTime ?? null);
@@ -2216,7 +2221,8 @@ function ActiveWorkout({
         setSaving(false);
         setSaveStatus('success');
         navigator.vibrate?.(200);
-        setTimeout(() => onFinish(routineName, elapsed, currentLogs), 2000);
+        // Offer to share the routine before finishing (instead of auto-closing).
+        setShareWorkoutId(latest.id);
         return;
       } catch (err) {
         console.error('[save] Failed:', err);
@@ -2241,6 +2247,38 @@ function ActiveWorkout({
   const retrySave = () => {
     setSaveStatus(null);
     handleSave();
+  };
+
+  // ─── Post-save share prompt ───
+  const finishAfterShare = () => {
+    setShareWorkoutId(null);
+    setShareCaption('');
+    setShareError(null);
+    onFinish(routineName, elapsed, exerciseLogsRef.current);
+  };
+
+  const submitShare = async () => {
+    if (!shareWorkoutId) return;
+    setSharing(true);
+    setShareError(null);
+    try {
+      const res = await fetch('/api/social/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemType: 'routine', sourceId: shareWorkoutId, caption: shareCaption }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setShareError(d.error || 'Could not share');
+        setSharing(false);
+        return;
+      }
+      setSharing(false);
+      finishAfterShare();
+    } catch {
+      setShareError('Could not share');
+      setSharing(false);
+    }
   };
 
   const hitItGroups = useMemo(() => groupExercises(latest.exercises), [latest.exercises]);
@@ -2393,6 +2431,40 @@ function ActiveWorkout({
             </div>
           )}
         </div>
+
+        {/* Post-save: offer to share the routine with followers */}
+        {shareWorkoutId && (
+          <Modal isOpen onClose={finishAfterShare} title="Share with your contacts?" size="sm">
+            <div className="space-y-3">
+              <p className="text-sm text-slate-400">
+                Followers can recreate this routine in their own account.
+              </p>
+              <textarea
+                value={shareCaption}
+                onChange={(e) => setShareCaption(e.target.value)}
+                placeholder="Add a note (optional)"
+                rows={2}
+                className="w-full bg-card border border-border-dark rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary resize-none"
+              />
+              {shareError && <p className="text-xs text-red-400">{shareError}</p>}
+              <div className="flex gap-3">
+                <button
+                  onClick={finishAfterShare}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm active:scale-95 transition-transform"
+                >
+                  Not now
+                </button>
+                <button
+                  onClick={submitShare}
+                  disabled={sharing}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white font-medium text-sm active:scale-95 transition-transform disabled:opacity-60"
+                >
+                  {sharing ? 'Sharing…' : 'Share'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
       </div>
     );
   }
