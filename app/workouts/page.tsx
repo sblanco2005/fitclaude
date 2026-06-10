@@ -1266,6 +1266,7 @@ function RoutineDetail({
   const [renameValue, setRenameValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmShare, setConfirmShare] = useState(false);
+  const [shareComment, setShareComment] = useState('');
   const [sharing, setSharing] = useState(false);
   const [addingExercise, setAddingExercise] = useState(false);
   const [swappingExercise, setSwappingExercise] = useState<WorkoutExercise | null>(null);
@@ -1347,24 +1348,26 @@ function RoutineDetail({
 
   const startShare = () => {
     setMenuOpen(false);
+    setShareComment('');
     setConfirmShare(true);
   };
 
   const confirmShareRoutine = async () => {
-    if (sharing) return;
+    if (sharing || !shareComment.trim()) return;
     setSharing(true);
     try {
       const res = await fetch('/api/social/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemType: 'routine', sourceId: latest.id }),
+        body: JSON.stringify({ itemType: 'routine', sourceId: latest.id, caption: shareComment }),
       });
-      toast(res.ok ? 'Routine shared with your followers!' : 'Failed to share routine', res.ok ? 'success' : 'error');
+      const ok = res.ok;
+      toast(ok ? 'Routine shared with your followers!' : 'Failed to share routine', ok ? 'success' : 'error');
+      if (ok) setConfirmShare(false);
     } catch {
       toast('Failed to share routine', 'error');
     } finally {
       setSharing(false);
-      setConfirmShare(false);
     }
   };
 
@@ -1411,6 +1414,13 @@ function RoutineDetail({
             <p className="text-xs text-muted mt-1">
               Your followers will see this routine in their feed and can recreate it in their own account.
             </p>
+            <textarea
+              value={shareComment}
+              onChange={(e) => setShareComment(e.target.value)}
+              placeholder="Add a comment (required)"
+              rows={2}
+              className="w-full mt-3 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary resize-none"
+            />
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => setConfirmShare(false)}
@@ -1421,7 +1431,7 @@ function RoutineDetail({
               </button>
               <button
                 onClick={confirmShareRoutine}
-                disabled={sharing}
+                disabled={sharing || !shareComment.trim()}
                 className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-60"
               >
                 {sharing ? 'Sharing…' : 'Share'}
@@ -2506,7 +2516,7 @@ function ActiveWorkout({
               <textarea
                 value={shareCaption}
                 onChange={(e) => setShareCaption(e.target.value)}
-                placeholder="Add a note (optional)"
+                placeholder="Add a comment (required)"
                 rows={2}
                 className="w-full bg-card border border-border-dark rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary resize-none"
               />
@@ -2520,7 +2530,7 @@ function ActiveWorkout({
                 </button>
                 <button
                   onClick={submitShare}
-                  disabled={sharing}
+                  disabled={sharing || !shareCaption.trim()}
                   className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white font-medium text-sm active:scale-95 transition-transform disabled:opacity-60"
                 >
                   {sharing ? 'Sharing…' : 'Share'}

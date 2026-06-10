@@ -13,6 +13,10 @@ export const POST = withAuth(async (request, user) => {
   if (!sourceId || typeof sourceId !== 'string') {
     return NextResponse.json({ error: 'sourceId required' }, { status: 400 });
   }
+  // A comment is required to share.
+  if (typeof caption !== 'string' || !caption.trim()) {
+    return NextResponse.json({ error: 'Please add a comment to share.' }, { status: 400 });
+  }
 
   // Build an immutable snapshot from the source the user owns.
   const snapshot =
@@ -29,7 +33,7 @@ export const POST = withAuth(async (request, user) => {
       userId: user.id,
       itemType,
       title: snapshotTitle(snapshot),
-      caption: typeof caption === 'string' && caption.trim() ? caption.trim() : null,
+      caption: caption.trim(),
       snapshot: JSON.stringify(snapshot),
       sourceId,
     },
@@ -37,4 +41,16 @@ export const POST = withAuth(async (request, user) => {
   });
 
   return NextResponse.json(post, { status: 201 });
+});
+
+// DELETE — remove one of my own shares (?id=). Cascades to its recreations records.
+export const DELETE = withAuth(async (request, user) => {
+  const id = new URL(request.url).searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  const post = await prisma.sharePost.findFirst({ where: { id, userId: user.id }, select: { id: true } });
+  if (!post) return AuthErrors.notFound('Share');
+
+  await prisma.sharePost.delete({ where: { id: post.id } });
+  return NextResponse.json({ deleted: true });
 });

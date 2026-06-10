@@ -13,13 +13,11 @@ export const GET = withAuth(async (request, user) => {
     where: { followerId: user.id, status: 'accepted' },
     select: { followingId: true },
   });
-  const followingIds = accepted.map((f) => f.followingId);
-  if (followingIds.length === 0) {
-    return NextResponse.json({ items: [], nextCursor: null });
-  }
+  // Feed = shares from people I follow + my own shares (so I can see/manage what I posted).
+  const authorIds = [...accepted.map((f) => f.followingId), user.id];
 
   const posts = await prisma.sharePost.findMany({
-    where: { userId: { in: followingIds } },
+    where: { userId: { in: authorIds } },
     orderBy: { createdAt: 'desc' },
     take: PAGE_SIZE + 1, // fetch one extra to compute nextCursor
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -53,6 +51,7 @@ export const GET = withAuth(async (request, user) => {
       recreateCount: p.recreateCount,
       createdAt: p.createdAt,
       sharer: p.user,
+      isOwn: p.user.id === user.id,
       alreadyRecreated: recreatedSet.has(p.id),
     })),
     nextCursor: hasMore ? page[page.length - 1].id : null,

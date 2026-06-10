@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 
-type Tab = 'feed' | 'find' | 'requests' | 'programs';
+type Tab = 'feed' | 'find' | 'requests';
 
 interface Me {
   username: string | null;
@@ -33,6 +33,7 @@ interface FeedItem {
   recreateCount: number;
   createdAt: string;
   sharer: Sharer;
+  isOwn: boolean;
   alreadyRecreated: boolean;
 }
 
@@ -101,7 +102,7 @@ export default function SocialPage() {
           )}
         </div>
         <div className="flex gap-2 mt-3">
-          {(['feed', 'find', 'requests', 'programs'] as Tab[]).map((t) => (
+          {(['feed', 'find', 'requests'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -109,7 +110,7 @@ export default function SocialPage() {
                 tab === t ? 'bg-primary text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {t === 'feed' ? 'FEED' : t === 'find' ? 'FIND' : t === 'requests' ? 'REQUESTS' : 'PROGRAMS'}
+              {t === 'feed' ? 'FEED' : t === 'find' ? 'FIND' : 'REQUESTS'}
               {t === 'requests' && me && me.pendingCount > 0 && (
                 <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] w-4 h-4">
                   {me.pendingCount}
@@ -124,7 +125,6 @@ export default function SocialPage() {
         {tab === 'feed' && <FeedTab toast={toast} />}
         {tab === 'find' && <FindTab toast={toast} />}
         {tab === 'requests' && <RequestsTab toast={toast} onChange={loadMe} />}
-        {tab === 'programs' && <ProgramsTab toast={toast} />}
       </div>
     </div>
   );
@@ -188,6 +188,7 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [recreating, setRecreating] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
 
   const load = useCallback(() => {
     fetch('/api/social/feed')
@@ -198,6 +199,24 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const removeShare = async (item: FeedItem) => {
+    if (!confirm('Delete this shared post? Followers will no longer see it.')) return;
+    setRemoving(item.id);
+    try {
+      const res = await fetch(`/api/social/share?id=${item.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setItems((prev) => prev.filter((p) => p.id !== item.id));
+        toast('Share deleted');
+      } else {
+        toast('Could not delete', 'error');
+      }
+    } catch {
+      toast('Could not delete', 'error');
+    } finally {
+      setRemoving(null);
+    }
+  };
 
   const recreate = async (item: FeedItem) => {
     setRecreating(item.id);
@@ -212,7 +231,7 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
         toast(item.itemType === 'program' ? 'Program added (inactive). Activate it in Workouts.' : 'Routine added to your workouts!');
         setItems((prev) => prev.map((p) => (p.id === item.id ? { ...p, alreadyRecreated: true, recreateCount: p.recreateCount + 1 } : p)));
       } else if (d.code === 'capReached') {
-        toast(`You already have ${d.limit} programs. Remove one in Workouts → Programs first.`, 'error');
+        toast(`You already have ${d.limit} programs. Remove one before recreating another.`, 'error');
       } else {
         toast(d.error || 'Could not recreate', 'error');
       }
@@ -228,7 +247,7 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
     return (
       <div className="text-center py-12 text-slate-400">
         <p className="font-semibold text-slate-300 mb-1">Your feed is empty</p>
-        <p className="text-sm">Follow people in “Find People” to see the routines and programs they share.</p>
+        <p className="text-sm">Share a routine or program, or follow people in “Find People” to see what they share.</p>
       </div>
     );
   }
@@ -240,7 +259,9 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
           <div className="flex items-center gap-3 mb-3">
             <Avatar user={item.sharer} />
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-white truncate">{userHandle(item.sharer)}</div>
+              <div className="text-sm font-semibold text-white truncate">
+                {item.isOwn ? 'You' : userHandle(item.sharer)}
+              </div>
               <div className="text-xs text-slate-500">shared a {item.itemType}</div>
             </div>
             <Badge variant={item.itemType === 'program' ? 'info' : 'default'} className="ml-auto">
@@ -248,17 +269,28 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
             </Badge>
           </div>
           <div className="text-white font-bold">{item.title}</div>
-          {item.caption && <p className="text-sm text-slate-400 mt-1">{item.caption}</p>}
+          {item.caption && <p className="text-sm text-slate-300 mt-1">{item.caption}</p>}
           <div className="flex items-center justify-between mt-3">
             <span className="text-xs text-slate-500">{item.recreateCount} recreated</span>
-            <Button
-              size="sm"
-              variant={item.alreadyRecreated ? 'ghost' : 'primary'}
-              disabled={item.alreadyRecreated || recreating === item.id}
-              onClick={() => recreate(item)}
-            >
-              {item.alreadyRecreated ? 'Added ✓' : recreating === item.id ? 'Adding…' : 'Recreate'}
-            </Button>
+            {item.isOwn ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={removing === item.id}
+                onClick={() => removeShare(item)}
+              >
+                {removing === item.id ? 'Deleting…' : 'Delete'}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant={item.alreadyRecreated ? 'ghost' : 'primary'}
+                disabled={item.alreadyRecreated || recreating === item.id}
+                onClick={() => recreate(item)}
+              >
+                {item.alreadyRecreated ? 'Added ✓' : recreating === item.id ? 'Adding…' : 'Recreate'}
+              </Button>
+            )}
           </div>
         </Card>
       ))}
@@ -409,111 +441,6 @@ function RequestsTab({ toast, onChange }: { toast: (m: string, t?: 'success' | '
           <div className="ml-auto flex gap-2">
             <Button size="sm" onClick={() => act(req, true)}>Accept</Button>
             <Button size="sm" variant="ghost" onClick={() => act(req, false)}>Decline</Button>
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-// ─── Programs (active + recreated) ───────────────────────────────────────────
-
-interface ProgramItem {
-  id: string;
-  name: string | null;
-  isActive: boolean;
-  totalWeeks: number;
-  currentWeek: number;
-  dayCount: number;
-  source: { id: string; name: string | null; username: string | null } | null;
-}
-
-function ProgramsTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info') => void }) {
-  const [programs, setPrograms] = useState<ProgramItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    fetch('/api/program/list')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d) => setPrograms(d))
-      .catch(() => setPrograms([]))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const makeActive = async (p: ProgramItem) => {
-    setBusy(p.id);
-    try {
-      const res = await fetch('/api/program', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ programId: p.id }),
-      });
-      if (res.ok) { toast('Active program switched'); load(); }
-      else toast('Could not switch', 'error');
-    } catch { toast('Could not switch', 'error'); }
-    finally { setBusy(null); }
-  };
-
-  const remove = async (p: ProgramItem) => {
-    setBusy(p.id);
-    try {
-      const res = await fetch(`/api/program?programId=${p.id}`, { method: 'DELETE' });
-      if (res.ok) { toast('Program removed'); setPrograms((prev) => prev.filter((x) => x.id !== p.id)); }
-      else toast('Could not remove', 'error');
-    } catch { toast('Could not remove', 'error'); }
-    finally { setBusy(null); }
-  };
-
-  const share = async (p: ProgramItem) => {
-    setBusy(p.id);
-    try {
-      const res = await fetch('/api/social/share', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemType: 'program', sourceId: p.id }),
-      });
-      if (res.ok) toast('Program shared with your followers!');
-      else toast('Could not share', 'error');
-    } catch { toast('Could not share', 'error'); }
-    finally { setBusy(null); }
-  };
-
-  if (loading) return <p className="text-slate-400 text-sm py-8 text-center">Loading…</p>;
-  if (programs.length === 0) {
-    return (
-      <div className="text-center py-12 text-slate-400">
-        <p className="font-semibold text-slate-300 mb-1">No programs yet</p>
-        <p className="text-sm">Build one with Coach Fit, or recreate a program shared with you.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-slate-500">You can hold up to 3 programs. Only one is active at a time.</p>
-      {programs.map((p) => (
-        <Card key={p.id} className={p.isActive ? 'border border-primary/40' : ''}>
-          <div className="flex items-center gap-2">
-            <div className="min-w-0">
-              <div className="text-white font-bold truncate">{p.name || 'Training program'}</div>
-              <div className="text-xs text-slate-500">
-                {p.totalWeeks}-week · {p.dayCount} days
-                {p.source && <> · from @{p.source.username || p.source.name}</>}
-              </div>
-            </div>
-            {p.isActive && <Badge variant="success" className="ml-auto">Active</Badge>}
-          </div>
-          <div className="flex gap-2 mt-3">
-            {!p.isActive && (
-              <Button size="sm" disabled={busy === p.id} onClick={() => makeActive(p)}>Make active</Button>
-            )}
-            <Button size="sm" variant="secondary" disabled={busy === p.id} onClick={() => share(p)}>Share</Button>
-            {!p.isActive && (
-              <Button size="sm" variant="ghost" disabled={busy === p.id} onClick={() => remove(p)}>Remove</Button>
-            )}
           </div>
         </Card>
       ))}

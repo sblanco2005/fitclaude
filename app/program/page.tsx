@@ -92,6 +92,8 @@ export default function ProgramPage() {
   const [building, setBuilding] = useState(false);
   const [selectedDay, setSelectedDay] = useState<ProgramDay | null>(null);
   const [sharingProgram, setSharingProgram] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [programComment, setProgramComment] = useState('');
 
   // Builder state — start with 2 weeks, all rest days
   const [totalWeeks, setTotalWeeks] = useState(2);
@@ -272,18 +274,26 @@ export default function ProgramPage() {
     }
   };
 
+  const openShareModal = () => {
+    setProgramComment('');
+    setShowShareModal(true);
+  };
+
   const shareProgram = async () => {
-    if (!program || sharingProgram) return;
-    if (!confirm('Share this program with your followers? They\'ll see it in their feed and can recreate it in their own account.')) return;
+    if (!program || sharingProgram || !programComment.trim()) return;
     setSharingProgram(true);
     try {
       const res = await fetch('/api/social/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemType: 'program', sourceId: program.id }),
+        body: JSON.stringify({ itemType: 'program', sourceId: program.id, caption: programComment }),
       });
-      if (res.ok) toast('Program shared with your followers!');
-      else toast('Failed to share program', 'error');
+      if (res.ok) {
+        toast('Program shared with your followers!');
+        setShowShareModal(false);
+      } else {
+        toast('Failed to share program', 'error');
+      }
     } catch {
       toast('Failed to share program', 'error');
     } finally {
@@ -310,6 +320,40 @@ export default function ProgramPage() {
 
     return (
       <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
+        {showShareModal && (
+          <>
+            <div className="fixed inset-0 bg-black/60 z-50" onClick={() => !sharingProgram && setShowShareModal(false)} />
+            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-[90%] shadow-2xl">
+              <p className="text-base font-bold text-white">Share this program?</p>
+              <p className="text-xs text-muted mt-1">
+                Your followers will see it in their feed and can recreate it in their own account.
+              </p>
+              <textarea
+                value={programComment}
+                onChange={(e) => setProgramComment(e.target.value)}
+                placeholder="Add a comment (required)"
+                rows={2}
+                className="w-full mt-3 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary resize-none"
+              />
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  disabled={sharingProgram}
+                  className="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={shareProgram}
+                  disabled={sharingProgram || !programComment.trim()}
+                  className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-60"
+                >
+                  {sharingProgram ? 'Sharing…' : 'Share'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-white">Training Program</h2>
           <Link href="/" className="text-xs text-muted hover:text-white">← Back</Link>
@@ -325,14 +369,13 @@ export default function ProgramPage() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={shareProgram}
-                disabled={sharingProgram}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 active:scale-95 transition disabled:opacity-60"
+                onClick={openShareModal}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 active:scale-95 transition"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
-                {sharingProgram ? 'Sharing…' : 'Share'}
+                Share
               </button>
               <button
                 onClick={deleteProgram}
