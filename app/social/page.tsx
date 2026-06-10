@@ -293,6 +293,7 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
   const [loading, setLoading] = useState(true);
   const [recreating, setRecreating] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [confirmAdd, setConfirmAdd] = useState<FeedItem | null>(null);
 
   const load = useCallback(() => {
     fetch('/api/social/feed')
@@ -332,7 +333,7 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast(item.itemType === 'program' ? 'Program added (inactive). Activate it in Workouts.' : 'Routine added to your workouts!');
+        toast(item.itemType === 'program' ? 'Program added to your library (inactive).' : 'Routine added to your library!');
         setItems((prev) => prev.map((p) => (p.id === item.id ? { ...p, alreadyRecreated: true, recreateCount: p.recreateCount + 1 } : p)));
       } else if (d.code === 'capReached') {
         toast(`You already have ${d.limit} programs. Remove one before recreating another.`, 'error');
@@ -373,7 +374,7 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
             </Badge>
           </div>
           <div className="text-white font-bold">{item.title}</div>
-          {item.caption && <p className="text-sm text-slate-300 mt-1">{item.caption}</p>}
+          {item.caption && <p className="text-lg font-bold text-yellow-400 mt-1">{item.caption}</p>}
           {item.preview?.days && item.preview.days.length > 0 && <ProgramPreview days={item.preview.days} />}
           {item.preview?.exercises && item.preview.exercises.length > 0 && <RoutinePreview exercises={item.preview.exercises} />}
           <div className="flex items-center justify-between mt-3">
@@ -392,14 +393,43 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
                 size="sm"
                 variant={item.alreadyRecreated ? 'ghost' : 'primary'}
                 disabled={item.alreadyRecreated || recreating === item.id}
-                onClick={() => recreate(item)}
+                onClick={() => setConfirmAdd(item)}
               >
-                {item.alreadyRecreated ? 'Added ✓' : recreating === item.id ? 'Adding…' : 'Recreate'}
+                {item.alreadyRecreated ? 'Added ✓' : recreating === item.id ? 'Adding…' : 'Add to library'}
               </Button>
             )}
           </div>
         </Card>
       ))}
+
+      {confirmAdd && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setConfirmAdd(null)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-[90%] shadow-2xl">
+            <p className="text-base font-bold text-white">Add to your library?</p>
+            <p className="text-xs text-slate-400 mt-1">
+              <span className="font-semibold text-white">{confirmAdd.title}</span>{' '}
+              {confirmAdd.itemType === 'program'
+                ? 'will be added as a new (inactive) program you can activate later.'
+                : 'will be added to your routines.'}
+            </p>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setConfirmAdd(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-700/60 text-slate-300 text-sm font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { const it = confirmAdd; setConfirmAdd(null); recreate(it); }}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-bold"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
