@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { Modal } from '@/components/ui/Modal';
+import { useToast } from '@/components/ui/Toast';
 import type { Workout, WorkoutExercise, Exercise, Activity, WorkoutCollection } from '@/types';
 import SetRow, { type WeightUnit, lbToKg } from '@/components/workout/SetRow';
 import FocusedExerciseView from '@/components/workout/FocusedExerciseView';
@@ -1259,10 +1260,13 @@ function RoutineDetail({
   onSpin: () => void;
   weightUnit?: 'lb' | 'kg';
 }) {
+  const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmShare, setConfirmShare] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [addingExercise, setAddingExercise] = useState(false);
   const [swappingExercise, setSwappingExercise] = useState<WorkoutExercise | null>(null);
   const [confirmRemoveExercise, setConfirmRemoveExercise] = useState<WorkoutExercise | null>(null);
@@ -1341,6 +1345,29 @@ function RoutineDetail({
     setConfirmDelete(true);
   };
 
+  const startShare = () => {
+    setMenuOpen(false);
+    setConfirmShare(true);
+  };
+
+  const confirmShareRoutine = async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const res = await fetch('/api/social/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemType: 'routine', sourceId: latest.id }),
+      });
+      toast(res.ok ? 'Routine shared with your followers!' : 'Failed to share routine', res.ok ? 'success' : 'error');
+    } catch {
+      toast('Failed to share routine', 'error');
+    } finally {
+      setSharing(false);
+      setConfirmShare(false);
+    }
+  };
+
   const confirmDeleteAction = () => {
     onDelete(workouts.map((w) => w.id));
     setConfirmDelete(false);
@@ -1370,6 +1397,34 @@ function RoutineDetail({
                 className="flex-1 py-2 rounded-lg bg-red-500 text-white text-xs font-bold"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {confirmShare && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => !sharing && setConfirmShare(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[300px] w-full shadow-2xl">
+            <p className="text-base font-bold text-white">Share with followers?</p>
+            <p className="text-xs text-muted mt-1">
+              Your followers will see this routine in their feed and can recreate it in their own account.
+            </p>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setConfirmShare(false)}
+                disabled={sharing}
+                className="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmShareRoutine}
+                disabled={sharing}
+                className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-60"
+              >
+                {sharing ? 'Sharing…' : 'Share'}
               </button>
             </div>
           </div>
@@ -1436,6 +1491,15 @@ function RoutineDetail({
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                         Swap / Regenerate
+                      </button>
+                      <button
+                        onClick={startShare}
+                        className="w-full text-left px-4 py-2.5 text-sm font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        Share with followers
                       </button>
                       <button
                         onClick={startRename}
