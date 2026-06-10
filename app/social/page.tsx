@@ -176,6 +176,7 @@ export default function SocialPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 shrink-0 border-b border-border-dark">
+        <div className="max-w-lg mx-auto w-full">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black text-white">Social</h1>
           {me && (
@@ -203,12 +204,15 @@ export default function SocialPage() {
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
-        {tab === 'feed' && <FeedTab toast={toast} />}
-        {tab === 'find' && <FindTab toast={toast} />}
-        {tab === 'requests' && <RequestsTab toast={toast} onChange={loadMe} />}
+        <div className="max-w-lg mx-auto w-full">
+          {tab === 'feed' && <FeedTab toast={toast} />}
+          {tab === 'find' && <FindTab toast={toast} />}
+          {tab === 'requests' && <RequestsTab toast={toast} onChange={loadMe} />}
+        </div>
       </div>
     </div>
   );
