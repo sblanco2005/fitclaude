@@ -25,6 +25,9 @@ interface Sharer {
   image: string | null;
 }
 
+interface DayPreview { weekday: number; weekNumber: number; dayType: string; dayLabel: string }
+interface ExercisePreview { name: string; sets: number; reps: string | null }
+
 interface FeedItem {
   id: string;
   itemType: 'routine' | 'program';
@@ -35,6 +38,70 @@ interface FeedItem {
   sharer: Sharer;
   isOwn: boolean;
   alreadyRecreated: boolean;
+  preview?: { days?: DayPreview[]; exercises?: ExercisePreview[] };
+}
+
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// Program day strip — mirrors the home-screen program preview (emerald = coached,
+// purple = log-your-own, muted = rest).
+function ProgramPreview({ days }: { days: DayPreview[] }) {
+  const weeks = [...new Set(days.map((d) => d.weekNumber))].sort((a, b) => a - b);
+  return (
+    <div className="space-y-2 mt-3">
+      {weeks.map((wk) => {
+        const byWeekday = new Map(days.filter((d) => d.weekNumber === wk).map((d) => [d.weekday, d]));
+        return (
+          <div key={wk}>
+            {weeks.length > 1 && (
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Week {wk}</div>
+            )}
+            <div className="grid grid-cols-7 gap-1.5">
+              {WEEKDAY_LABELS.map((label, wd) => {
+                const day = byWeekday.get(wd);
+                const dayType = day?.dayType || 'rest';
+                const typeColor =
+                  dayType === 'coached'
+                    ? 'bg-primary/20 text-primary border-primary/40'
+                    : dayType === 'pt_session' || dayType === 'class'
+                      ? 'bg-purple-500/20 text-purple-400 border-purple-500/40'
+                      : 'bg-slate-800/40 text-slate-500 border-slate-700';
+                return (
+                  <div
+                    key={wd}
+                    className={`aspect-[4/5] rounded-lg border flex flex-col items-center justify-center p-1 ${typeColor}`}
+                  >
+                    <div className="text-[10px] font-bold opacity-70 uppercase">{label}</div>
+                    <div className="text-[9px] font-medium text-center leading-tight mt-0.5 line-clamp-2">
+                      {day?.dayLabel || 'Rest'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Routine preview — compact exercise list.
+function RoutinePreview({ exercises }: { exercises: ExercisePreview[] }) {
+  const shown = exercises.slice(0, 8);
+  return (
+    <div className="mt-3 rounded-lg bg-slate-900/50 border border-slate-800 divide-y divide-slate-800/80">
+      {shown.map((e, i) => (
+        <div key={i} className="flex items-center justify-between px-3 py-1.5 text-xs">
+          <span className="text-slate-300 truncate">{e.name}</span>
+          <span className="text-slate-500 ml-2 shrink-0 tabular-nums">{e.sets} × {e.reps || '—'}</span>
+        </div>
+      ))}
+      {exercises.length > shown.length && (
+        <div className="px-3 py-1.5 text-[11px] text-slate-500">+{exercises.length - shown.length} more</div>
+      )}
+    </div>
+  );
 }
 
 interface SearchUser extends Sharer {
@@ -48,12 +115,27 @@ interface FollowRequest {
 }
 
 function Avatar({ user, size = 40 }: { user: Sharer; size?: number }) {
+  const [broken, setBroken] = useState(false);
   const initial = (user.name || user.username || '?').charAt(0).toUpperCase();
-  return user.image ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={user.image} alt="" width={size} height={size} className="rounded-full object-cover" style={{ width: size, height: size }} />
-  ) : (
-    <div className="rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold" style={{ width: size, height: size }}>
+  if (user.image && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={user.image}
+        alt=""
+        width={size}
+        height={size}
+        onError={() => setBroken(true)}
+        className="rounded-full object-cover ring-1 ring-white/10"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <div
+      className="rounded-full bg-gradient-to-br from-primary/40 to-emerald-700/20 text-primary flex items-center justify-center font-bold ring-1 ring-primary/30"
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+    >
       {initial}
     </div>
   );
@@ -270,6 +352,8 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
           </div>
           <div className="text-white font-bold">{item.title}</div>
           {item.caption && <p className="text-sm text-slate-300 mt-1">{item.caption}</p>}
+          {item.preview?.days && item.preview.days.length > 0 && <ProgramPreview days={item.preview.days} />}
+          {item.preview?.exercises && item.preview.exercises.length > 0 && <RoutinePreview exercises={item.preview.exercises} />}
           <div className="flex items-center justify-between mt-3">
             <span className="text-xs text-slate-500">{item.recreateCount} recreated</span>
             {item.isOwn ? (

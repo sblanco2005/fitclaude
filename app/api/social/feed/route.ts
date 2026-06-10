@@ -4,6 +4,41 @@ import { prisma } from '@/lib/prisma';
 
 const PAGE_SIZE = 20;
 
+interface DayPreview { weekday: number; weekNumber: number; dayType: string; dayLabel: string }
+interface ExercisePreview { name: string; sets: number; reps: string | null }
+interface Preview { days?: DayPreview[]; exercises?: ExercisePreview[] }
+
+// Derive a lightweight preview (day strip for programs, exercise list for routines)
+// from the immutable snapshot, so the feed can show "what's inside" without shipping
+// the whole snapshot.
+function buildPreview(itemType: string, snapshotJson: string): Preview {
+  try {
+    const s = JSON.parse(snapshotJson);
+    if (itemType === 'program' && Array.isArray(s.days)) {
+      return {
+        days: s.days.map((d: Record<string, unknown>) => ({
+          weekday: d.weekday as number,
+          weekNumber: d.weekNumber as number,
+          dayType: d.dayType as string,
+          dayLabel: d.dayLabel as string,
+        })),
+      };
+    }
+    if (itemType === 'routine' && Array.isArray(s.exercises)) {
+      return {
+        exercises: s.exercises.map((e: Record<string, unknown>) => ({
+          name: e.name as string,
+          sets: (e.sets as number) ?? 0,
+          reps: (e.reps as string) ?? null,
+        })),
+      };
+    }
+  } catch {
+    /* malformed snapshot — no preview */
+  }
+  return {};
+}
+
 // GET — feed of shared items from people I follow (accepted), newest first (?cursor=)
 export const GET = withAuth(async (request, user) => {
   const cursor = new URL(request.url).searchParams.get('cursor') || undefined;
@@ -28,6 +63,7 @@ export const GET = withAuth(async (request, user) => {
       caption: true,
       recreateCount: true,
       createdAt: true,
+      snapshot: true,
       user: { select: { id: true, name: true, username: true, image: true } },
     },
   });
@@ -53,6 +89,7 @@ export const GET = withAuth(async (request, user) => {
       sharer: p.user,
       isOwn: p.user.id === user.id,
       alreadyRecreated: recreatedSet.has(p.id),
+      preview: buildPreview(p.itemType, p.snapshot),
     })),
     nextCursor: hasMore ? page[page.length - 1].id : null,
   });
