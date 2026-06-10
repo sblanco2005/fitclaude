@@ -163,6 +163,24 @@ function userHandle(u: Sharer): string {
   return u.username ? `@${u.username}` : u.name || 'Someone';
 }
 
+// Relative "time ago" — computed at render, so it refreshes whenever the feed
+// (re)mounts, i.e. each time the user opens the Social/Feed tab.
+function timeAgo(iso: string): string {
+  const secs = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
 export default function SocialPage() {
   const { status } = useSession();
   const { toast } = useToast();
@@ -367,7 +385,7 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
               <div className="text-sm font-semibold text-white truncate">
                 {item.isOwn ? 'You' : userHandle(item.sharer)}
               </div>
-              <div className="text-xs text-slate-500">shared a {item.itemType}</div>
+              <div className="text-xs text-slate-500">shared a {item.itemType} · {timeAgo(item.createdAt)}</div>
             </div>
             <Badge variant={item.itemType === 'program' ? 'info' : 'default'} className="ml-auto">
               {item.itemType}
