@@ -43,47 +43,63 @@ interface FeedItem {
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// Program week view — mirrors the home-screen program card (framed container with
-// a WEEK header and the 7-day strip: emerald = coached, purple = log-your-own,
-// muted = rest).
+// Program week view — mirrors the home-screen program card. Shows ONE week at a
+// time with ‹ › nav (saves vertical space) and the 7-day strip: emerald = coached,
+// purple = log-your-own, muted = rest.
 function ProgramPreview({ days }: { days: DayPreview[] }) {
   const weeks = [...new Set(days.map((d) => d.weekNumber))].sort((a, b) => a - b);
   const totalWeeks = weeks.length ? Math.max(...weeks) : 1;
+  const [viewWeek, setViewWeek] = useState(weeks[0] || 1);
+  const multiWeek = weeks.length > 1;
+
+  const idx = Math.max(0, weeks.indexOf(viewWeek));
+  const byWeekday = new Map(days.filter((d) => d.weekNumber === viewWeek).map((d) => [d.weekday, d]));
+  const step = (dir: number) => setViewWeek(weeks[(idx + dir + weeks.length) % weeks.length]);
+
   return (
-    <div className="mt-3 rounded-2xl border border-slate-700/60 bg-slate-900/50 p-3 space-y-3">
-      {weeks.map((wk) => {
-        const byWeekday = new Map(days.filter((d) => d.weekNumber === wk).map((d) => [d.weekday, d]));
-        return (
-          <div key={wk}>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-2 text-center">
-              Program — Week {wk} of {totalWeeks}
+    <div className="mt-3 rounded-2xl border border-slate-700/60 bg-slate-900/50 p-3">
+      <div className="flex items-center justify-center gap-2 mb-2">
+        {multiWeek && (
+          <button onClick={() => step(-1)} className="text-slate-500 hover:text-white transition-colors" aria-label="Previous week">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em]">
+          Program — Week {viewWeek} of {totalWeeks}
+        </span>
+        {multiWeek && (
+          <button onClick={() => step(1)} className="text-slate-500 hover:text-white transition-colors" aria-label="Next week">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {WEEKDAY_LABELS.map((label, wd) => {
+          const day = byWeekday.get(wd);
+          const dayType = day?.dayType || 'rest';
+          const typeColor =
+            dayType === 'coached'
+              ? 'bg-primary/20 text-primary border-primary/40'
+              : dayType === 'pt_session' || dayType === 'class'
+                ? 'bg-purple-500/20 text-purple-400 border-purple-500/40'
+                : 'bg-slate-800/40 text-slate-500 border-slate-700';
+          return (
+            <div
+              key={wd}
+              className={`aspect-[4/5] rounded-lg border flex flex-col items-center justify-center px-0.5 py-1 ${typeColor}`}
+            >
+              <div className="text-[10px] font-extrabold uppercase tracking-wide">{label}</div>
+              <div className="text-[9px] font-medium text-center leading-tight mt-1 line-clamp-2">
+                {day?.dayLabel || 'Rest'}
+              </div>
             </div>
-            <div className="grid grid-cols-7 gap-1.5">
-              {WEEKDAY_LABELS.map((label, wd) => {
-                const day = byWeekday.get(wd);
-                const dayType = day?.dayType || 'rest';
-                const typeColor =
-                  dayType === 'coached'
-                    ? 'bg-primary/20 text-primary border-primary/40'
-                    : dayType === 'pt_session' || dayType === 'class'
-                      ? 'bg-purple-500/20 text-purple-400 border-purple-500/40'
-                      : 'bg-slate-800/40 text-slate-500 border-slate-700';
-                return (
-                  <div
-                    key={wd}
-                    className={`aspect-[4/5] rounded-lg border flex flex-col items-center justify-center px-0.5 py-1 ${typeColor}`}
-                  >
-                    <div className="text-[10px] font-extrabold uppercase tracking-wide">{label}</div>
-                    <div className="text-[9px] font-medium text-center leading-tight mt-1 line-clamp-2">
-                      {day?.dayLabel || 'Rest'}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
