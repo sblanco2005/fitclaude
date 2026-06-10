@@ -43,19 +43,21 @@ interface FeedItem {
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// Program day strip — mirrors the home-screen program preview (emerald = coached,
-// purple = log-your-own, muted = rest).
+// Program week view — mirrors the home-screen program card (framed container with
+// a WEEK header and the 7-day strip: emerald = coached, purple = log-your-own,
+// muted = rest).
 function ProgramPreview({ days }: { days: DayPreview[] }) {
   const weeks = [...new Set(days.map((d) => d.weekNumber))].sort((a, b) => a - b);
+  const totalWeeks = weeks.length ? Math.max(...weeks) : 1;
   return (
-    <div className="space-y-2 mt-3">
+    <div className="mt-3 rounded-2xl border border-slate-700/60 bg-slate-900/50 p-3 space-y-3">
       {weeks.map((wk) => {
         const byWeekday = new Map(days.filter((d) => d.weekNumber === wk).map((d) => [d.weekday, d]));
         return (
           <div key={wk}>
-            {weeks.length > 1 && (
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Week {wk}</div>
-            )}
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-2 text-center">
+              Program — Week {wk} of {totalWeeks}
+            </div>
             <div className="grid grid-cols-7 gap-1.5">
               {WEEKDAY_LABELS.map((label, wd) => {
                 const day = byWeekday.get(wd);
@@ -69,10 +71,10 @@ function ProgramPreview({ days }: { days: DayPreview[] }) {
                 return (
                   <div
                     key={wd}
-                    className={`aspect-[4/5] rounded-lg border flex flex-col items-center justify-center p-1 ${typeColor}`}
+                    className={`aspect-[4/5] rounded-lg border flex flex-col items-center justify-center px-0.5 py-1 ${typeColor}`}
                   >
-                    <div className="text-[10px] font-bold opacity-70 uppercase">{label}</div>
-                    <div className="text-[9px] font-medium text-center leading-tight mt-0.5 line-clamp-2">
+                    <div className="text-[10px] font-extrabold uppercase tracking-wide">{label}</div>
+                    <div className="text-[9px] font-medium text-center leading-tight mt-1 line-clamp-2">
                       {day?.dayLabel || 'Rest'}
                     </div>
                   </div>
