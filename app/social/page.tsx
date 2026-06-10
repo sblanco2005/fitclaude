@@ -428,7 +428,7 @@ function FeedTab({ toast }: { toast: (m: string, t?: 'success' | 'error' | 'info
             <p className="text-xs text-slate-400 mt-1">
               <span className="font-semibold text-white">{confirmAdd.title}</span>{' '}
               {confirmAdd.itemType === 'program'
-                ? 'will be added as a new (inactive) program you can activate later.'
+                ? 'will be added to your programs. If you already have 3, your oldest extra one is replaced. Make it your main program anytime from Home.'
                 : 'will be added to your routines.'}
             </p>
             <div className="flex gap-2 mt-4">

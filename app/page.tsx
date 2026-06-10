@@ -10,6 +10,45 @@ import { useFitClaude } from '@/context/FitClaudeContext';
 import type { Activity, DailyNutrition, TodayWorkout, TrainingProgram, UserProfile, Workout, WorkoutCollection } from '@/types';
 import { estimateActivityKcal } from '@/lib/calorie-estimate';
 
+interface ProgramDayLite { weekday: number; weekNumber: number; dayType: string; dayLabel: string }
+interface ProgramListItem {
+  id: string;
+  name: string | null;
+  isActive: boolean;
+  totalWeeks: number;
+  currentWeek: number;
+  dayCount: number;
+  days: ProgramDayLite[];
+  source: { id: string; name: string | null; username: string | null } | null;
+}
+
+const MINI_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// Compact 7-day strip for a non-active "bench" program (week 1).
+function MiniWeekStrip({ days }: { days: ProgramDayLite[] }) {
+  const byWeekday = new Map(days.map((d) => [d.weekday, d]));
+  return (
+    <div className="grid grid-cols-7 gap-1">
+      {MINI_WEEKDAYS.map((label, wd) => {
+        const day = byWeekday.get(wd);
+        const dayType = day?.dayType || 'rest';
+        const color =
+          dayType === 'coached'
+            ? 'bg-primary/20 text-primary border-primary/40'
+            : dayType === 'pt_session' || dayType === 'class'
+              ? 'bg-purple-500/20 text-purple-400 border-purple-500/40'
+              : 'bg-slate-800/40 text-slate-500 border-slate-700';
+        return (
+          <div key={wd} className={`aspect-[4/5] rounded-md border flex flex-col items-center justify-center px-0.5 py-0.5 ${color}`}>
+            <div className="text-[9px] font-bold uppercase">{label}</div>
+            <div className="text-[8px] font-medium text-center leading-tight line-clamp-2">{day?.dayLabel || 'Rest'}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -21,6 +60,7 @@ export default function DashboardPage() {
   const [collections, setCollections] = useState<WorkoutCollection[]>([]);
   const [programToday, setProgramToday] = useState<TodayWorkout | null>(null);
   const [program, setProgram] = useState<TrainingProgram | null>(null);
+  const [allPrograms, setAllPrograms] = useState<ProgramListItem[]>([]);
   const [programLoaded, setProgramLoaded] = useState(false);
   const [viewedWeek, setViewedWeek] = useState<number | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -94,6 +134,11 @@ export default function DashboardPage() {
         })
         .catch(() => setProgramLoaded(true));
 
+      fetch('/api/program/list')
+        .then((res) => res.ok ? res.json() : [])
+        .then((data) => setAllPrograms(Array.isArray(data) ? data : []))
+        .catch(() => {});
+
       fetch('/api/profile')
         .then((res) => res.ok ? res.json() : null)
         .then((data) => { if (data) setProfile(data); })
@@ -107,6 +152,36 @@ export default function DashboardPage() {
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [status, dataVersion]);
+
+  // Promote a program to the active "main" one; refresh the active card + list.
+  const makeMain = async (programId: string) => {
+    try {
+      const res = await fetch('/api/program', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ programId }),
+      });
+      if (!res.ok) return;
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const [p, today, list] = await Promise.all([
+        fetch('/api/program').then((r) => (r.ok ? r.json() : null)),
+        fetch(`/api/program/today?tz=${encodeURIComponent(tz)}`).then((r) => (r.ok ? r.json() : null)),
+        fetch('/api/program/list').then((r) => (r.ok ? r.json() : [])),
+      ]);
+      setProgram(p?.id ? p : null);
+      setProgramToday(today?.programDayId ? today : null);
+      setAllPrograms(Array.isArray(list) ? list : []);
+      setViewedWeek(null);
+    } catch { /* ignore */ }
+  };
+
+  const removeBenchProgram = async (programId: string) => {
+    if (!confirm('Remove this program? This cannot be undone.')) return;
+    try {
+      await fetch(`/api/program?programId=${programId}`, { method: 'DELETE' });
+      setAllPrograms((prev) => prev.filter((p) => p.id !== programId));
+    } catch { /* ignore */ }
+  };
 
   if (status === 'loading') {
     return (
@@ -340,6 +415,44 @@ export default function DashboardPage() {
             </div>
           </Card>
         </Link>
+      )}
+
+      {/* ──────────── BLOCK 1b — OTHER PROGRAMS (bench, up to 2) ──────────────── */}
+      {allPrograms.filter((p) => !p.isActive).length > 0 && (
+        <div className="space-y-2">
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Other programs</div>
+          {allPrograms
+            .filter((p) => !p.isActive)
+            .map((p) => (
+              <Card key={p.id} className="p-3">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{p.name || 'Training program'}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {p.totalWeeks}-week · {p.dayCount} days
+                      {p.source && <> · from @{p.source.username || p.source.name}</>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => makeMain(p.id)}
+                      className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold active:scale-95 transition"
+                    >
+                      Make main
+                    </button>
+                    <button
+                      onClick={() => removeBenchProgram(p.id)}
+                      className="text-slate-600 hover:text-red-400 text-xs font-medium px-1"
+                      title="Remove program"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                <MiniWeekStrip days={p.days.filter((d) => d.weekNumber === 1)} />
+              </Card>
+            ))}
+        </div>
       )}
 
       {/* ───────────────── BLOCK 2 — NUTRITION ───────────────────────────────── */}

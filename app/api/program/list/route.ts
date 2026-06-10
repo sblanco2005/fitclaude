@@ -16,6 +16,10 @@ export const GET = withAuth(async (_request, user) => {
       sourceUserId: true,
       createdAt: true,
       _count: { select: { days: true } },
+      days: {
+        orderBy: [{ weekNumber: 'asc' }, { weekday: 'asc' }],
+        select: { weekday: true, weekNumber: true, dayType: true, dayLabel: true },
+      },
     },
   });
 
@@ -34,6 +38,7 @@ export const GET = withAuth(async (_request, user) => {
       totalWeeks: p.totalWeeks,
       currentWeek: p.currentWeek,
       dayCount: p._count.days,
+      days: p.days,
       source: p.sourceUserId ? sourceById.get(p.sourceUserId) ?? null : null,
     })),
   );

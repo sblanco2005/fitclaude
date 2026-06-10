@@ -123,9 +123,17 @@ export async function recreateProgram(
   provenance: { sourceUserId?: string | null; sourceShareId?: string | null } = {},
 ): Promise<string> {
   return prisma.$transaction(async (tx) => {
-    const count = await tx.trainingProgram.count({ where: { userId } });
-    if (count >= MAX_PROGRAMS_PER_USER) {
-      throw new ProgramCapReachedError(MAX_PROGRAMS_PER_USER);
+    // Enforce the cap by evicting the OLDEST non-active program (never the active
+    // "main"), so adding a program at the limit replaces the oldest bench program.
+    const existing = await tx.trainingProgram.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, isActive: true },
+    });
+    if (existing.length >= MAX_PROGRAMS_PER_USER) {
+      const evict = existing.find((p) => !p.isActive);
+      if (!evict) throw new ProgramCapReachedError(MAX_PROGRAMS_PER_USER); // all active (shouldn't happen)
+      await tx.trainingProgram.delete({ where: { id: evict.id } });
     }
 
     const program = await tx.trainingProgram.create({
