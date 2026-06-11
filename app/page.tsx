@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import type { Activity, DailyNutrition, TodayWorkout, TrainingProgram, UserProfile, Workout, WorkoutCollection } from '@/types';
 import { estimateActivityKcal } from '@/lib/calorie-estimate';
@@ -51,6 +52,7 @@ function MiniWeekStrip({ days }: { days: ProgramDayLite[] }) {
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
+  const { toast } = useToast();
   const router = useRouter();
   const { setChatOpen, setChatTopic, dataVersion, setPendingSessionType } = useFitClaude();
   const [nutrition, setNutrition] = useState<DailyNutrition | null>(null);
@@ -61,6 +63,11 @@ export default function DashboardPage() {
   const [programToday, setProgramToday] = useState<TodayWorkout | null>(null);
   const [program, setProgram] = useState<TrainingProgram | null>(null);
   const [allPrograms, setAllPrograms] = useState<ProgramListItem[]>([]);
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
+  const [shareProgramId, setShareProgramId] = useState<string | null>(null);
+  const [shareComment, setShareComment] = useState('');
+  const [shareBusy, setShareBusy] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [programLoaded, setProgramLoaded] = useState(false);
   const [viewedWeek, setViewedWeek] = useState<number | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -180,7 +187,31 @@ export default function DashboardPage() {
     try {
       await fetch(`/api/program?programId=${programId}`, { method: 'DELETE' });
       setAllPrograms((prev) => prev.filter((p) => p.id !== programId));
+      if (selectedProgramId === programId) setSelectedProgramId(null);
     } catch { /* ignore */ }
+  };
+
+  const submitShareProgram = async () => {
+    if (!shareProgramId || shareBusy || !shareComment.trim()) return;
+    setShareBusy(true);
+    try {
+      const res = await fetch('/api/social/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemType: 'program', sourceId: shareProgramId, caption: shareComment }),
+      });
+      if (res.ok) {
+        toast('Program shared with your followers!');
+        setShareProgramId(null);
+        setShareComment('');
+      } else {
+        toast('Failed to share program', 'error');
+      }
+    } catch {
+      toast('Failed to share program', 'error');
+    } finally {
+      setShareBusy(false);
+    }
   };
 
   if (status === 'loading') {
@@ -237,6 +268,14 @@ export default function DashboardPage() {
     : [];
   const daysByWeekday = new Map(displayedWeekDays.map((d) => [d.weekday, d]));
   const isViewingCurrentWeek = program ? displayWeek === program.currentWeek : true;
+
+  // Program tabs: the active program is the "main" tab; non-active are bench tabs.
+  // When a bench tab is selected we render that program's strip; otherwise the
+  // full main program (with today highlight + week nav) from /api/program.
+  const activeProgramItem = allPrograms.find((p) => p.isActive) || null;
+  const selectedBench =
+    allPrograms.find((p) => p.id === selectedProgramId && !p.isActive) || null;
+  const viewingMain = !selectedBench;
 
   // Build the combined activity list for the viewed date
   type TodayItem = { id: string; label: string; meta: string; kcal?: number | null; done: boolean; type: 'workout' | 'activity' | 'todo'; href?: string; onClick?: () => void };
@@ -324,6 +363,36 @@ export default function DashboardPage() {
         </Card>
       ) : program ? (
         <Card className="p-4">
+          {/* Program tabs: main (active) + up to 2 bench programs */}
+          <div className="flex items-center gap-1.5 mb-3 overflow-x-auto -mx-1 px-1">
+            {allPrograms.map((p) => {
+              const isSel = p.isActive ? viewingMain : selectedProgramId === p.id;
+              const benchPos = allPrograms.filter((x) => !x.isActive).findIndex((x) => x.id === p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedProgramId(p.isActive ? null : p.id)}
+                  className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+                    isSel ? 'bg-primary text-white' : 'bg-slate-800/50 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {p.isActive ? '★ Main' : (p.name || `Program ${benchPos + 2}`)}
+                </button>
+              );
+            })}
+            {allPrograms.length < 3 && (
+              <button
+                onClick={() => setAddMenuOpen(true)}
+                className="shrink-0 w-7 h-7 rounded-lg bg-slate-800/50 text-slate-400 hover:text-white flex items-center justify-center text-lg leading-none"
+                title="Add a program"
+              >
+                +
+              </button>
+            )}
+          </div>
+
+          {viewingMain ? (
+          <>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               {program.totalWeeks > 1 && (
@@ -365,11 +434,19 @@ export default function DashboardPage() {
                 </button>
               )}
             </div>
-            <Link href="/program" className="text-slate-600 hover:text-white transition-colors">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setShareComment(''); setShareProgramId(program.id); }}
+                className="text-xs font-bold text-primary hover:text-primary/80 transition-colors"
+              >
+                Share
+              </button>
+              <Link href="/program" className="text-slate-600 hover:text-white transition-colors">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
           </div>
           <Link href="/program" className="block">
             <div className="grid grid-cols-7 gap-1.5">
@@ -399,6 +476,31 @@ export default function DashboardPage() {
               })}
             </div>
           </Link>
+          </>
+          ) : selectedBench ? (
+          <>
+            <div className="flex items-center justify-between mb-3 gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest truncate">
+                {selectedBench.name || 'Program'} · {selectedBench.totalWeeks}-week
+              </span>
+              {selectedBench.source && (
+                <span className="text-[10px] text-slate-600 shrink-0">from @{selectedBench.source.username || selectedBench.source.name}</span>
+              )}
+            </div>
+            <MiniWeekStrip days={selectedBench.days.filter((d) => d.weekNumber === 1)} />
+            <div className="flex items-center gap-2 mt-3">
+              <button onClick={() => makeMain(selectedBench.id)} className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold active:scale-95 transition">
+                Make main
+              </button>
+              <button onClick={() => { setShareComment(''); setShareProgramId(selectedBench.id); }} className="px-3 py-1.5 rounded-lg bg-slate-700/60 text-slate-300 text-xs font-bold">
+                Share
+              </button>
+              <button onClick={() => removeBenchProgram(selectedBench.id)} className="ml-auto text-slate-600 hover:text-red-400 text-xs font-medium">
+                Remove
+              </button>
+            </div>
+          </>
+          ) : null}
         </Card>
       ) : (
         <Link href="/program" className="block">
@@ -417,42 +519,49 @@ export default function DashboardPage() {
         </Link>
       )}
 
-      {/* ──────────── BLOCK 1b — OTHER PROGRAMS (bench, up to 2) ──────────────── */}
-      {allPrograms.filter((p) => !p.isActive).length > 0 && (
-        <div className="space-y-2">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Other programs</div>
-          {allPrograms
-            .filter((p) => !p.isActive)
-            .map((p) => (
-              <Card key={p.id} className="p-3">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold text-white truncate">{p.name || 'Training program'}</div>
-                    <div className="text-[11px] text-slate-500">
-                      {p.totalWeeks}-week · {p.dayCount} days
-                      {p.source && <> · from @{p.source.username || p.source.name}</>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => makeMain(p.id)}
-                      className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold active:scale-95 transition"
-                    >
-                      Make main
-                    </button>
-                    <button
-                      onClick={() => removeBenchProgram(p.id)}
-                      className="text-slate-600 hover:text-red-400 text-xs font-medium px-1"
-                      title="Remove program"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                <MiniWeekStrip days={p.days.filter((d) => d.weekNumber === 1)} />
-              </Card>
-            ))}
-        </div>
+      {/* Add-program menu */}
+      {addMenuOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setAddMenuOpen(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-4 max-w-[300px] w-[90%] shadow-2xl space-y-2">
+            <p className="text-sm font-bold text-white mb-1">Add a program</p>
+            <Link href="/program" onClick={() => setAddMenuOpen(false)} className="block w-full px-4 py-3 rounded-xl bg-primary/15 text-primary text-sm font-bold text-center">
+              Build a new program
+            </Link>
+            <Link href="/social" onClick={() => setAddMenuOpen(false)} className="block w-full px-4 py-3 rounded-xl bg-slate-700/60 text-slate-300 text-sm font-bold text-center">
+              Import from a post
+            </Link>
+            <button onClick={() => setAddMenuOpen(false)} className="w-full px-4 py-2 text-slate-500 text-xs font-medium">
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Share program */}
+      {shareProgramId && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => !shareBusy && setShareProgramId(null)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[320px] w-[90%] shadow-2xl">
+            <p className="text-base font-bold text-white">Share this program?</p>
+            <p className="text-xs text-slate-400 mt-1">Your followers will see it in their feed and can add it to their library.</p>
+            <textarea
+              value={shareComment}
+              onChange={(e) => setShareComment(e.target.value)}
+              placeholder="Add a comment (required)"
+              rows={2}
+              className="w-full mt-3 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary resize-none"
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShareProgramId(null)} disabled={shareBusy} className="flex-1 py-2.5 rounded-xl bg-slate-700/60 text-slate-300 text-sm font-bold disabled:opacity-60">
+                Cancel
+              </button>
+              <button onClick={submitShareProgram} disabled={shareBusy || !shareComment.trim()} className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60">
+                {shareBusy ? 'Sharing…' : 'Share'}
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* ───────────────── BLOCK 2 — NUTRITION ───────────────────────────────── */}
