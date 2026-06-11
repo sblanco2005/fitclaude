@@ -525,7 +525,7 @@ export default function DashboardPage() {
           <div className="fixed inset-0 bg-black/60 z-50" onClick={() => setAddMenuOpen(false)} />
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-4 max-w-[300px] w-[90%] shadow-2xl space-y-2">
             <p className="text-sm font-bold text-white mb-1">Add a program</p>
-            <Link href="/program" onClick={() => setAddMenuOpen(false)} className="block w-full px-4 py-3 rounded-xl bg-primary/15 text-primary text-sm font-bold text-center">
+            <Link href="/program?new=1" onClick={() => setAddMenuOpen(false)} className="block w-full px-4 py-3 rounded-xl bg-primary/15 text-primary text-sm font-bold text-center">
               Build a new program
             </Link>
             <Link href="/social" onClick={() => setAddMenuOpen(false)} className="block w-full px-4 py-3 rounded-xl bg-slate-700/60 text-slate-300 text-sm font-bold text-center">
