@@ -552,3 +552,14 @@ model ShareRecreation {
   @@index([userId])
   @@map("share_recreations")
 }
+
+// Invite allowlist — only these emails (plus already-registered users) may sign in.
+// Managed by admins from Settings; replaces the ALLOWED_EMAILS env var.
+model AllowedEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  invitedBy String? // admin user id who added it
+  createdAt DateTime @default(now())
+
+  @@map("allowed_emails")
+}

@@ -23,6 +23,88 @@ const experienceLevels = [
   { value: 'advanced', label: 'Advanced' },
 ];
 
+interface InviteRow { id: string; email: string; joined: boolean }
+
+function InviteUsers() {
+  const { toast } = useToast();
+  const [emails, setEmails] = useState<InviteRow[]>([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/allowed-emails')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setEmails(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
+
+  const add = async () => {
+    const email = input.trim().toLowerCase();
+    if (!email || busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch('/api/admin/allowed-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setEmails((prev) => [{ id: d.id, email: d.email, joined: false }, ...prev.filter((e) => e.email !== d.email)]);
+        setInput('');
+        toast('Invite added');
+      } else {
+        toast(d.error || 'Could not add invite', 'error');
+      }
+    } catch {
+      toast('Could not add invite', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (email: string) => {
+    try {
+      await fetch(`/api/admin/allowed-emails?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+      setEmails((prev) => prev.filter((e) => e.email !== email));
+    } catch {
+      toast('Could not remove invite', 'error');
+    }
+  };
+
+  return (
+    <Card>
+      <div className="text-sm font-bold text-white mb-1">Invite users</div>
+      <p className="text-xs text-muted mb-3">Only invited emails (and people who already have an account) can sign in.</p>
+      <div className="flex gap-2 mb-3">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
+          type="email"
+          placeholder="name@gmail.com"
+          className="flex-1 bg-card border border-border-dark rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary"
+        />
+        <Button onClick={add} disabled={busy || !input.trim()} size="sm">Invite</Button>
+      </div>
+      <div className="space-y-0.5">
+        {emails.length === 0 && <p className="text-xs text-slate-500">No invites yet.</p>}
+        {emails.map((e) => (
+          <div key={e.id} className="flex items-center justify-between py-1 text-sm">
+            <span className="text-slate-300 truncate">
+              {e.email}
+              {e.joined && <span className="ml-2 text-[10px] font-bold text-primary uppercase">joined</span>}
+            </span>
+            <button onClick={() => remove(e.email)} className="text-slate-600 hover:text-red-400 text-xs ml-2 shrink-0">
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { toast } = useToast();
@@ -388,6 +470,9 @@ export default function SettingsPage() {
           </a>
         </Card>
       )}
+
+      {/* Invite users (admin only) */}
+      {profile.isAdmin && <InviteUsers />}
 
 
       {/* Save */}
