@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { Modal } from '@/components/ui/Modal';
+import { useToast } from '@/components/ui/Toast';
 import type { Workout, WorkoutExercise, Exercise, Activity, WorkoutCollection } from '@/types';
 import SetRow, { type WeightUnit, lbToKg } from '@/components/workout/SetRow';
 import FocusedExerciseView from '@/components/workout/FocusedExerciseView';
@@ -241,11 +242,13 @@ function RoutineCard({
   workouts,
   onClick,
   onAddToCollection,
+  onShare,
 }: {
   name: string;
   workouts: Workout[];
   onClick: () => void;
   onAddToCollection?: (routineName: string) => void;
+  onShare?: (workoutId: string) => void;
 }) {
   const latest = workouts[0];
   const typeColor = TYPE_COLORS[latest.workoutType] ?? 'default';
@@ -296,6 +299,19 @@ function RoutineCard({
           </div>
         )}
       </button>
+
+      {/* Share to followers */}
+      {onShare && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onShare(latest.id); }}
+          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-slate-800/60"
+          title="Share with followers"
+        >
+          <svg className="w-[18px] h-[18px] text-slate-600 hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+        </button>
+      )}
 
       {/* Right-side action: program link (if linked) OR collection folder */}
       {isProgramLinked ? (
@@ -1259,10 +1275,14 @@ function RoutineDetail({
   onSpin: () => void;
   weightUnit?: 'lb' | 'kg';
 }) {
+  const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmShare, setConfirmShare] = useState(false);
+  const [shareComment, setShareComment] = useState('');
+  const [sharing, setSharing] = useState(false);
   const [addingExercise, setAddingExercise] = useState(false);
   const [swappingExercise, setSwappingExercise] = useState<WorkoutExercise | null>(null);
   const [confirmRemoveExercise, setConfirmRemoveExercise] = useState<WorkoutExercise | null>(null);
@@ -1341,6 +1361,31 @@ function RoutineDetail({
     setConfirmDelete(true);
   };
 
+  const startShare = () => {
+    setMenuOpen(false);
+    setShareComment('');
+    setConfirmShare(true);
+  };
+
+  const confirmShareRoutine = async () => {
+    if (sharing || !shareComment.trim()) return;
+    setSharing(true);
+    try {
+      const res = await fetch('/api/social/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemType: 'routine', sourceId: latest.id, caption: shareComment }),
+      });
+      const ok = res.ok;
+      toast(ok ? 'Routine shared with your followers!' : 'Failed to share routine', ok ? 'success' : 'error');
+      if (ok) setConfirmShare(false);
+    } catch {
+      toast('Failed to share routine', 'error');
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const confirmDeleteAction = () => {
     onDelete(workouts.map((w) => w.id));
     setConfirmDelete(false);
@@ -1370,6 +1415,41 @@ function RoutineDetail({
                 className="flex-1 py-2 rounded-lg bg-red-500 text-white text-xs font-bold"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {confirmShare && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => !sharing && setConfirmShare(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-[300px] w-full shadow-2xl">
+            <p className="text-base font-bold text-white">Share with followers?</p>
+            <p className="text-xs text-muted mt-1">
+              Your followers will see this routine in their feed and can recreate it in their own account.
+            </p>
+            <textarea
+              value={shareComment}
+              onChange={(e) => setShareComment(e.target.value)}
+              placeholder="Add a comment (required)"
+              rows={2}
+              className="w-full mt-3 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary resize-none"
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setConfirmShare(false)}
+                disabled={sharing}
+                className="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmShareRoutine}
+                disabled={sharing || !shareComment.trim()}
+                className="flex-1 py-2 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-60"
+              >
+                {sharing ? 'Sharing…' : 'Share'}
               </button>
             </div>
           </div>
@@ -1436,6 +1516,15 @@ function RoutineDetail({
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                         Swap / Regenerate
+                      </button>
+                      <button
+                        onClick={startShare}
+                        className="w-full text-left px-4 py-2.5 text-sm font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        Share with followers
                       </button>
                       <button
                         onClick={startRename}
@@ -2029,6 +2118,11 @@ function ActiveWorkout({
   const [saveStatus, setSaveStatus] = useState<null | 'success' | 'error'>(null);
   const [autoStopped, setAutoStopped] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | 'save' | 'discard'>(null);
+  // Post-save "share with your contacts?" prompt
+  const [shareWorkoutId, setShareWorkoutId] = useState<string | null>(null);
+  const [shareCaption, setShareCaption] = useState('');
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
   const pausedAtRef = useRef<number>(restored?.pausedAt ?? 0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(restored?.startTime ?? null);
@@ -2216,7 +2310,8 @@ function ActiveWorkout({
         setSaving(false);
         setSaveStatus('success');
         navigator.vibrate?.(200);
-        setTimeout(() => onFinish(routineName, elapsed, currentLogs), 2000);
+        // Offer to share the routine before finishing (instead of auto-closing).
+        setShareWorkoutId(latest.id);
         return;
       } catch (err) {
         console.error('[save] Failed:', err);
@@ -2241,6 +2336,38 @@ function ActiveWorkout({
   const retrySave = () => {
     setSaveStatus(null);
     handleSave();
+  };
+
+  // ─── Post-save share prompt ───
+  const finishAfterShare = () => {
+    setShareWorkoutId(null);
+    setShareCaption('');
+    setShareError(null);
+    onFinish(routineName, elapsed, exerciseLogsRef.current);
+  };
+
+  const submitShare = async () => {
+    if (!shareWorkoutId) return;
+    setSharing(true);
+    setShareError(null);
+    try {
+      const res = await fetch('/api/social/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemType: 'routine', sourceId: shareWorkoutId, caption: shareCaption }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setShareError(d.error || 'Could not share');
+        setSharing(false);
+        return;
+      }
+      setSharing(false);
+      finishAfterShare();
+    } catch {
+      setShareError('Could not share');
+      setSharing(false);
+    }
   };
 
   const hitItGroups = useMemo(() => groupExercises(latest.exercises), [latest.exercises]);
@@ -2393,6 +2520,40 @@ function ActiveWorkout({
             </div>
           )}
         </div>
+
+        {/* Post-save: offer to share the routine with followers */}
+        {shareWorkoutId && (
+          <Modal isOpen onClose={finishAfterShare} title="Share with your contacts?" size="sm">
+            <div className="space-y-3">
+              <p className="text-sm text-slate-400">
+                Followers can recreate this routine in their own account.
+              </p>
+              <textarea
+                value={shareCaption}
+                onChange={(e) => setShareCaption(e.target.value)}
+                placeholder="Add a comment (required)"
+                rows={2}
+                className="w-full bg-card border border-border-dark rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary resize-none"
+              />
+              {shareError && <p className="text-xs text-red-400">{shareError}</p>}
+              <div className="flex gap-3">
+                <button
+                  onClick={finishAfterShare}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-700/60 text-slate-300 font-medium text-sm active:scale-95 transition-transform"
+                >
+                  Not now
+                </button>
+                <button
+                  onClick={submitShare}
+                  disabled={sharing || !shareCaption.trim()}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white font-medium text-sm active:scale-95 transition-transform disabled:opacity-60"
+                >
+                  {sharing ? 'Sharing…' : 'Share'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
       </div>
     );
   }
@@ -2589,6 +2750,7 @@ const SPIN_CONFIRMS = [
 
 function WorkoutsPageInner() {
   const { chatOpen, dataVersion, sendMessage, setChatOpen, setChatTopic, setCustomBack, profile } = useFitClaude();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
   // Track if the current routine was opened via deep link (e.g. from / or /program)
@@ -2653,6 +2815,10 @@ function WorkoutsPageInner() {
   const [activeCollection, setActiveCollection] = useState<string | null>(searchParams.get('collection'));
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [assignCollectionRoutine, setAssignCollectionRoutine] = useState<string | null>(null);
+  // Share a routine straight from the list
+  const [shareRoutine, setShareRoutine] = useState<{ id: string; name: string } | null>(null);
+  const [shareRoutineComment, setShareRoutineComment] = useState('');
+  const [shareRoutineBusy, setShareRoutineBusy] = useState(false);
   const [editingCollection, setEditingCollection] = useState<WorkoutCollection | null>(null);
   const [deletingCollection, setDeletingCollection] = useState<WorkoutCollection | null>(null);
   const [confirmDeleteActivity, setConfirmDeleteActivity] = useState<string | null>(null);
@@ -2897,6 +3063,29 @@ function WorkoutsPageInner() {
       setCollections((prev) => prev.map((c) => (c.id === id ? updated : c)));
     } catch (err) {
       console.error('Failed to update collection:', err);
+    }
+  };
+
+  const submitRoutineShare = async () => {
+    if (!shareRoutine || shareRoutineBusy || !shareRoutineComment.trim()) return;
+    setShareRoutineBusy(true);
+    try {
+      const res = await fetch('/api/social/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemType: 'routine', sourceId: shareRoutine.id, caption: shareRoutineComment }),
+      });
+      if (res.ok) {
+        toast('Routine shared with your followers!');
+        setShareRoutine(null);
+        setShareRoutineComment('');
+      } else {
+        toast('Failed to share routine', 'error');
+      }
+    } catch {
+      toast('Failed to share routine', 'error');
+    } finally {
+      setShareRoutineBusy(false);
     }
   };
 
@@ -3509,6 +3698,7 @@ function WorkoutsPageInner() {
                 workouts={group}
                 onClick={() => setSelectedRoutine(key)}
                 onAddToCollection={(routineName) => setAssignCollectionRoutine(routineName)}
+                onShare={(workoutId) => { setShareRoutineComment(''); setShareRoutine({ id: workoutId, name: key }); }}
               />
             ))
           )}
@@ -3872,6 +4062,41 @@ function WorkoutsPageInner() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Share routine with followers */}
+      {shareRoutine && (
+        <Modal isOpen={true} onClose={() => !shareRoutineBusy && setShareRoutine(null)} title="Share with followers?" size="sm">
+          <div className="space-y-3">
+            <p className="text-sm text-slate-400">
+              Sharing <span className="font-semibold text-white capitalize">{shareRoutine.name.replace(/_/g, ' ')}</span>. Followers can recreate it in their own account.
+            </p>
+            <textarea
+              value={shareRoutineComment}
+              onChange={(e) => setShareRoutineComment(e.target.value)}
+              placeholder="Add a comment (required)"
+              rows={2}
+              autoFocus
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary resize-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShareRoutine(null)}
+                disabled={shareRoutineBusy}
+                className="flex-1 py-2.5 rounded-xl bg-slate-700/60 text-slate-300 text-sm font-bold disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitRoutineShare}
+                disabled={shareRoutineBusy || !shareRoutineComment.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+              >
+                {shareRoutineBusy ? 'Sharing…' : 'Share'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Assign Routine to Collection Modal */}

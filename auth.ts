@@ -30,11 +30,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
   callbacks: {
     async signIn({ profile }) {
-      const allowed = process.env.ALLOWED_EMAILS?.split(',') ?? [];
-      if (allowed.length > 0 && !allowed.includes(profile?.email ?? '')) {
-        return false;
-      }
-      return true;
+      const email = profile?.email?.toLowerCase().trim() ?? '';
+      if (!email) return false;
+
+      // Already-registered users can always sign in (never lock out existing accounts).
+      // Case-insensitive: stored emails may differ in case from the normalized one.
+      const existing = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (existing) return true;
+
+      // New users must be invited: present in the DB allowlist...
+      const invited = await prisma.allowedEmail.findUnique({ where: { email } });
+      if (invited) return true;
+
+      // ...or in the legacy ALLOWED_EMAILS env var (bootstrap).
+      const envAllowed = process.env.ALLOWED_EMAILS?.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean) ?? [];
+      return envAllowed.includes(email);
     },
     async session({ session, user }) {
       if (session.user) {

@@ -11,10 +11,15 @@ class TrainingProgram(Base):
     __tablename__ = "training_programs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column("userId", ForeignKey("users.id"), unique=True)
+    # A user may hold up to 3 programs (1 active + up to 2 recreated). Exactly one is active;
+    # exclusivity is enforced in the application layer, not by a unique constraint.
+    user_id: Mapped[str] = mapped_column("userId", ForeignKey("users.id"))
+    name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     total_weeks: Mapped[int] = mapped_column("totalWeeks", default=2)
     current_week: Mapped[int] = mapped_column("currentWeek", default=1)
     is_active: Mapped[bool] = mapped_column("isActive", default=True)
+    source_user_id: Mapped[Optional[str]] = mapped_column("sourceUserId", String, nullable=True)
+    source_share_id: Mapped[Optional[str]] = mapped_column("sourceShareId", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         "createdAt", DateTime, default=func.now()
     )
@@ -22,7 +27,7 @@ class TrainingProgram(Base):
         "updatedAt", DateTime, default=func.now(), onupdate=func.now()
     )
 
-    user: Mapped["User"] = relationship(back_populates="training_program")  # noqa: F821
+    user: Mapped["User"] = relationship(back_populates="training_programs")  # noqa: F821
     days: Mapped[List["ProgramDay"]] = relationship(
         back_populates="program", cascade="all, delete-orphan"
     )

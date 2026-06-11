@@ -60,6 +60,11 @@ class User(Base):
     is_onboarded: Mapped[bool] = mapped_column("isOnboarded", default=False)
     tier: Mapped[str] = mapped_column(String, default="free")  # free, pro, unlimited
 
+    # Social / discovery
+    username: Mapped[Optional[str]] = mapped_column(String, nullable=True, unique=True)
+    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_public: Mapped[bool] = mapped_column("isPublic", default=True)
+
     # Relations
     workouts: Mapped[List["Workout"]] = relationship(back_populates="user")  # noqa: F821
     nutrition_logs: Mapped[List["NutritionLog"]] = relationship(back_populates="user")  # noqa: F821
@@ -68,4 +73,4 @@ class User(Base):
     activities: Mapped[List["Activity"]] = relationship(back_populates="user")  # noqa: F821
     token_usages: Mapped[List["TokenUsage"]] = relationship(back_populates="user")  # noqa: F821
     usage_limit: Mapped[Optional["UserUsageLimit"]] = relationship(back_populates="user", uselist=False)  # noqa: F821
-    training_program: Mapped[Optional["TrainingProgram"]] = relationship(back_populates="user", uselist=False)  # noqa: F821
+    training_programs: Mapped[List["TrainingProgram"]] = relationship(back_populates="user")  # noqa: F821

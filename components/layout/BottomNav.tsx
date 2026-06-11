@@ -41,6 +41,15 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    href: '/social',
+    label: 'Social',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-2.83-4" />
+      </svg>
+    ),
+  },
 ];
 
 /** Check if there's an active (running) Hit It session in localStorage */

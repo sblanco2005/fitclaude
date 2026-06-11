@@ -93,9 +93,16 @@ async def get_program(
 
 @router.delete("")
 async def delete_program(user_id: str, db: AsyncSession = Depends(get_db)):
-    """Delete the user's training program."""
+    """Delete the user's active training program.
+
+    A user can now hold multiple programs (1 active + recreated ones), so this is
+    scoped to the active program. Removing a specific non-active program is handled
+    in the Next.js/Prisma layer.
+    """
     result = await db.execute(
-        select(TrainingProgram).where(TrainingProgram.user_id == user_id)
+        select(TrainingProgram).where(
+            TrainingProgram.user_id == user_id, TrainingProgram.is_active == True
+        )
     )
     program = result.scalar_one_or_none()
     if not program:
