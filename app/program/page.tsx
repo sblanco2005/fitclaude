@@ -103,18 +103,27 @@ export default function ProgramPage() {
   const [originalDrafts, setOriginalDrafts] = useState<DayDraft[]>([]);
   const [editingDay, setEditingDay] = useState<DayDraft | null>(null);
   const [generating, setGenerating] = useState(false);
+  // "Build a new program" (from Home's + menu) opens a fresh builder that creates
+  // an ADDITIONAL program instead of editing the existing main.
+  const [creatingNew, setCreatingNew] = useState(false);
 
   useEffect(() => {
+    const isNew = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1';
+    if (isNew) {
+      setCreatingNew(true);
+      startBuilding(); // open a blank builder; don't show the existing program
+    }
     fetch('/api/program')
       .then((r) => r.json())
       .then((data) => {
         if (data?.id) {
           setProgram(data);
-          setBuilding(false);
+          if (!isNew) setBuilding(false);
         }
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Initialize draft days when user enters build mode
@@ -166,6 +175,13 @@ export default function ProgramPage() {
   const generateProgram = async () => {
     setGenerating(true);
     try {
+      // Building an ADDITIONAL program: demote the current main to a bench slot
+      // (freeing the "active" slot) so the generator creates a fresh active program
+      // rather than overwriting the existing main.
+      if (creatingNew) {
+        await fetch('/api/program/prepare-new', { method: 'POST' }).catch(() => {});
+      }
+
       // Build a fingerprint map of the original so we can detect unchanged days
       const originalByKey = new Map<string, DayDraft>();
       originalDrafts.forEach((d) => {
@@ -249,7 +265,8 @@ export default function ProgramPage() {
         if (progData?.id) {
           setProgram(progData);
           setBuilding(false);
-          toast('Program created!');
+          setCreatingNew(false);
+          toast(creatingNew ? 'New program created and set as main!' : 'Program created!');
         } else {
           toast('Coach responded but program was not saved', 'error');
         }

@@ -180,6 +180,32 @@ export async function recreateProgram(
 }
 
 /**
+ * Prepare to build a brand-new program: demote the current active program to a
+ * bench slot and evict the oldest bench program if needed so there's room for one
+ * more. After this the user has no active program, so the generator will create a
+ * fresh active one (keeping the old main as a bench).
+ */
+export async function demoteActiveAndMakeRoom(userId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const programs = await tx.trainingProgram.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, isActive: true },
+    });
+    const active = programs.find((p) => p.isActive);
+    if (active) await tx.trainingProgram.update({ where: { id: active.id }, data: { isActive: false } });
+
+    // Need room for the soon-to-be-created program: keep at most MAX-1 existing.
+    let total = programs.length;
+    for (const p of programs.filter((x) => x.id !== active?.id)) {
+      if (total < MAX_PROGRAMS_PER_USER) break;
+      await tx.trainingProgram.delete({ where: { id: p.id } });
+      total -= 1;
+    }
+  });
+}
+
+/**
  * Make `programId` the user's single active program (deactivating the others).
  * Verifies ownership. Returns false if the program isn't found / not owned.
  */
