@@ -58,6 +58,14 @@ export const PATCH = withAuth(async (request, user) => {
     }
   }
 
+  // Validate the social fields that come through the allowlist.
+  if ('isPublic' in updates && typeof updates.isPublic !== 'boolean') {
+    return NextResponse.json({ error: 'isPublic must be a boolean.' }, { status: 400 });
+  }
+  if (typeof updates.bio === 'string' && updates.bio.length > 500) {
+    updates.bio = updates.bio.slice(0, 500);
+  }
+
   // Username: normalize + validate (handled separately from the simple allowlist).
   if ('username' in body) {
     if (body.username === null || body.username === '') {

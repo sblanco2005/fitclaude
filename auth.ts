@@ -34,7 +34,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (!email) return false;
 
       // Already-registered users can always sign in (never lock out existing accounts).
-      const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+      // Case-insensitive: stored emails may differ in case from the normalized one.
+      const existing = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
+        select: { id: true },
+      });
       if (existing) return true;
 
       // New users must be invited: present in the DB allowlist...

@@ -273,9 +273,12 @@ export default function DashboardPage() {
   // When a bench tab is selected we render that program's strip; otherwise the
   // full main program (with today highlight + week nav) from /api/program.
   const activeProgramItem = allPrograms.find((p) => p.isActive) || null;
-  const selectedBench =
-    allPrograms.find((p) => p.id === selectedProgramId && !p.isActive) || null;
-  const viewingMain = !selectedBench;
+  const explicitBench = allPrograms.find((p) => p.id === selectedProgramId && !p.isActive) || null;
+  // Safety net: if there's no active program (e.g. orphaned after a failed "build
+  // new"), still show the first program so benches stay reachable + promotable.
+  const selectedBench = explicitBench || (!activeProgramItem ? (allPrograms[0] ?? null) : null);
+  const viewingMain = !!program && !explicitBench;
+  const shownProgramId = viewingMain ? activeProgramItem?.id : selectedBench?.id;
 
   // Build the combined activity list for the viewed date
   type TodayItem = { id: string; label: string; meta: string; kcal?: number | null; done: boolean; type: 'workout' | 'activity' | 'todo'; href?: string; onClick?: () => void };
@@ -361,12 +364,12 @@ export default function DashboardPage() {
         <Card className="p-4">
           <div className="h-20 bg-slate-800/40 rounded animate-pulse" />
         </Card>
-      ) : program ? (
+      ) : (program || allPrograms.length > 0) ? (
         <Card className="p-4">
           {/* Program tabs: main (active) + up to 2 bench programs */}
           <div className="flex items-center gap-1.5 mb-3 overflow-x-auto -mx-1 px-1">
             {allPrograms.map((p) => {
-              const isSel = p.isActive ? viewingMain : selectedProgramId === p.id;
+              const isSel = p.id === shownProgramId;
               const benchPos = allPrograms.filter((x) => !x.isActive).findIndex((x) => x.id === p.id);
               return (
                 <button

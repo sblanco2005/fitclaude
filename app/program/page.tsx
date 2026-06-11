@@ -174,12 +174,26 @@ export default function ProgramPage() {
 
   const generateProgram = async () => {
     setGenerating(true);
+    // If we demote the current main to build a new one and generation then fails,
+    // re-promote the old main so the user is never left with zero active programs.
+    const prevActiveId = creatingNew ? program?.id ?? null : null;
+    let demoted = false;
+    const rollbackDemote = async () => {
+      if (demoted && prevActiveId) {
+        await fetch('/api/program', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ programId: prevActiveId }),
+        }).catch(() => {});
+      }
+    };
     try {
       // Building an ADDITIONAL program: demote the current main to a bench slot
       // (freeing the "active" slot) so the generator creates a fresh active program
       // rather than overwriting the existing main.
       if (creatingNew) {
         await fetch('/api/program/prepare-new', { method: 'POST' }).catch(() => {});
+        demoted = true;
       }
 
       // Build a fingerprint map of the original so we can detect unchanged days
@@ -268,12 +282,15 @@ export default function ProgramPage() {
           setCreatingNew(false);
           toast(creatingNew ? 'New program created and set as main!' : 'Program created!');
         } else {
+          await rollbackDemote();
           toast('Coach responded but program was not saved', 'error');
         }
       } else {
+        await rollbackDemote();
         toast('Failed to generate program', 'error');
       }
     } catch {
+      await rollbackDemote();
       toast('Failed to generate program', 'error');
     } finally {
       setGenerating(false);

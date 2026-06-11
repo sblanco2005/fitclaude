@@ -105,77 +105,113 @@ async function createRoutineFromSnapshot(
 }
 
 /**
- * Recreate a shared routine into `userId`'s account as a new routine template.
- * Returns the new Workout id.
+ * Create a program (+days +routine templates) for `userId` from a snapshot, within
+ * an existing transaction. NON-active; enforces the cap by evicting the oldest bench
+ * program (never the active main). Throws ProgramCapReachedError if no room.
  */
+async function createProgramFromSnapshot(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  snapshot: ProgramSnapshot,
+  provenance: { sourceUserId?: string | null; sourceShareId?: string | null } = {},
+): Promise<string> {
+  const existing = await tx.trainingProgram.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, isActive: true },
+  });
+  if (existing.length >= MAX_PROGRAMS_PER_USER) {
+    const evict = existing.find((p) => !p.isActive);
+    if (!evict) throw new ProgramCapReachedError(MAX_PROGRAMS_PER_USER); // all active (shouldn't happen)
+    await tx.trainingProgram.delete({ where: { id: evict.id } });
+  }
+
+  const program = await tx.trainingProgram.create({
+    data: {
+      userId,
+      name: snapshot.name,
+      totalWeeks: snapshot.totalWeeks,
+      currentWeek: 1,
+      isActive: false, // recreated programs start inactive; user promotes later
+      sourceUserId: provenance.sourceUserId ?? null,
+      sourceShareId: provenance.sourceShareId ?? null,
+    },
+    select: { id: true },
+  });
+
+  let displayId = await nextDisplayId(tx, userId);
+  for (const day of snapshot.days) {
+    const programDay = await tx.programDay.create({
+      data: {
+        programId: program.id,
+        weekday: day.weekday,
+        weekNumber: day.weekNumber,
+        dayType: day.dayType,
+        dayLabel: day.dayLabel,
+        workoutType: day.workoutType,
+        exerciseTemplate: day.exerciseTemplate ? JSON.stringify(day.exerciseTemplate) : null,
+      },
+      select: { id: true },
+    });
+    if (day.routine) {
+      await createRoutineFromSnapshot(tx, userId, day.routine, { displayId, programDayId: programDay.id });
+      displayId += 1;
+    }
+  }
+  return program.id;
+}
+
+/** Recreate a shared routine into `userId`'s account as a new routine template. */
 export async function recreateRoutine(userId: string, snapshot: RoutineSnapshot): Promise<string> {
   return prisma.$transaction((tx) => createRoutineFromSnapshot(tx, userId, snapshot));
 }
 
-/**
- * Recreate a shared program into `userId`'s account as a NON-active program,
- * enforcing the max-programs cap. Returns the new TrainingProgram id.
- * Throws ProgramCapReachedError if the user is already at the cap.
- */
+/** Recreate a shared program (non-active, cap-enforced). Throws ProgramCapReachedError. */
 export async function recreateProgram(
   userId: string,
   snapshot: ProgramSnapshot,
   provenance: { sourceUserId?: string | null; sourceShareId?: string | null } = {},
 ): Promise<string> {
+  return prisma.$transaction((tx) => createProgramFromSnapshot(tx, userId, snapshot, provenance));
+}
+
+export interface RecreatablePost {
+  id: string;
+  userId: string; // author
+  itemType: string; // "routine" | "program"
+  snapshot: string;
+}
+
+export type RecreateResult =
+  | { newItemId: string; alreadyRecreated: boolean };
+
+/**
+ * Recreate a shared post into `userId`'s account — the clone, the ShareRecreation
+ * dedup record, and the recreateCount bump all happen in ONE transaction. The
+ * unique [sharePostId, userId] index makes a retry/concurrent recreate fail cleanly
+ * instead of producing a duplicate clone (and corrupting the program cap).
+ * Throws ProgramCapReachedError if the program cap is full.
+ */
+export async function recreateSharePost(userId: string, post: RecreatablePost): Promise<RecreateResult> {
   return prisma.$transaction(async (tx) => {
-    // Enforce the cap by evicting the OLDEST non-active program (never the active
-    // "main"), so adding a program at the limit replaces the oldest bench program.
-    const existing = await tx.trainingProgram.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, isActive: true },
+    const existing = await tx.shareRecreation.findUnique({
+      where: { sharePostId_userId: { sharePostId: post.id, userId } },
+      select: { newItemId: true },
     });
-    if (existing.length >= MAX_PROGRAMS_PER_USER) {
-      const evict = existing.find((p) => !p.isActive);
-      if (!evict) throw new ProgramCapReachedError(MAX_PROGRAMS_PER_USER); // all active (shouldn't happen)
-      await tx.trainingProgram.delete({ where: { id: evict.id } });
-    }
+    if (existing) return { newItemId: existing.newItemId, alreadyRecreated: true };
 
-    const program = await tx.trainingProgram.create({
-      data: {
-        userId,
-        name: snapshot.name,
-        totalWeeks: snapshot.totalWeeks,
-        currentWeek: 1,
-        isActive: false, // recreated programs start inactive; user promotes later
-        sourceUserId: provenance.sourceUserId ?? null,
-        sourceShareId: provenance.sourceShareId ?? null,
-      },
-      select: { id: true },
-    });
+    const snapshot = JSON.parse(post.snapshot);
+    const newItemId =
+      post.itemType === 'program'
+        ? await createProgramFromSnapshot(tx, userId, snapshot as ProgramSnapshot, {
+            sourceUserId: post.userId,
+            sourceShareId: post.id,
+          })
+        : await createRoutineFromSnapshot(tx, userId, snapshot as RoutineSnapshot);
 
-    let displayId = await nextDisplayId(tx, userId);
-
-    for (const day of snapshot.days) {
-      const programDay = await tx.programDay.create({
-        data: {
-          programId: program.id,
-          weekday: day.weekday,
-          weekNumber: day.weekNumber,
-          dayType: day.dayType,
-          dayLabel: day.dayLabel,
-          workoutType: day.workoutType,
-          exerciseTemplate: day.exerciseTemplate ? JSON.stringify(day.exerciseTemplate) : null,
-        },
-        select: { id: true },
-      });
-
-      // Coached days carry a routine-template workout; clone it linked to the day.
-      if (day.routine) {
-        await createRoutineFromSnapshot(tx, userId, day.routine, {
-          displayId,
-          programDayId: programDay.id,
-        });
-        displayId += 1;
-      }
-    }
-
-    return program.id;
+    await tx.shareRecreation.create({ data: { sharePostId: post.id, userId, newItemId } });
+    await tx.sharePost.update({ where: { id: post.id }, data: { recreateCount: { increment: 1 } } });
+    return { newItemId, alreadyRecreated: false };
   });
 }
 
