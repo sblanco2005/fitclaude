@@ -13,8 +13,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { chatOpen } = useFitClaude();
   const isAuthPage = pathname.startsWith('/auth') || pathname === '/onboarding';
   const isChatPage = pathname === '/chat';
+  // Redesign v1 lives at /v2 as an independent app with its own shell.
+  const isRedesign = pathname === '/v2' || pathname.startsWith('/v2/');
 
-  if (isAuthPage) {
+  if (isAuthPage || isRedesign) {
     return <>{children}</>;
   }
 
