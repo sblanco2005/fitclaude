@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* ============================================================
+   CURRENT APP — unchanged (emerald theme)
+   ============================================================ */
 :root {
   --background: #0b0b0f;
   --foreground: #ededed;
@@ -30,6 +33,27 @@
   --color-info: var(--info);
   --font-sans: var(--font-display), sans-serif;
   --font-mono: var(--font-mono-code), monospace;
+
+  /* --- Redesign v1 accent utilities (additive; resolve only inside
+         .redesign-root where the vars below are defined) --- */
+  --color-ember: var(--rd-ember);
+  --color-ember-light: var(--rd-ember-light);
+  --color-ember-deep: var(--rd-ember-deep);
+  --color-ember-lvl3: var(--rd-ember-lvl3);
+  --color-lime: var(--rd-lime);
+  --color-lime-light: var(--rd-lime-light);
+  --color-lime-deep: var(--rd-lime-deep);
+  --color-violet: var(--rd-violet);
+  --color-violet-blue: var(--rd-violet-blue);
+  --color-amber: var(--rd-amber);
+  --color-youtube: var(--rd-youtube);
+  --color-ink: var(--rd-ink);
+  --color-secondary: var(--rd-text-secondary);
+  --color-faint: var(--rd-text-faint);
+  --color-disabled: var(--rd-text-disabled);
+  --color-macro-protein: var(--rd-macro-protein);
+  --color-macro-carbs: var(--rd-macro-carbs);
+  --color-macro-fat: var(--rd-macro-fat);
 }
 
 body {
@@ -68,3 +92,139 @@ body {
 @utility animate-scan {
   animation: scan 2s ease-in-out infinite;
 }
+
+/* ============================================================
+   REDESIGN v1 — independent app scope
+   Everything below is namespaced under .redesign-root so the
+   current app is completely unaffected. Fonts (--rd-display/body/mono)
+   are injected by app/v2/layout.tsx.
+   Source of truth: design_handoff_fitclaude_redesign/
+   ============================================================ */
+.redesign-root {
+  /* Surfaces */
+  --rd-bg: #0A0C10;
+  --rd-chrome: #07080B;
+  --rd-card: #0C0E12;
+  --rd-card-hover: #14171D;
+  --rd-card-glass: rgba(255, 255, 255, 0.045);
+  --rd-card-glass-hover: rgba(255, 255, 255, 0.07);
+  --rd-border: rgba(255, 255, 255, 0.08);
+  --rd-border-strong: rgba(255, 255, 255, 0.14);
+
+  /* Text ramp */
+  --rd-ink: #F4F5F7;
+  --rd-text-secondary: #C9CDD6;
+  --rd-text-muted: #9AA0AC;
+  --rd-text-faint: #7A808C;
+  --rd-text-disabled: #5F6470;
+
+  /* Ember — energy, training, primary CTAs */
+  --rd-ember-light: #FF8A5B;
+  --rd-ember: #FF6B45;
+  --rd-ember-deep: #FF5A2C;
+  --rd-ember-lvl3: #E8542E;
+
+  /* Lime — nutrition, success, "go", PRs */
+  --rd-lime-light: #D6FF6B;
+  --rd-lime: #C8FF4D;
+  --rd-lime-deep: #A8F000;
+
+  /* Violet — the AI coach */
+  --rd-violet: #9B7BFF;
+  --rd-violet-blue: #6A8BFF;
+
+  /* Amber — fat macro / tertiary */
+  --rd-amber: #FFB23E;
+
+  /* Macro semantics */
+  --rd-macro-protein: #FF6B45;
+  --rd-macro-carbs: #C8FF4D;
+  --rd-macro-fat: #FFB23E;
+
+  /* Brand red (YouTube glyph) */
+  --rd-youtube: #FF3B30;
+
+  /* Signature gradients */
+  --rd-grad-ember: linear-gradient(135deg, #FF8A5B, #FF5A2C);
+  --rd-grad-lime: linear-gradient(135deg, #D6FF6B, #A8F000);
+  --rd-grad-coach: linear-gradient(140deg, #9B7BFF, #6A8BFF);
+
+  /* Accent glow shadows */
+  --rd-glow-ember: 0 8px 22px -6px rgba(255, 90, 44, 0.7);
+  --rd-glow-lime: 0 8px 22px -6px rgba(168, 240, 0, 0.55);
+  --rd-glow-coach: 0 10px 26px -6px rgba(139, 107, 255, 0.8);
+
+  background: var(--rd-bg);
+  color: var(--rd-ink);
+  font-family: var(--rd-body), 'DM Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Font-role utilities (scoped; reference --rd-* vars) */
+.redesign-root .font-display,
+.redesign-root .font-num {
+  font-family: var(--rd-display), 'Space Grotesk', sans-serif;
+}
+.redesign-root .font-body {
+  font-family: var(--rd-body), 'DM Sans', system-ui, sans-serif;
+}
+.redesign-root .font-label {
+  font-family: var(--rd-mono), 'JetBrains Mono', monospace;
+}
+
+/* Translucent design-language card */
+.redesign-root .rd-card {
+  background: var(--rd-card-glass);
+  border: 1px solid var(--rd-border);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+}
+
+/* Screen-accent radial glow; tint via --glow-tint inline */
+.redesign-root .rd-screen-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 55% at 50% -6%, var(--glow-tint, rgba(255, 107, 69, 0.16)), transparent 55%);
+}
+
+/* Gradient fills */
+.redesign-root .grad-ember { background-image: var(--rd-grad-ember); }
+.redesign-root .grad-lime  { background-image: var(--rd-grad-lime); }
+.redesign-root .grad-coach { background-image: var(--rd-grad-coach); }
+
+/* ---- Keyframes (verbatim from FitClaude.dc.html) ---- */
+@keyframes rd-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+@keyframes rd-livedot {
+  0% { box-shadow: 0 0 0 0 rgba(200, 255, 77, .55); }
+  70%, 100% { box-shadow: 0 0 0 8px rgba(200, 255, 77, 0); }
+}
+@keyframes rd-floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes rd-sheen {
+  0% { transform: translateX(-120%) skewX(-18deg); }
+  60%, 100% { transform: translateX(320%) skewX(-18deg); }
+}
+@keyframes rd-spinslow { to { transform: rotate(360deg); } }
+@keyframes rd-fadeup {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rd-restpulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 69, .5); }
+  55% { box-shadow: 0 0 0 9px rgba(255, 107, 69, 0); }
+}
+
+.redesign-root .animate-livedot { animation: rd-livedot 2.1s ease-out infinite; }
+.redesign-root .animate-floaty { animation: rd-floaty 4s ease-in-out infinite; }
+.redesign-root .animate-sheen { animation: rd-sheen 3.4s ease-in-out infinite; }
+.redesign-root .animate-spinslow { animation: rd-spinslow 1.1s linear infinite; }
+.redesign-root .animate-fadeup { animation: rd-fadeup .4s ease-out both; }
+.redesign-root .animate-restpulse { animation: rd-restpulse 2s ease-out infinite; }
+.redesign-root .animate-pulse-soft { animation: rd-pulse 2s ease-in-out infinite; }
