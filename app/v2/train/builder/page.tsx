@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ScreenHeader } from '@/components/redesign/ui';
-import { ChevronLeftIcon, MinusIcon, PlusIcon } from '@/components/redesign/icons';
+import { MinusIcon, PlusIcon } from '@/components/redesign/icons';
 
 // Screen 15 · Program Builder — accent: lime
 // Persists through the real program-creation path (the coach chat tool),
@@ -37,14 +37,7 @@ export default function ProgramBuilderPage() {
 
   return (
     <div className="animate-fadeup space-y-5 pb-4">
-      <ScreenHeader
-        title="Build program"
-        right={
-          <button onClick={() => router.push('/v2/train/add')} aria-label="Back" className="text-[var(--rd-text-muted)]">
-            <ChevronLeftIcon size={22} />
-          </button>
-        }
-      />
+      <ScreenHeader title="Build program" back onBack={() => router.push('/v2/train/add')} />
 
       {/* Name */}
       <Field label="PROGRAM NAME">

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import type { ExerciseVideoLink } from '@/types';
 import { ScreenHeader } from '@/components/redesign/ui';
-import { ChevronLeftIcon, CheckIcon, CloseIcon, SpinIcon } from '@/components/redesign/icons';
+import { CheckIcon, CloseIcon, SpinIcon } from '@/components/redesign/icons';
 
 // Screen 16 · Admin — accent: violet
 export default function AdminPage() {
@@ -54,16 +54,12 @@ export default function AdminPage() {
     }
   };
 
-  const back = (
-    <button onClick={() => router.push('/v2/settings')} aria-label="Back" className="text-[var(--rd-text-muted)]">
-      <ChevronLeftIcon size={22} />
-    </button>
-  );
+  const goBack = () => router.push('/v2/settings');
 
   if (!isAdmin && status !== 'loading') {
     return (
       <div className="animate-fadeup space-y-5">
-        <ScreenHeader title="Admin" right={back} />
+        <ScreenHeader title="Admin" back onBack={goBack} />
         <div className="rd-card p-6 text-center text-[13px] text-[var(--rd-text-muted)]">Admins only.</div>
       </div>
     );
@@ -71,7 +67,7 @@ export default function AdminPage() {
 
   return (
     <div className="animate-fadeup space-y-5">
-      <ScreenHeader eyebrow="INTERNAL" title="Admin" right={back} />
+      <ScreenHeader eyebrow="INTERNAL" title="Admin" back onBack={goBack} />
 
       {/* Job triggers */}
       <section>

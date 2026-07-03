@@ -17,7 +17,7 @@ export default function LibraryPage() {
 
   return (
     <div className="animate-fadeup space-y-4 pb-2">
-      <ScreenHeader title="Exercises" />
+      <ScreenHeader title="Exercises" back />
 
       {/* Search */}
       <div className="flex items-center gap-2 rounded-[13px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-3.5 py-2.5">

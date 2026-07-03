@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import type { UserProfile } from '@/types';
 import { ScreenHeader } from '@/components/redesign/ui';
-import { ChevronLeftIcon } from '@/components/redesign/icons';
 
 // Screen 08 · Settings — accent: violet
 const titleCase = (s?: string | null) => (s ? s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '');
@@ -42,14 +41,7 @@ export default function SettingsPage() {
 
   return (
     <div className="animate-fadeup space-y-5">
-      <ScreenHeader
-        title="Settings"
-        right={
-          <button onClick={() => router.push('/v2')} aria-label="Back" className="text-[var(--rd-text-muted)]">
-            <ChevronLeftIcon size={22} />
-          </button>
-        }
-      />
+      <ScreenHeader title="Settings" back onBack={() => router.push('/v2')} />
 
       {/* Profile card */}
       <section className="rd-card flex items-center gap-3.5 p-4">

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { MacroRing } from '@/components/redesign/dashboard/MacroRing';
 import { useDashboardData } from '@/components/redesign/dashboard/useDashboardData';
+import { BackButton } from '@/components/redesign/ui';
 import { CheckIcon, PlusIcon, DropletIcon, SparkleIcon } from '@/components/redesign/icons';
 
 // Screen 01 · Dashboard ("Home") — accent: ember
@@ -39,13 +40,16 @@ export default function DashboardV2() {
     <div className="animate-fadeup space-y-5">
       {/* Greeting row */}
       <header className="flex items-start justify-between pt-1">
-        <div>
-          <p className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">
-            {nowEyebrow()}
-          </p>
-          <h1 className="font-display mt-1 text-[25px] font-bold leading-[1.1] text-[var(--rd-ink)]">
-            {greeting()}, {firstName}
-          </h1>
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <div>
+            <p className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">
+              {nowEyebrow()}
+            </p>
+            <h1 className="font-display mt-1 text-[25px] font-bold leading-[1.1] text-[var(--rd-ink)]">
+              {greeting()}, {firstName}
+            </h1>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {d.streak > 0 && (
