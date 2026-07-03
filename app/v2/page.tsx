@@ -54,14 +54,16 @@ export default function DashboardV2() {
               <span className="font-label text-[12px] font-semibold text-[var(--rd-ink)]">{d.streak}</span>
             </span>
           )}
-          {session?.user?.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={session.user.image} alt="" className="h-9 w-9 rounded-full object-cover" />
-          ) : (
-            <span className="grad-coach flex h-9 w-9 items-center justify-center rounded-full font-display text-sm font-bold text-[#0A0C10]">
-              {avatarLetter}
-            </span>
-          )}
+          <Link href="/v2/settings" aria-label="Settings">
+            {session?.user?.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={session.user.image} alt="" className="h-9 w-9 rounded-full object-cover" />
+            ) : (
+              <span className="grad-coach flex h-9 w-9 items-center justify-center rounded-full font-display text-sm font-bold text-[#0A0C10]">
+                {avatarLetter}
+              </span>
+            )}
+          </Link>
         </div>
       </header>
 
