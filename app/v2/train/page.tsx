@@ -126,7 +126,7 @@ export default function TrainPage() {
       ) : (
         <div className="space-y-2.5">
           {list.map((r) => (
-            <RoutineRow key={r.key} r={r} onSpin={() => w.spin(r)} spinning={w.busy === r.key} onHit={() => hitIt(r.latestId)} />
+            <RoutineRow key={r.key} r={r} onSpin={() => w.spin(r)} spinning={w.busy === r.key} onOpen={() => router.push(`/v2/train/routine/${r.latestId}`)} />
           ))}
         </div>
       )}
@@ -134,14 +134,14 @@ export default function TrainPage() {
   );
 }
 
-function RoutineRow({ r, onSpin, spinning, onHit }: { r: RoutineCard; onSpin: () => void; spinning: boolean; onHit: () => void }) {
+function RoutineRow({ r, onSpin, spinning, onOpen }: { r: RoutineCard; onSpin: () => void; spinning: boolean; onOpen: () => void }) {
   const s = catStyle(r.category);
   return (
     <div className="rd-card flex items-center gap-3 p-3.5">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]" style={{ background: s.tint, color: s.color }}>
         <TrainIcon size={20} />
       </span>
-      <button onClick={onHit} className="min-w-0 flex-1 text-left">
+      <button onClick={onOpen} className="min-w-0 flex-1 text-left">
         <p className="truncate text-[14px] font-semibold text-[var(--rd-ink)]">{r.name}</p>
         <p className="font-label mt-0.5 text-[11px] capitalize text-[var(--rd-text-faint)]">
           {r.exerciseCount} exercises{r.muscles.length ? ` · ${r.muscles.join(', ')}` : ''}
