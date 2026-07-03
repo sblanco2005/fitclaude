@@ -89,6 +89,19 @@ export default function RoutineDetailPage() {
         </Chip>
       </div>
 
+      {/* Hit it — kept up top so it's visible without scrolling the exercise list */}
+      <button
+        onClick={hitIt}
+        disabled={starting}
+        className="grad-ember relative flex h-12 w-full items-center justify-center overflow-hidden rounded-[14px] text-[15px] font-semibold text-[#0A0C10] disabled:opacity-60"
+        style={{ boxShadow: 'var(--rd-glow-ember)' }}
+      >
+        <span className="relative z-10">{starting ? 'Starting…' : 'Hit it'}</span>
+        {!starting && (
+          <span aria-hidden className="animate-sheen absolute inset-y-0 -left-1/3 z-0 w-1/3" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent)' }} />
+        )}
+      </button>
+
       {/* Exercise rows */}
       <div className="space-y-2.5">
         {exercises.map((e, i) => (
@@ -112,19 +125,6 @@ export default function RoutineDetailPage() {
           </div>
         ))}
       </div>
-
-      {/* Hit it */}
-      <button
-        onClick={hitIt}
-        disabled={starting}
-        className="grad-ember relative mt-1 flex h-12 w-full items-center justify-center overflow-hidden rounded-[14px] text-[15px] font-semibold text-[#0A0C10] disabled:opacity-60"
-        style={{ boxShadow: 'var(--rd-glow-ember)' }}
-      >
-        <span className="relative z-10">{starting ? 'Starting…' : 'Hit it'}</span>
-        {!starting && (
-          <span aria-hidden className="animate-sheen absolute inset-y-0 -left-1/3 z-0 w-1/3" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent)' }} />
-        )}
-      </button>
     </div>
   );
 }
