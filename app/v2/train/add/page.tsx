@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ScreenHeader } from '@/components/redesign/ui';
-import { ChevronLeftIcon, SparkleIcon, LibraryIcon, TrainIcon, ArrowRightIcon } from '@/components/redesign/icons';
+import { SparkleIcon, LibraryIcon, TrainIcon, ArrowRightIcon } from '@/components/redesign/icons';
 
 // Screen 14 · Add Program (method) — accent: ember
 export default function AddProgramPage() {
@@ -37,14 +37,7 @@ export default function AddProgramPage() {
 
   return (
     <div className="animate-fadeup space-y-5">
-      <ScreenHeader
-        title="Add program"
-        right={
-          <button onClick={() => router.push('/v2/train')} aria-label="Back" className="text-[var(--rd-text-muted)]">
-            <ChevronLeftIcon size={22} />
-          </button>
-        }
-      />
+      <ScreenHeader title="Add program" back onBack={() => router.push('/v2/train')} />
       <div className="space-y-3">
         {methods.map((m) => (
           <button key={m.title} onClick={m.go} className="rd-card flex w-full items-center gap-4 p-4 text-left">

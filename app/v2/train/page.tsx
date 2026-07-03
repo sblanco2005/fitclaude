@@ -8,13 +8,6 @@ import { ScreenHeader, FilterChips } from '@/components/redesign/ui';
 import { PlusIcon, SpinIcon, TrainIcon } from '@/components/redesign/icons';
 
 // Screen 05 · Workouts ("Train") — accent: ember
-const CAT_COLOR: Record<string, { color: string; tint: string }> = {
-  lifting: { color: 'var(--rd-violet)', tint: 'rgba(155,123,255,.16)' },
-  hiit: { color: 'var(--rd-lime)', tint: 'rgba(200,255,77,.14)' },
-  cardio: { color: 'var(--rd-amber)', tint: 'rgba(255,178,62,.14)' },
-};
-const catStyle = (c: string) => CAT_COLOR[(c || '').toLowerCase()] ?? { color: 'var(--rd-ember)', tint: 'rgba(255,107,69,.14)' };
-
 export default function TrainPage() {
   const w = useWorkouts();
   const router = useRouter();
@@ -39,6 +32,7 @@ export default function TrainPage() {
       <ScreenHeader
         eyebrow={`${w.routines.length} routines`}
         title="Your workouts"
+        back
         right={
           <Link
             href="/v2/train/add"
@@ -51,9 +45,7 @@ export default function TrainPage() {
         }
       />
 
-      <FilterChips options={chips} value={filter} onChange={setFilter} accent="var(--rd-ember)" />
-
-      {/* Featured next-up */}
+      {/* Featured next-up (kept above filters so "Hit it" is always visible) */}
       {w.featured && (
         <section
           className="relative overflow-hidden rounded-[20px] border p-5"
@@ -111,11 +103,14 @@ export default function TrainPage() {
         </section>
       )}
 
-      {/* Routine list */}
+      {/* Filters (below the featured hero) */}
+      <FilterChips options={chips} value={filter} onChange={setFilter} accent="var(--rd-ember)" />
+
+      {/* Routine grid */}
       {w.loading ? (
-        <div className="space-y-2.5">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="rd-card h-[72px] animate-pulse-soft" />
+        <div className="grid grid-cols-2 gap-2.5">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="rd-card h-[132px] animate-pulse-soft" />
           ))}
         </div>
       ) : list.length === 0 ? (
@@ -124,33 +119,92 @@ export default function TrainPage() {
           <p className="mt-1 text-[12px] text-[var(--rd-text-faint)]">Ask the coach to generate one.</p>
         </div>
       ) : (
-        <div className="space-y-2.5">
-          {list.map((r) => (
-            <RoutineRow key={r.key} r={r} onSpin={() => w.spin(r)} spinning={w.busy === r.key} onOpen={() => router.push(`/v2/train/routine/${r.latestId}`)} />
-          ))}
-        </div>
+        <>
+          <div className="flex items-center justify-between">
+            <span className="font-label text-[11px] tracking-[.1em] text-[var(--rd-text-faint)]">
+              ALL ROUTINES · {list.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            {list.map((r, i) => (
+              <RoutineTile
+                key={r.key}
+                r={r}
+                accent={TILE_ACCENTS[i % TILE_ACCENTS.length]}
+                onOpen={() => router.push(`/v2/train/routine/${r.latestId}`)}
+                onSpin={() => w.spin(r)}
+                spinning={w.busy === r.key}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-function RoutineRow({ r, onSpin, spinning, onOpen }: { r: RoutineCard; onSpin: () => void; spinning: boolean; onOpen: () => void }) {
-  const s = catStyle(r.category);
+// Accent palette cycled across tiles (violet / amber / lime / ember)
+const TILE_ACCENTS = ['155,123,255', '255,178,62', '200,255,77', '255,138,91'];
+
+// Deterministic bar heights from the routine key — a decorative volume/intensity glyph
+function volumeBars(key: string, n = 6): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const c = key.charCodeAt((i * 7) % Math.max(1, key.length)) || 65;
+    out.push(35 + ((c * (i + 3)) % 66));
+  }
+  return out;
+}
+
+function RoutineTile({
+  r,
+  accent,
+  onOpen,
+  onSpin,
+  spinning,
+}: {
+  r: RoutineCard;
+  accent: string; // "r,g,b"
+  onOpen: () => void;
+  onSpin: () => void;
+  spinning: boolean;
+}) {
+  const bars = volumeBars(r.key);
+  const rgb = (a: number) => `rgba(${accent},${a})`;
   return (
-    <div className="rd-card flex items-center gap-3 p-3.5">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]" style={{ background: s.tint, color: s.color }}>
-        <TrainIcon size={20} />
-      </span>
-      <button onClick={onOpen} className="min-w-0 flex-1 text-left">
-        <p className="truncate text-[14px] font-semibold text-[var(--rd-ink)]">{r.name}</p>
-        <p className="font-label mt-0.5 text-[11px] capitalize text-[var(--rd-text-faint)]">
-          {r.exerciseCount} exercises{r.muscles.length ? ` · ${r.muscles.join(', ')}` : ''}
-        </p>
+    <div
+      className="relative flex flex-col gap-2.5 overflow-hidden rounded-[18px] p-3.5"
+      style={{ background: rgb(0.06), border: `1px solid ${rgb(0.22)}` }}
+    >
+      {/* decorative glow */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -right-3.5 -top-3.5 h-[60px] w-[60px] rounded-full"
+        style={{ background: `radial-gradient(circle, ${rgb(0.26)}, transparent 70%)` }}
+      />
+      <div className="flex items-center justify-between">
+        <span className="flex h-9 w-9 items-center justify-center rounded-[12px]" style={{ background: rgb(0.15), color: `rgb(${accent})` }}>
+          <TrainIcon size={18} />
+        </span>
+        <button onClick={onSpin} aria-label="Spin" className="relative z-10" style={{ color: `rgb(${accent})` }}>
+          <SpinIcon size={15} className={spinning ? 'animate-spinslow' : ''} />
+        </button>
+      </div>
+      <button onClick={onOpen} className="relative z-10 text-left">
+        <div className="truncate font-display text-[15px] font-bold leading-tight text-[var(--rd-ink)]">{r.name}</div>
+        <div className="font-label mt-1 truncate text-[10px] capitalize text-[var(--rd-text-faint)]">
+          {r.exerciseCount} ex · {r.estMinutes}m{r.muscles.length ? ` · ${r.muscles[0]}` : ''}
+        </div>
       </button>
-      <span className="font-label text-[11px] text-[var(--rd-text-faint)]">{r.estMinutes}m</span>
-      <button onClick={onSpin} aria-label="Spin" className="text-[var(--rd-text-muted)]">
-        <SpinIcon size={16} className={spinning ? 'animate-spinslow' : ''} />
-      </button>
+      <div className="flex h-[22px] items-end gap-[3px]">
+        {bars.map((h, i) => (
+          <span
+            key={i}
+            className="flex-1 rounded-[3px]"
+            style={{ height: `${h}%`, background: i === bars.length - 3 ? `rgb(${accent})` : rgb(0.4) }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DailyNutritionSummary, UserProfile } from '@/types';
 import { ScreenHeader } from '@/components/redesign/ui';
-import { ChevronLeftIcon } from '@/components/redesign/icons';
 
 // Screen 13 · Nutrition History — accent: lime
 const dayShort = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short' });
@@ -34,15 +33,7 @@ export default function NutritionHistoryPage() {
 
   return (
     <div className="animate-fadeup space-y-5">
-      <ScreenHeader
-        eyebrow="NUTRITION"
-        title="History"
-        right={
-          <button onClick={() => router.push('/v2/fuel')} aria-label="Back" className="text-[var(--rd-text-muted)]">
-            <ChevronLeftIcon size={22} />
-          </button>
-        }
-      />
+      <ScreenHeader eyebrow="NUTRITION" title="History" back onBack={() => router.push('/v2/fuel')} />
 
       {/* 7-day trend */}
       <section className="rd-card p-5">

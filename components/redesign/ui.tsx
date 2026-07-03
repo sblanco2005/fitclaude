@@ -1,23 +1,48 @@
+'use client';
+
 import React from 'react';
+import { useRouter } from 'next/navigation';
+import { ChevronLeftIcon } from './icons';
 
 // Shared redesign primitives (scoped by .redesign-root in globals.css)
+
+// Global back control — 34×34, radius 11, chevron-left. Source: delta handoff.
+export function BackButton({ onClick }: { onClick?: () => void }) {
+  const router = useRouter();
+  return (
+    <button
+      onClick={onClick ?? (() => router.back())}
+      aria-label="Back"
+      className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"
+    >
+      <ChevronLeftIcon size={17} />
+    </button>
+  );
+}
 
 export function ScreenHeader({
   eyebrow,
   title,
   right,
+  back,
+  onBack,
 }: {
   eyebrow?: string;
   title: string;
   right?: React.ReactNode;
+  back?: boolean;
+  onBack?: () => void;
 }) {
   return (
     <header className="flex items-end justify-between pt-1">
-      <div>
-        {eyebrow && (
-          <p className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">{eyebrow}</p>
-        )}
-        <h1 className="font-display mt-1 text-[25px] font-bold leading-[1.1] text-[var(--rd-ink)]">{title}</h1>
+      <div className="flex items-center gap-3">
+        {back && <BackButton onClick={onBack} />}
+        <div>
+          {eyebrow && (
+            <p className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">{eyebrow}</p>
+          )}
+          <h1 className="font-display mt-1 text-[25px] font-bold leading-[1.1] text-[var(--rd-ink)]">{title}</h1>
+        </div>
       </div>
       {right}
     </header>
