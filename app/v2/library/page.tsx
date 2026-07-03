@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Exercise } from '@/types';
 import { useExercises, primaryVideo, FILTERS } from '@/components/redesign/library/useExercises';
 import { ScreenHeader, FilterChips, VideoThumb } from '@/components/redesign/ui';
@@ -75,10 +76,14 @@ function SpicyMeter({ count }: { count: number }) {
 }
 
 function FeaturedExercise({ ex }: { ex: Exercise }) {
+  const router = useRouter();
   const video = primaryVideo(ex);
-  const open = () => video?.youtubeUrl && window.open(video.youtubeUrl, '_blank');
+  const open = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (video?.youtubeUrl) window.open(video.youtubeUrl, '_blank');
+  };
   return (
-    <div className="rd-card overflow-hidden">
+    <div className="rd-card cursor-pointer overflow-hidden" onClick={() => router.push(`/v2/library/${ex.id}`)}>
       <VideoThumb className="h-[150px] w-full" rounded="rounded-none">
         {video?.thumbnailUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -120,10 +125,14 @@ function FeaturedExercise({ ex }: { ex: Exercise }) {
 }
 
 function ExerciseRow({ ex }: { ex: Exercise }) {
+  const router = useRouter();
   const video = primaryVideo(ex);
-  const open = () => video?.youtubeUrl && window.open(video.youtubeUrl, '_blank');
+  const open = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (video?.youtubeUrl) window.open(video.youtubeUrl, '_blank');
+  };
   return (
-    <div className="rd-card flex items-center gap-3 p-3">
+    <div className="rd-card flex cursor-pointer items-center gap-3 p-3" onClick={() => router.push(`/v2/library/${ex.id}`)}>
       <button
         onClick={open}
         disabled={!video}

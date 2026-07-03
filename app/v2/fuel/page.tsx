@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { MacroBar } from '@/components/redesign/nutrition/MacroBar';
 import { useNutrition, type MealItem } from '@/components/redesign/nutrition/useNutrition';
 import { ScreenHeader, Pill } from '@/components/redesign/ui';
@@ -66,7 +67,9 @@ export default function FuelPage() {
       <section>
         <div className="mb-2.5 flex items-center justify-between">
           <p className="text-[13px] font-semibold text-[var(--rd-ink)]">Today&apos;s meals</p>
-          <span className="font-label text-[11px] text-[var(--rd-text-faint)]">{n.meals.length} logged</span>
+          <Link href="/v2/fuel/history" className="font-label text-[11px] font-semibold text-[var(--rd-lime)]">
+            History
+          </Link>
         </div>
 
         {n.loading ? (
