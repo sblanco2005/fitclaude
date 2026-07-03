@@ -1,11 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   HomeIcon, TrainIcon, SparkleIcon, DropletIcon, LibraryIcon,
 } from './icons';
+import { CoachSheet } from './coach/CoachSheet';
+import type { CoachContext } from './coach/useCoachChat';
 
 // Per-screen accent glow tint (radial glow at top of the canvas)
 const GLOW: Record<string, string> = {
@@ -55,7 +57,7 @@ function StatusBar() {
   );
 }
 
-function BottomNav({ pathname }: { pathname: string }) {
+function BottomNav({ pathname, onCoach, coachOpen }: { pathname: string; onCoach: () => void; coachOpen: boolean }) {
   return (
     <nav
       className="absolute inset-x-0 bottom-0 z-20 border-t border-[var(--rd-border)] px-4 pb-6 pt-2"
@@ -67,17 +69,17 @@ function BottomNav({ pathname }: { pathname: string }) {
           if (center) {
             return (
               <li key={href} className="relative -mt-8 flex flex-col items-center">
-                <Link
-                  href={href}
+                <button
+                  onClick={onCoach}
                   aria-label={label}
                   className="grad-coach animate-floaty flex h-14 w-14 items-center justify-center rounded-full text-[#0A0C10]"
                   style={{ boxShadow: 'var(--rd-glow-coach)' }}
                 >
                   <Icon size={26} />
-                </Link>
+                </button>
                 <span
                   className="font-label mt-1 text-[9px] font-semibold tracking-[.12em]"
-                  style={{ color: active ? accent : 'var(--rd-text-disabled)' }}
+                  style={{ color: coachOpen ? accent : 'var(--rd-text-disabled)' }}
                 >
                   {label}
                 </span>
@@ -113,6 +115,10 @@ export function RedesignShell({ children }: { children: React.ReactNode }) {
   // (live workout, onboarding wizard).
   const isFocus = pathname.includes('/v2/train/session/') || pathname.startsWith('/v2/onboarding');
 
+  // Coach docked sheet — context derived from the screen it opens over.
+  const [coachOpen, setCoachOpen] = useState(false);
+  const coachContext: CoachContext = pathname.startsWith('/v2/fuel') ? 'nutrition' : 'workout';
+
   return (
     <div className="h-dvh w-full overflow-hidden" style={{ background: 'var(--rd-chrome)' }}>
       <div
@@ -139,7 +145,8 @@ export function RedesignShell({ children }: { children: React.ReactNode }) {
         >
           {children}
         </main>
-        {!isFocus && <BottomNav pathname={pathname} />}
+        {!isFocus && <BottomNav pathname={pathname} onCoach={() => setCoachOpen(true)} coachOpen={coachOpen} />}
+        <CoachSheet open={coachOpen} context={coachContext} onClose={() => setCoachOpen(false)} />
       </div>
     </div>
   );
