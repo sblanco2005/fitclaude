@@ -109,9 +109,9 @@ export function RedesignShell({ children }: { children: React.ReactNode }) {
   // Chat manages its own scroll + pinned input, so it fills a fixed height
   // instead of the default scrolling body with tall bottom padding.
   const isChat = pathname.startsWith('/v2/coach');
-  // Live-workout focus mode: hide the tab bar; the screen supplies its own
-  // full-width "Finish & rate" bar.
-  const isFocus = pathname.includes('/v2/train/session/');
+  // Focus mode: hide the tab bar for immersive full-screen flows
+  // (live workout, onboarding wizard).
+  const isFocus = pathname.includes('/v2/train/session/') || pathname.startsWith('/v2/onboarding');
 
   return (
     <div className="min-h-dvh w-full" style={{ background: 'var(--rd-chrome)' }}>

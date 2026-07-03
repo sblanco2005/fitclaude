@@ -41,8 +41,8 @@ export default function TrainPage() {
         title="Your workouts"
         right={
           <Link
-            href="/v2/coach"
-            aria-label="New routine"
+            href="/v2/train/add"
+            aria-label="Add program"
             className="grad-ember flex h-9 w-9 items-center justify-center rounded-[11px] text-[#0A0C10]"
             style={{ boxShadow: 'var(--rd-glow-ember)' }}
           >
