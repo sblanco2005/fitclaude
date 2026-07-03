@@ -106,6 +106,9 @@ function BottomNav({ pathname }: { pathname: string }) {
 export function RedesignShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '/v2';
   const glowTint = GLOW[accentForPath(pathname)];
+  // Chat manages its own scroll + pinned input, so it fills a fixed height
+  // instead of the default scrolling body with tall bottom padding.
+  const isChat = pathname.startsWith('/v2/coach');
 
   return (
     <div className="min-h-dvh w-full" style={{ background: 'var(--rd-chrome)' }}>
@@ -122,7 +125,13 @@ export function RedesignShell({ children }: { children: React.ReactNode }) {
         <div className="relative z-10 shrink-0">
           <StatusBar />
         </div>
-        <main className="scrollbar-hide relative z-10 flex-1 overflow-y-auto px-5 pb-32 pt-2">
+        <main
+          className={
+            isChat
+              ? 'relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-24 pt-2'
+              : 'scrollbar-hide relative z-10 flex-1 overflow-y-auto px-5 pb-32 pt-2'
+          }
+        >
           {children}
         </main>
         <BottomNav pathname={pathname} />
