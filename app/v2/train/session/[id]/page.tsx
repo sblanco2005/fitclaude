@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useSession, type SessionExercise, type SetEntry } from '@/components/redesign/session/useSession';
+import { useSession, lastSummary, type SessionExercise, type SetEntry } from '@/components/redesign/session/useSession';
 import { FinishRate } from '@/components/redesign/session/FinishRate';
-import { CheckIcon, CloseIcon, PlusIcon, MinusIcon, PlayIcon, ChevronLeftIcon, ArrowRightIcon } from '@/components/redesign/icons';
+import { CheckIcon, CloseIcon, PlusIcon, MinusIcon, PlayIcon, ChevronLeftIcon, ArrowRightIcon, SpinIcon } from '@/components/redesign/icons';
 
 // Screen 03 · Hit It (live workout) — accent: ember
 
@@ -24,6 +24,8 @@ export default function SessionPage() {
   const s = useSession(id);
   const [exIdx, setExIdx] = useState(0);
   const [unit, setUnit] = useState<'kg' | 'lb'>('kg');
+  const [perSide, setPerSide] = useState(false);
+  const [barKg, setBarKg] = useState(20);
   const [elapsed, setElapsed] = useState(0);
   const [finishing, setFinishing] = useState(false);
 
@@ -64,9 +66,13 @@ export default function SessionPage() {
     );
   }
 
-  const ex = s.exercises[exIdx];
+  const safeIdx = Math.min(exIdx, s.exercises.length - 1);
+  const ex = s.exercises[safeIdx];
   const activeSetIdx = ex.sets.findIndex((st) => !st.done);
-  const next = s.exercises[exIdx + 1];
+  const next = s.exercises[safeIdx + 1];
+  const last = lastSummary(ex, unit);
+  const showBarControls = ex.isBarbell;
+  const skip = () => setExIdx((i) => Math.min(s.exercises.length - 1, i + 1));
 
   return (
     <div className="animate-fadeup space-y-4">
@@ -86,19 +92,19 @@ export default function SessionPage() {
       <section className="rd-card p-4">
         <div className="flex items-center justify-between">
           <button
-            onClick={() => setExIdx((i) => Math.max(0, i - 1))}
-            disabled={exIdx === 0}
+            onClick={() => setExIdx(Math.max(0, safeIdx - 1))}
+            disabled={safeIdx === 0}
             className="text-[var(--rd-text-muted)] disabled:opacity-30"
             aria-label="Previous exercise"
           >
             <ChevronLeftIcon size={20} />
           </button>
           <span className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">
-            EXERCISE {exIdx + 1} / {s.exercises.length}
+            EXERCISE {safeIdx + 1} / {s.exercises.length}
           </span>
           <button
-            onClick={() => setExIdx((i) => Math.min(s.exercises.length - 1, i + 1))}
-            disabled={exIdx === s.exercises.length - 1}
+            onClick={() => setExIdx(Math.min(s.exercises.length - 1, safeIdx + 1))}
+            disabled={safeIdx === s.exercises.length - 1}
             className="rotate-180 text-[var(--rd-text-muted)] disabled:opacity-30"
             aria-label="Next exercise"
           >
@@ -116,24 +122,69 @@ export default function SessionPage() {
           )}
         </div>
 
-        {/* How-to video */}
-        {ex.youtubeUrl && (
-          <button
-            onClick={() => window.open(ex.youtubeUrl, '_blank')}
-            className="mt-3 flex w-full items-center gap-3 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card)] p-2.5"
-          >
-            <span
-              className="flex h-9 w-12 items-center justify-center rounded-[8px]"
-              style={{ background: 'linear-gradient(135deg,#26282f,#15171c)' }}
-            >
-              <PlayIcon size={14} className="text-white/90" />
-            </span>
-            <span className="flex-1 text-left text-[13px] font-medium text-[var(--rd-text-secondary)]">Watch how-to</span>
-            <span className="font-label rounded-[6px] px-1.5 py-0.5 text-[9px] font-bold text-white" style={{ background: 'var(--rd-youtube)' }}>
-              YT
-            </span>
-          </button>
+        {/* Last summary */}
+        {last && (
+          <p className="mt-2 text-[12px] text-[var(--rd-text-muted)]">
+            <span className="text-[var(--rd-text-faint)]">Last:</span> {last} {unit}
+          </p>
         )}
+
+        {/* Exercise controls: unit / per-side / bar */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="flex overflow-hidden rounded-[9px] border border-[var(--rd-border)]">
+            {(['kg', 'lb'] as const).map((u) => (
+              <button
+                key={u}
+                onClick={() => setUnit(u)}
+                className="font-label px-3 py-1.5 text-[11px] font-semibold"
+                style={{ background: unit === u ? 'var(--rd-ember)' : 'transparent', color: unit === u ? '#0A0C10' : 'var(--rd-text-muted)' }}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+          {showBarControls && (
+            <>
+              <button
+                onClick={() => setPerSide((v) => !v)}
+                className="font-label flex items-center gap-1.5 rounded-[9px] border px-2.5 py-1.5 text-[11px] font-semibold"
+                style={{
+                  borderColor: perSide ? 'rgba(255,107,69,.3)' : 'var(--rd-border)',
+                  background: perSide ? 'rgba(255,138,91,.12)' : 'var(--rd-card-glass)',
+                  color: perSide ? 'var(--rd-ember)' : 'var(--rd-text-muted)',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 7 4 12l4 5M16 7l4 5-4 5M4 12h16" /></svg>
+                Per side
+              </button>
+              <button
+                onClick={() => setBarKg((b) => (b === 20 ? 15 : b === 15 ? 10 : 20))}
+                className="font-label flex items-center gap-1 rounded-[9px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--rd-text-secondary)]"
+              >
+                Bar {barKg} kg
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Action toolbar */}
+        <div className="mt-3 flex gap-1.5">
+          <ToolBtn label="Demo" color="var(--rd-lime)" active onClick={() => ex.youtubeUrl && window.open(ex.youtubeUrl, '_blank')}>
+            <PlayIcon size={16} />
+          </ToolBtn>
+          <ToolBtn label="Swap" onClick={() => s.swapExercise(safeIdx)}>
+            <SpinIcon size={16} />
+          </ToolBtn>
+          <ToolBtn label="Up" onClick={() => s.moveExercise(safeIdx, -1)}>
+            <ChevronLeftIcon size={16} className="rotate-90" />
+          </ToolBtn>
+          <ToolBtn label="Skip" onClick={skip}>
+            <ArrowRightIcon size={16} />
+          </ToolBtn>
+          <ToolBtn label="Delete" color="#FF6B6B" onClick={() => s.removeExercise(safeIdx)}>
+            <CloseIcon size={16} />
+          </ToolBtn>
+        </div>
 
         {/* Sets */}
         <div className="mt-4 space-y-2">
@@ -151,14 +202,33 @@ export default function SessionPage() {
                 set={set}
                 unit={unit}
                 isBarbell={ex.isBarbell}
-                onUnit={setUnit}
-                onChange={(patch) => s.updateSet(exIdx, i, patch)}
-                onLog={() => s.updateSet(exIdx, i, { done: true })}
+                perSide={perSide}
+                barKg={barKg}
+                onChange={(patch) => s.updateSet(safeIdx, i, patch)}
+                onLog={() => s.updateSet(safeIdx, i, { done: true })}
               />
             ) : (
               <SetRow key={i} setNum={i + 1} set={set} unit={unit} />
             ),
           )}
+
+          {/* Add / remove set */}
+          <div className="mt-1 flex gap-2">
+            <button
+              onClick={() => s.removeSet(safeIdx)}
+              disabled={ex.sets.length <= 1}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] py-2.5 text-[13px] font-semibold text-[var(--rd-text-secondary)] disabled:opacity-40"
+            >
+              <MinusIcon size={14} /> Remove set
+            </button>
+            <button
+              onClick={() => s.addSet(safeIdx)}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-[12px] border py-2.5 text-[13px] font-semibold"
+              style={{ borderColor: 'rgba(200,255,77,.3)', background: 'rgba(200,255,77,.08)', color: 'var(--rd-lime)' }}
+            >
+              <PlusIcon size={14} /> Add set
+            </button>
+          </div>
         </div>
       </section>
 
@@ -212,45 +282,70 @@ function SetRow({ setNum, set, unit }: { setNum: number; set: SetEntry; unit: 'k
   );
 }
 
+function ToolBtn({
+  label, color, active, onClick, children,
+}: {
+  label: string;
+  color?: string;
+  active?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const c = color ?? 'var(--rd-text-muted)';
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-1 flex-col items-center gap-1 rounded-[12px] border py-2.5"
+      style={
+        active
+          ? { borderColor: 'rgba(200,255,77,.2)', background: 'rgba(200,255,77,.07)', color }
+          : { borderColor: 'var(--rd-border)', background: 'var(--rd-card-glass)', color: c }
+      }
+    >
+      {children}
+      <span className="font-label text-[9px] font-semibold" style={{ color: active ? color : 'var(--rd-text-faint)' }}>{label}</span>
+    </button>
+  );
+}
+
 function ActiveSet({
-  setNum, set, unit, isBarbell, onUnit, onChange, onLog,
+  setNum, set, unit, isBarbell, perSide, barKg, onChange, onLog,
 }: {
   setNum: number;
   set: SetEntry;
   unit: 'kg' | 'lb';
   isBarbell: boolean;
-  onUnit: (u: 'kg' | 'lb') => void;
+  perSide: boolean;
+  barKg: number;
   onChange: (patch: Partial<SetEntry>) => void;
   onLog: () => void;
 }) {
   const step = unit === 'kg' ? 2.5 : 5;
-  const dispW = toDisplay(set.weightKg, unit);
-  const setWeight = (nextDisplay: number) => onChange({ weightKg: Math.max(0, fromDisplay(Math.round(nextDisplay * 10) / 10, unit)) });
-  const bar = 20;
-  const perSide = set.weightKg > bar ? (set.weightKg - bar) / 2 : 0;
+  const usePerSide = perSide && isBarbell;
+  const perSideKg = Math.max(0, (set.weightKg - barKg) / 2);
+  const shownKg = usePerSide ? perSideKg : set.weightKg;
+  const dispW = Math.round(toDisplay(shownKg, unit) * 10) / 10;
+
+  const setWeight = (nextDisplay: number) => {
+    const enteredKg = fromDisplay(Math.max(0, Math.round(nextDisplay * 10) / 10), unit);
+    onChange({ weightKg: usePerSide ? barKg + 2 * enteredKg : enteredKg });
+  };
 
   return (
     <div className="rounded-[14px] border p-3.5" style={{ borderColor: 'var(--rd-ember)', background: 'rgba(255,107,69,.08)' }}>
       <div className="flex items-center justify-between">
         <span className="font-label text-[10px] tracking-[.14em] text-[var(--rd-ember)]">SET {setNum}</span>
-        <div className="flex overflow-hidden rounded-full border border-[var(--rd-border)]">
-          {(['kg', 'lb'] as const).map((u) => (
-            <button
-              key={u}
-              onClick={() => onUnit(u)}
-              className="font-label px-2.5 py-0.5 text-[10px] font-semibold"
-              style={{ background: unit === u ? 'var(--rd-ember)' : 'transparent', color: unit === u ? '#0A0C10' : 'var(--rd-text-muted)' }}
-            >
-              {u}
-            </button>
-          ))}
-        </div>
+        {set.lastWeightKg != null && (
+          <span className="font-label text-[10px] text-[var(--rd-text-faint)]">
+            Last {Math.round(toDisplay(set.lastWeightKg, unit))}{unit} × {set.lastReps ?? '–'}
+          </span>
+        )}
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Stepper
-          label="WEIGHT"
-          value={`${Math.round(dispW * 10) / 10}`}
+          label={usePerSide ? 'WEIGHT / SIDE' : 'WEIGHT'}
+          value={`${dispW}`}
           unit={unit}
           onMinus={() => setWeight(dispW - step)}
           onPlus={() => setWeight(dispW + step)}
@@ -263,9 +358,9 @@ function ActiveSet({
         />
       </div>
 
-      {isBarbell && perSide > 0 && (
-        <p className="font-label mt-2 text-center text-[10px] text-[var(--rd-text-faint)]">
-          = {Math.round(set.weightKg)} kg total · {bar}kg bar + 2×{Math.round(perSide)}kg
+      {usePerSide && set.weightKg >= barKg && (
+        <p className="font-label mt-2 text-center text-[10px] text-[var(--rd-lime)]">
+          = {Math.round(set.weightKg)} kg total · {barKg}kg bar + 2×{Math.round(perSideKg)}kg
         </p>
       )}
 
