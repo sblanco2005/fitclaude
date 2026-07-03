@@ -114,9 +114,9 @@ export function RedesignShell({ children }: { children: React.ReactNode }) {
   const isFocus = pathname.includes('/v2/train/session/') || pathname.startsWith('/v2/onboarding');
 
   return (
-    <div className="min-h-dvh w-full" style={{ background: 'var(--rd-chrome)' }}>
+    <div className="h-dvh w-full overflow-hidden" style={{ background: 'var(--rd-chrome)' }}>
       <div
-        className="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col overflow-hidden"
+        className="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden"
         style={{ background: 'var(--rd-bg)' }}
       >
         {/* screen-accent radial glow */}
@@ -131,10 +131,10 @@ export function RedesignShell({ children }: { children: React.ReactNode }) {
         <main
           className={
             isFocus
-              ? 'scrollbar-hide relative z-10 flex-1 overflow-y-auto px-5 pb-24 pt-2'
+              ? 'scrollbar-hide relative z-10 min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-2'
               : isChat
                 ? 'relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-24 pt-2'
-                : 'scrollbar-hide relative z-10 flex-1 overflow-y-auto px-5 pb-32 pt-2'
+                : 'scrollbar-hide relative z-10 min-h-0 flex-1 overflow-y-auto px-5 pb-32 pt-2'
           }
         >
           {children}
