@@ -108,6 +108,80 @@ export function useSession(id: string) {
     );
   }, []);
 
+  const addSet = useCallback((exIdx: number) => {
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== exIdx) return ex;
+        const ref = ex.sets[ex.sets.length - 1];
+        return { ...ex, sets: [...ex.sets, { weightKg: ref?.weightKg ?? 0, reps: ref?.reps ?? 8, done: false }] };
+      }),
+    );
+  }, []);
+
+  const removeSet = useCallback((exIdx: number) => {
+    setExercises((prev) =>
+      prev.map((ex, i) => (i !== exIdx || ex.sets.length <= 1 ? ex : { ...ex, sets: ex.sets.slice(0, -1) })),
+    );
+  }, []);
+
+  // Delete an exercise from the live session (server + local, preserves progress)
+  const removeExercise = useCallback(async (exIdx: number) => {
+    const ex = exercises[exIdx];
+    if (!ex) return;
+    setExercises((prev) => prev.filter((_, i) => i !== exIdx));
+    fetch(`/api/workouts/${id}/exercises/${ex.woExerciseId}`, { method: 'DELETE' }).catch(() => {});
+  }, [exercises, id]);
+
+  // Swap an exercise for a same-muscle alternative
+  const swapExercise = useCallback(async (exIdx: number) => {
+    const ex = exercises[exIdx];
+    if (!ex) return;
+    try {
+      const sug = await fetch(`/api/workouts/${id}/exercises/${ex.woExerciseId}/suggest`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      if (!sug?.id) return;
+      const r = await fetch(`/api/workouts/${id}/exercises/${ex.woExerciseId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newExerciseId: sug.id }),
+      });
+      if (!r.ok) return;
+      const updated = await r.json();
+      setExercises((prev) =>
+        prev.map((e, i) =>
+          i !== exIdx
+            ? e
+            : {
+                ...e,
+                name: updated.exercise?.name || sug.name || e.name,
+                muscle: updated.exercise?.muscleGroup || e.muscle,
+                equipment: updated.exercise?.equipmentRequired || '',
+                isBarbell: /barbell/i.test(updated.exercise?.equipmentRequired || ''),
+                youtubeUrl: updated.exercise?.videos?.[0] ? `https://youtube.com/watch?v=${updated.exercise.videos[0].youtubeVideoId}` : undefined,
+                sets: e.sets.map((s) => ({ ...s, done: false })),
+              },
+        ),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [exercises, id]);
+
+  // Reorder (move an exercise up/down)
+  const moveExercise = useCallback((exIdx: number, dir: -1 | 1) => {
+    setExercises((prev) => {
+      const next = [...prev];
+      const target = exIdx + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[exIdx], next[target]] = [next[target], next[exIdx]];
+      fetch(`/api/workouts/${id}/exercises/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: next.map((e) => e.woExerciseId) }),
+      }).catch(() => {});
+      return next;
+    });
+  }, [id]);
+
   const stats = useMemo(() => {
     let volume = 0;
     let setsLogged = 0;
@@ -165,9 +239,27 @@ export function useSession(id: string) {
     workout,
     exercises,
     updateSet,
+    addSet,
+    removeSet,
+    removeExercise,
+    swapExercise,
+    moveExercise,
     stats,
     startedAt,
     save,
     name: workout?.name?.trim() || workout?.workoutType || 'Workout',
   };
 }
+
+// "Last: 55×8 · 57.5×8 · …" from a set's reference values; empty if none.
+export function lastSummary(ex: SessionExercise, unit: 'kg' | 'lb'): string {
+  const parts = ex.sets
+    .filter((s) => s.lastWeightKg != null)
+    .map((s) => {
+      const w = unit === 'kg' ? s.lastWeightKg! : Math.round((s.lastWeightKg! / KG_PER_LB) * 10) / 10;
+      return `${Math.round(w)}×${s.lastReps ?? '–'}`;
+    });
+  return parts.length ? parts.join(' · ') : '';
+}
+
+const KG_PER_LB = 0.453592;
