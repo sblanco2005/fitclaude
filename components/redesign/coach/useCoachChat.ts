@@ -58,7 +58,9 @@ async function buildRoutineCard(workoutId: string): Promise<GeneratedRoutine | u
   }
 }
 
-export function useCoachChat() {
+export type CoachContext = 'workout' | 'nutrition';
+
+export function useCoachChat(context: CoachContext = 'workout') {
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -73,7 +75,7 @@ export function useCoachChat() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/chat/history?topic=workout');
+        const r = await fetch(`/api/chat/history?topic=${context}`);
         if (r.ok) {
           const hist = await r.json();
           setMessages(
@@ -89,7 +91,7 @@ export function useCoachChat() {
         scrollToBottom();
       }
     })();
-  }, [scrollToBottom]);
+  }, [scrollToBottom, context]);
 
   const send = useCallback(
     async (text: string) => {
@@ -102,7 +104,7 @@ export function useCoachChat() {
         const r = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: clean, topic: 'workout', timezone: tz() }),
+          body: JSON.stringify({ message: clean, topic: context, timezone: tz() }),
         });
         const data = r.ok ? await r.json() : { response: 'Something went wrong. Try again.' };
         const [meal, routine] = await Promise.all([
@@ -126,7 +128,7 @@ export function useCoachChat() {
         scrollToBottom();
       }
     },
-    [loading, scrollToBottom],
+    [loading, scrollToBottom, context],
   );
 
   return { messages, loading, historyLoaded, send, listRef };
