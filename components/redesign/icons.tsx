@@ -70,3 +70,47 @@ export const PlayIcon = (p: IconProps) => (
     <path d="M8 5.5v13l11-6.5-11-6.5Z" />
   </svg>
 );
+
+export const SearchIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.2-3.2" />
+  </svg>
+);
+
+export const ArrowRightIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </svg>
+);
+
+export const SpinIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M20 12a8 8 0 1 1-2.3-5.6" />
+    <path d="M20 3v4h-4" />
+  </svg>
+);
+
+export const BookmarkIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M6 4h12v16l-6-4-6 4V4Z" />
+  </svg>
+);
+
+export const CloseIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </svg>
+);
+
+export const MinusIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M5 12h14" />
+  </svg>
+);
+
+export const ChevronLeftIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M15 6l-6 6 6 6" />
+  </svg>
+);
