@@ -25,6 +25,7 @@ export default function SettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const isAdmin = (session?.user as { isAdmin?: boolean } | undefined)?.isAdmin;
   const name = p?.name || session?.user?.name || 'Athlete';
   const email = p?.email || session?.user?.email || '';
   const goal = titleCase(p?.fitnessGoal);
@@ -81,17 +82,32 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Rows */}
+      {/* Rows — tap to edit via the onboarding wizard */}
       <section className="rd-card divide-y divide-[var(--rd-border)] overflow-hidden">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-center justify-between gap-3 p-4">
+          <button
+            key={r.label}
+            onClick={() => router.push('/v2/onboarding')}
+            className="flex w-full items-center justify-between gap-3 p-4 text-left"
+          >
             <span className="text-[14px] text-[var(--rd-text-secondary)]">{r.label}</span>
             <span className="truncate text-right text-[13px] font-medium text-[var(--rd-text-muted)]">
               {loading ? '…' : r.value}
             </span>
-          </div>
+          </button>
         ))}
       </section>
+
+      {/* Admin */}
+      {isAdmin && (
+        <button
+          onClick={() => router.push('/v2/admin')}
+          className="rd-card flex w-full items-center justify-between p-4"
+        >
+          <span className="text-[14px] font-medium text-[var(--rd-text-secondary)]">Admin tools</span>
+          <span className="font-label text-[11px] tracking-[.12em] text-[var(--rd-violet)]">INTERNAL</span>
+        </button>
+      )}
 
       {/* Sign out */}
       <button
