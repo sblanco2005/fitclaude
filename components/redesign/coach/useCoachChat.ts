@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFitClaude } from '@/context/FitClaudeContext';
 import type { LoggedMeal, GeneratedRoutine } from './ChatCards';
 
 export type CoachMessage = {
@@ -61,6 +62,7 @@ async function buildRoutineCard(workoutId: string): Promise<GeneratedRoutine | u
 export type CoachContext = 'workout' | 'nutrition';
 
 export function useCoachChat(context: CoachContext = 'workout') {
+  const { bumpDataVersion } = useFitClaude();
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -126,9 +128,11 @@ export function useCoachChat(context: CoachContext = 'workout') {
       } finally {
         setLoading(false);
         scrollToBottom();
+        // signal watchers (nutrition counter, dashboard) to refetch
+        bumpDataVersion();
       }
     },
-    [loading, scrollToBottom, context],
+    [loading, scrollToBottom, context, bumpDataVersion],
   );
 
   return { messages, loading, historyLoaded, send, listRef };

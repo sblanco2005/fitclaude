@@ -17,6 +17,8 @@ interface FitClaudeState {
   loading: boolean;
   /** Increments after every successful chat response — pages can watch this to re-fetch */
   dataVersion: number;
+  /** Manually bump dataVersion to force watchers (nutrition, dashboard) to refetch */
+  bumpDataVersion: () => void;
 
   fetchProfile: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
@@ -45,6 +47,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
   const [chatTopic, setChatTopicState] = useState<ChatTopic>('workout');
   const [loading, setLoading] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
+  const bumpDataVersion = useCallback(() => setDataVersion((v) => v + 1), []);
   const [customBack, setCustomBackRaw] = useState<(() => void) | null>(null);
   const pendingSessionTypeRef = useRef<'lifting' | 'conditioning' | null>(null);
   const setPendingSessionType = useCallback((type: 'lifting' | 'conditioning' | null) => {
@@ -270,6 +273,7 @@ export function FitClaudeProvider({ children }: { children: React.ReactNode }) {
         chatTopic,
         loading,
         dataVersion,
+        bumpDataVersion,
         customBack,
         setCustomBack,
         fetchProfile,
