@@ -136,18 +136,26 @@ export default function SessionPage() {
         </div>
 
         {/* Sets */}
-        <div className="mt-4 space-y-3">
-          {ex.sets.map((set, i) => (
-            <SetRow
-              key={i}
-              n={i + 1}
-              set={set}
-              unit={unit}
-              perSide={perSide && ex.isBarbell}
-              barDisplay={barDisplay}
-              onChange={(patch) => s.updateSet(safeIdx, i, patch)}
-            />
-          ))}
+        <div className="mt-4 space-y-2">
+          <div className="font-label grid grid-cols-[28px_1fr_1fr_24px] gap-2 px-1 text-[9px] tracking-[.1em] text-[var(--rd-text-faint)]">
+            <span>SET</span><span>LAST TIME</span><span>THIS SET</span><span />
+          </div>
+          {ex.sets.map((set, i) =>
+            i === ex.sets.findIndex((st) => !st.done) ? (
+              <ActiveSet
+                key={i}
+                n={i + 1}
+                set={set}
+                unit={unit}
+                perSide={perSide && ex.isBarbell}
+                barDisplay={barDisplay}
+                onChange={(patch) => s.updateSet(safeIdx, i, patch)}
+                onLog={() => s.updateSet(safeIdx, i, { done: true })}
+              />
+            ) : (
+              <CompactRow key={i} n={i + 1} set={set} unit={unit} onToggle={() => s.updateSet(safeIdx, i, { done: !set.done })} />
+            ),
+          )}
 
           <div className="flex gap-2 pt-1">
             <button onClick={() => s.removeSet(safeIdx)} disabled={ex.sets.length <= 1} className="flex flex-1 items-center justify-center gap-1.5 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] py-2.5 text-[13px] font-semibold text-[var(--rd-text-secondary)] disabled:opacity-40"><MinusIcon size={14} /> Remove set</button>
@@ -230,8 +238,25 @@ function ToolBtn({ label, color, active, disabled, onClick, children }: {
   );
 }
 
-function SetRow({ n, set, unit, perSide, barDisplay, onChange }: {
-  n: number; set: SetEntry; unit: Unit; perSide: boolean; barDisplay: number; onChange: (p: Partial<SetEntry>) => void;
+// Compact read-only row for done / upcoming sets (V2 design)
+function CompactRow({ n, set, unit, onToggle }: { n: number; set: SetEntry; unit: Unit; onToggle: () => void }) {
+  return (
+    <div className="grid grid-cols-[28px_1fr_1fr_24px] items-center gap-2 rounded-[11px] px-1 py-2">
+      <span className="font-num text-[13px] font-bold text-[var(--rd-text-muted)]">{n}</span>
+      <span className="font-label text-[12px] text-[var(--rd-text-faint)]">{set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—'}</span>
+      <span className="font-label text-[12px]" style={{ color: set.done ? 'var(--rd-lime)' : 'var(--rd-text-faint)' }}>
+        {set.done ? `${formatWeight(set.weightLb, unit)} × ${set.reps}` : '—'}
+      </span>
+      <button onClick={onToggle} aria-label="Toggle set" className="flex justify-center">
+        {set.done ? <span className="text-[var(--rd-lime)]"><CheckIcon size={15} /></span> : <span className="h-4 w-4 rounded-full border border-[var(--rd-border-strong)]" />}
+      </button>
+    </div>
+  );
+}
+
+// Single active-set editor — the ember card (V2 design), with per-side + editable weight
+function ActiveSet({ n, set, unit, perSide, barDisplay, onChange, onLog }: {
+  n: number; set: SetEntry; unit: Unit; perSide: boolean; barDisplay: number; onChange: (p: Partial<SetEntry>) => void; onLog: () => void;
 }) {
   const toDisp = (lb: number) => (unit === 'lb' ? lb : lbToKg(lb));
   const fromDisp = (v: number) => (unit === 'lb' ? v : kgToLb(v));
@@ -239,7 +264,6 @@ function SetRow({ n, set, unit, perSide, barDisplay, onChange }: {
   const perSideDisplay = perSide ? Math.max(0, Math.round(((totalDisplay - barDisplay) / 2) * 10) / 10) : totalDisplay;
   const shown = perSide ? perSideDisplay : totalDisplay;
   const step = perSide ? 5 : unit === 'kg' ? 2.5 : 5;
-
   const setShown = (v: number) => {
     const clamped = Math.max(0, Math.round(v * 10) / 10);
     const newTotal = perSide ? clamped * 2 + barDisplay : clamped;
@@ -248,20 +272,34 @@ function SetRow({ n, set, unit, perSide, barDisplay, onChange }: {
   const otherLabel = unit === 'lb' ? `${lbToKg(set.weightLb)}kg` : `${Math.round(set.weightLb)}lb`;
 
   return (
-    <div className="rounded-[13px] border p-2.5" style={{ borderColor: set.done ? 'rgba(200,255,77,.28)' : 'var(--rd-border)', background: set.done ? 'rgba(200,255,77,.05)' : 'var(--rd-card-glass)' }}>
-      <div className="flex items-center gap-2">
-        <span className="font-label w-6 shrink-0 text-[11px] font-bold text-[var(--rd-text-muted)]">S{n}</span>
-        <NumStepper value={shown} step={step} decimals={unit === 'kg' && !perSide ? 1 : 0} onChange={setShown} />
-        <div className="flex min-w-0 flex-col items-center px-0.5">
-          <span className="font-label text-[9px] tracking-[.06em] text-[var(--rd-text-faint)]">{perSide ? '/side =' : unit}</span>
-          {perSide && <span className="font-num text-[13px] font-bold text-[var(--rd-ink)]">{Math.round(totalDisplay)}{unit}</span>}
-        </div>
-        <NumStepper value={set.reps} step={1} decimals={0} onChange={(v) => onChange({ reps: Math.max(0, Math.round(v)) })} />
-        <button onClick={() => onChange({ done: !set.done })} aria-label="Log set" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ background: set.done ? 'var(--rd-lime)' : 'transparent', border: set.done ? 'none' : '1px solid var(--rd-border-strong)', color: set.done ? '#0A0C10' : 'var(--rd-text-muted)' }}>
-          <CheckIcon size={16} />
-        </button>
+    <div className="rounded-[14px] border p-3.5" style={{ borderColor: 'var(--rd-ember)', background: 'rgba(255,107,69,.08)' }}>
+      <div className="flex items-center justify-between">
+        <span className="font-label text-[10px] tracking-[.14em] text-[var(--rd-ember)]">SET {n}</span>
+        {set.lastWeightLb != null && (
+          <span className="font-label text-[10px] text-[var(--rd-text-faint)]">Last {formatWeight(set.lastWeightLb, unit)} × {set.lastReps ?? '–'}</span>
+        )}
       </div>
-      {set.weightLb > 0 && <p className="font-label mt-1 pl-8 text-[10px] text-[var(--rd-text-faint)]">= {otherLabel}</p>}
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div>
+          <p className="font-label mb-1.5 text-center text-[9px] tracking-[.12em] text-[var(--rd-text-faint)]">{perSide ? 'WEIGHT / SIDE' : `WEIGHT (${unit})`}</p>
+          <NumStepper value={shown} step={step} decimals={unit === 'kg' && !perSide ? 1 : 0} onChange={setShown} />
+        </div>
+        <div>
+          <p className="font-label mb-1.5 text-center text-[9px] tracking-[.12em] text-[var(--rd-text-faint)]">REPS</p>
+          <NumStepper value={set.reps} step={1} decimals={0} onChange={(v) => onChange({ reps: Math.max(0, Math.round(v)) })} />
+        </div>
+      </div>
+      {perSide && set.weightLb > 0 && (
+        <p className="font-label mt-2 text-center text-[10px] text-[var(--rd-lime)]">
+          = {Math.round(totalDisplay)}{unit} total · {Math.round(barDisplay)}{unit} bar + 2×{perSideDisplay}{unit}  <span className="text-[var(--rd-text-faint)]">= {otherLabel}</span>
+        </p>
+      )}
+      {!perSide && set.weightLb > 0 && (
+        <p className="font-label mt-2 text-center text-[10px] text-[var(--rd-text-faint)]">= {otherLabel}</p>
+      )}
+      <button onClick={onLog} className="grad-lime mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-[12px] text-[14px] font-semibold text-[#0A0C10]">
+        Log set {n} <CheckIcon size={16} />
+      </button>
     </div>
   );
 }
