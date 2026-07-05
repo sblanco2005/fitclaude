@@ -25,6 +25,7 @@ export default function SessionPage() {
   const [elapsed, setElapsed] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [inited, setInited] = useState(false);
+  const [media, setMedia] = useState<{ kind: 'gif' | 'video'; src: string } | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - s.startedAt) / 1000)), 1000);
@@ -169,10 +170,10 @@ export default function SessionPage() {
 
       {/* Action toolbar */}
       <div className="flex gap-1.5">
-        <ToolBtn label="Video" onClick={() => ex.youtubeUrl && window.open(ex.youtubeUrl, '_blank')} disabled={!ex.youtubeUrl}>
+        <ToolBtn label="Video" onClick={() => ex.youtubeId && setMedia({ kind: 'video', src: ex.youtubeId })} disabled={!ex.youtubeId}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C18 4.8 12 4.8 12 4.8s-6 0-7.7.5A2.7 2.7 0 0 0 2.4 7.2 28 28 0 0 0 2 12a28 28 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.7.5 7.7.5 7.7.5s6 0 7.7-.5a2.7 2.7 0 0 0 1.9-1.9A28 28 0 0 0 22 12a28 28 0 0 0-.4-4.8ZM10 15V9l5 3Z" /></svg>
         </ToolBtn>
-        <ToolBtn label="Demo" color="var(--rd-lime)" active onClick={() => ex.gifUrl ? window.open(ex.gifUrl, '_blank') : ex.youtubeUrl && window.open(ex.youtubeUrl, '_blank')}><PlayIcon size={16} /></ToolBtn>
+        <ToolBtn label="Demo" color="var(--rd-lime)" active disabled={!ex.gifUrl && !ex.youtubeId} onClick={() => ex.gifUrl ? setMedia({ kind: 'gif', src: ex.gifUrl }) : ex.youtubeId && setMedia({ kind: 'video', src: ex.youtubeId })}><PlayIcon size={16} /></ToolBtn>
         <ToolBtn label="Swap" onClick={() => s.swapExercise(safeIdx)}><SpinIcon size={16} /></ToolBtn>
         <ToolBtn label="Reorder" onClick={() => s.moveExercise(safeIdx, -1)}><ChevronLeftIcon size={16} className="rotate-90" /></ToolBtn>
         <ToolBtn label="Skip" onClick={skip}><ArrowRightIcon size={16} /></ToolBtn>
@@ -185,6 +186,33 @@ export default function SessionPage() {
           <button onClick={() => setFinishing(true)} className="grad-ember flex h-12 w-full items-center justify-center rounded-[14px] text-[15px] font-semibold text-[#0A0C10]" style={{ boxShadow: 'var(--rd-glow-ember)' }}>Finish &amp; rate workout</button>
         </div>
       </div>
+
+      {/* Floating demo / video player */}
+      {media && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-5" onClick={() => setMedia(null)}>
+          <div className="absolute inset-0" style={{ background: 'rgba(4,5,8,.8)', backdropFilter: 'blur(4px)' }} />
+          <div className="relative w-full max-w-[380px]" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="font-display text-[15px] font-bold text-[var(--rd-ink)]">{ex.name}</p>
+              <button onClick={() => setMedia(null)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
+            </div>
+            <div className="overflow-hidden rounded-[16px] bg-black" style={{ aspectRatio: media.kind === 'video' ? '16/9' : '1/1' }}>
+              {media.kind === 'gif' ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={media.src} alt={ex.name} className="h-full w-full object-contain" />
+              ) : (
+                <iframe
+                  className="h-full w-full"
+                  src={`https://www.youtube.com/embed/${media.src}?autoplay=1&playsinline=1&rel=0`}
+                  title={ex.name}
+                  allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -239,24 +267,28 @@ function SetRow({ n, set, unit, perSide, barDisplay, onChange }: {
 }
 
 function NumStepper({ value, step, decimals, onChange }: { value: number; step: number; decimals: number; onChange: (v: number) => void }) {
+  // draft holds the raw string while focused so partial input ("", ".") is allowed;
+  // committed live on every keystroke so the total updates as you type.
   const [draft, setDraft] = useState<string | null>(null);
-  const shown = draft ?? (decimals ? String(value) : String(Math.round(value)));
-  const commit = () => {
-    if (draft != null) { const v = parseFloat(draft); if (!Number.isNaN(v)) onChange(v); setDraft(null); }
-  };
+  const shown = draft != null ? draft : decimals ? String(value) : String(Math.round(value));
   return (
     <div className="flex flex-1 items-center gap-1">
-      <button onClick={() => onChange(Math.max(0, value - step))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--rd-card)] text-[var(--rd-ink)]" aria-label="Decrease"><MinusIcon size={14} /></button>
+      <button onClick={() => { setDraft(null); onChange(Math.max(0, value - step)); }} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--rd-card)] text-[var(--rd-ink)]" aria-label="Decrease"><MinusIcon size={14} /></button>
       <input
         inputMode="decimal"
         value={shown}
         onFocus={(e) => { setDraft(shown); e.currentTarget.select(); }}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/[^\d.]/g, '');
+          setDraft(raw);
+          const v = parseFloat(raw);
+          if (!Number.isNaN(v)) onChange(v);
+        }}
+        onBlur={() => setDraft(null)}
         onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
         className="font-num min-w-0 flex-1 rounded-[8px] bg-[var(--rd-card)] py-1.5 text-center text-[16px] font-bold text-[var(--rd-ink)] focus:outline-none"
       />
-      <button onClick={() => onChange(value + step)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--rd-card)] text-[var(--rd-ember)]" aria-label="Increase"><PlusIcon size={14} /></button>
+      <button onClick={() => { setDraft(null); onChange(value + step); }} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[var(--rd-card)] text-[var(--rd-ember)]" aria-label="Increase"><PlusIcon size={14} /></button>
     </div>
   );
 }
