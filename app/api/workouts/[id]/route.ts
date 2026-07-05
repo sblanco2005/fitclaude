@@ -11,7 +11,16 @@ export const GET = withAuth(async (_request, user, params) => {
     include: {
       exercises: {
         include: {
-          exercise: true,
+          exercise: {
+            include: {
+              videos: {
+                where: { status: { in: ['approved', 'pending'] } },
+                orderBy: [{ status: 'asc' }, { isPrimary: 'desc' }],
+                take: 1,
+                select: { youtubeVideoId: true, title: true, videoType: true, status: true },
+              },
+            },
+          },
           variation: true,
         },
         orderBy: { order: 'asc' },
