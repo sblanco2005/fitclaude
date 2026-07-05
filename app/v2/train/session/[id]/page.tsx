@@ -26,7 +26,7 @@ export default function SessionPage() {
   const [finishing, setFinishing] = useState(false);
   const [inited, setInited] = useState(false);
   // Inline demo player (compact, in-card — never covers the sets).
-  const [demo, setDemo] = useState<'gif' | 'video' | null>(null);
+  const [demo, setDemo] = useState<'gif' | 'video' | 'unavailable' | null>(null);
   const [gifFailed, setGifFailed] = useState(false);
   // Which set is expanded for editing. null → auto-pick the first unlogged set.
   const [activeSet, setActiveSet] = useState<number | null>(null);
@@ -75,7 +75,8 @@ export default function SessionPage() {
   const goTo = (i: number) => { setActiveSet(null); setDemo(null); setGifFailed(false); setExIdx(Math.max(0, Math.min(s.exercises.length - 1, i))); };
   const hasGif = !!ex.gifUrl;
   const hasVideo = !!ex.youtubeId;
-  const openDemo = () => setDemo(hasGif && !gifFailed ? 'gif' : hasVideo ? 'video' : null);
+  // Prefer the (reliable) video; fall back to the GIF; never silently vanish.
+  const openDemo = () => setDemo(hasVideo ? 'video' : hasGif && !gifFailed ? 'gif' : 'unavailable');
   const skip = () => goTo(safeIdx + 1);
   const barDisplay = unit === 'lb' ? barLb : lbToKg(barLb);
   // Selected set to edit: explicit choice, else first unlogged, else none.
@@ -138,10 +139,19 @@ export default function SessionPage() {
               </div>
               {demo === 'gif' ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={ex.gifUrl} alt={ex.name} className="max-h-[200px] w-full object-contain" onError={() => { setGifFailed(true); setDemo(hasVideo ? 'video' : null); }} />
+                <img src={ex.gifUrl} alt={ex.name} className="max-h-[200px] w-full object-contain" onError={() => { setGifFailed(true); setDemo(hasVideo ? 'video' : 'unavailable'); }} />
+              ) : demo === 'video' ? (
+                <div>
+                  <div className="aspect-video w-full">
+                    <iframe className="h-full w-full" src={`https://www.youtube.com/embed/${ex.youtubeId}?autoplay=1&playsinline=1&rel=0`} title={ex.name} allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                  </div>
+                  <a href={`https://youtube.com/watch?v=${ex.youtubeId}`} target="_blank" rel="noreferrer" className="font-label block px-3 py-1.5 text-center text-[10px] font-semibold text-[var(--rd-text-faint)]">
+                    Open in YouTube ↗
+                  </a>
+                </div>
               ) : (
-                <div className="aspect-video w-full">
-                  <iframe className="h-full w-full" src={`https://www.youtube.com/embed/${ex.youtubeId}?autoplay=1&playsinline=1&rel=0`} title={ex.name} allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                <div className="px-4 py-6 text-center">
+                  <p className="text-[13px] text-[var(--rd-text-muted)]">No demo available for this exercise yet.</p>
                 </div>
               )}
             </div>
@@ -151,8 +161,8 @@ export default function SessionPage() {
                 <PlayIcon size={14} className="text-white/90" />
               </span>
               <span className="flex-1 text-left text-[13px] font-medium text-[var(--rd-text-secondary)]">Watch how-to</span>
-              <span className="font-label rounded-[6px] px-1.5 py-0.5 text-[9px] font-bold" style={{ background: hasGif && !gifFailed ? 'rgba(200,255,77,.14)' : 'var(--rd-youtube)', color: hasGif && !gifFailed ? 'var(--rd-lime)' : '#fff' }}>
-                {hasGif && !gifFailed ? 'DEMO' : 'YT'}
+              <span className="font-label rounded-[6px] px-1.5 py-0.5 text-[9px] font-bold" style={{ background: hasVideo ? 'var(--rd-youtube)' : 'rgba(200,255,77,.14)', color: hasVideo ? '#fff' : 'var(--rd-lime)' }}>
+                {hasVideo ? 'VIDEO' : 'DEMO'}
               </span>
             </button>
           )
