@@ -76,6 +76,15 @@ export default function SessionPage() {
   // Selected set to edit: explicit choice, else first unlogged, else none.
   const firstUnlogged = ex.sets.findIndex((st) => !st.done);
   const activeIdx = activeSet != null && activeSet < ex.sets.length ? activeSet : firstUnlogged;
+  // Selecting another set auto-logs the current one (if it has a weight and
+  // isn't already logged), then moves the editor to the tapped set.
+  const selectSet = (i: number) => {
+    const a = activeIdx;
+    if (a >= 0 && a !== i && !ex.sets[a].done && ex.sets[a].weightLb > 0) {
+      s.updateSet(safeIdx, a, { done: true });
+    }
+    setActiveSet(i);
+  };
 
   return (
     <div className="animate-fadeup space-y-4">
@@ -175,7 +184,7 @@ export default function SessionPage() {
                 n={i + 1}
                 set={set}
                 unit={unit}
-                onSelect={() => setActiveSet(i)}
+                onSelect={() => selectSet(i)}
                 onToggle={() => s.updateSet(safeIdx, i, { done: !set.done })}
               />
             ),
