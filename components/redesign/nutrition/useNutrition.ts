@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFitClaude } from '@/context/FitClaudeContext';
-import type { UserProfile, DailyNutrition, NutritionLog, DailyNutritionSummary } from '@/types';
+import type { UserProfile, DailyNutrition, NutritionLog, DailyNutritionSummary, RecentNutritionItem } from '@/types';
 
 export type WeekBar = { label: string; magnitude: number; state: 'today' | 'logged' | 'future' };
 
@@ -14,6 +14,15 @@ export type MealItem = {
   proteinG: number;
   carbsG: number;
   fatG: number;
+};
+
+export type MealEdit = {
+  rawInput?: string;
+  mealType?: string | null;
+  calories?: number | null;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
 };
 
 export type NutritionData = {
@@ -32,6 +41,13 @@ export type NutritionData = {
   refetch: () => Promise<void>;
   logText: (text: string) => Promise<void>;
   logBarcode: (code: string) => Promise<'logged' | 'notfound' | 'error'>;
+  editMeal: (id: string, patch: MealEdit) => Promise<boolean>;
+  deleteMeal: (id: string) => Promise<boolean>;
+  closeDay: () => Promise<boolean>;
+  recentItems: RecentNutritionItem[];
+  recentLoading: boolean;
+  fetchRecent: () => Promise<void>;
+  logRecent: (item: RecentNutritionItem) => Promise<boolean>;
   logging: boolean;
 };
 
@@ -46,11 +62,26 @@ export function useNutrition(): NutritionData {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [today, setToday] = useState<DailyNutrition | null>(null);
   const [summaries, setSummaries] = useState<DailyNutritionSummary[]>([]);
+  const [recentItems, setRecentItems] = useState<RecentNutritionItem[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [logging, setLogging] = useState(false);
   const [localVersion, setLocalVersion] = useState(0);
+  const autoClosed = useRef(false);
 
   const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const bump = () => setLocalVersion((v) => v + 1);
+
+  // Close any prior un-summarized days, once per mount.
+  useEffect(() => {
+    if (autoClosed.current) return;
+    autoClosed.current = true;
+    fetch('/api/nutrition/auto-close', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timezone: tz() }),
+    }).then(() => bump()).catch(() => {});
+  }, []);
 
   const refetch = useCallback(async () => {
     try {
@@ -130,6 +161,83 @@ export function useNutrition(): NutritionData {
     }
   }, []);
 
+  const editMeal = useCallback(async (id: string, patch: MealEdit): Promise<boolean> => {
+    try {
+      const r = await fetch(`/api/nutrition/log/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      return r.ok;
+    } catch {
+      return false;
+    } finally {
+      bump();
+    }
+  }, []);
+
+  const deleteMeal = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      const r = await fetch(`/api/nutrition/log/${id}`, { method: 'DELETE' });
+      return r.ok;
+    } catch {
+      return false;
+    } finally {
+      bump();
+    }
+  }, []);
+
+  const closeDay = useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/api/nutrition/close-day', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone: tz() }),
+      });
+      return r.ok;
+    } catch {
+      return false;
+    } finally {
+      bump();
+    }
+  }, []);
+
+  const fetchRecent = useCallback(async () => {
+    setRecentLoading(true);
+    try {
+      const r = await fetch('/api/nutrition/recent-items?days=14&limit=50');
+      const data = r.ok ? await r.json() : null;
+      setRecentItems(Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []);
+    } catch {
+      setRecentItems([]);
+    } finally {
+      setRecentLoading(false);
+    }
+  }, []);
+
+  const logRecent = useCallback(async (item: RecentNutritionItem): Promise<boolean> => {
+    try {
+      const r = await fetch('/api/nutrition/log-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          calories: item.calories,
+          proteinG: item.proteinG,
+          carbsG: item.carbsG,
+          fatG: item.fatG,
+        }),
+      });
+      return r.ok;
+    } catch {
+      return false;
+    } finally {
+      bump();
+    }
+  }, []);
+
   const kcalTarget = profile?.dailyCalorieTarget ?? 2200;
   const totals = today?.totals;
   const kcal = Math.round(totals?.calories ?? 0);
@@ -177,6 +285,13 @@ export function useNutrition(): NutritionData {
     refetch,
     logText,
     logBarcode,
+    editMeal,
+    deleteMeal,
+    closeDay,
+    recentItems,
+    recentLoading,
+    fetchRecent,
+    logRecent,
     logging,
   };
 }
