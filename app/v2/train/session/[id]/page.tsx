@@ -255,18 +255,22 @@ function ToolBtn({ label, color, active, disabled, onClick, children }: {
   );
 }
 
-// Compact row for done / upcoming sets — tap the body to re-open it for editing.
+// Compact row for done / upcoming sets — tap anywhere to open it for editing.
 function CompactRow({ n, set, unit, onSelect, onToggle }: { n: number; set: SetEntry; unit: Unit; onSelect: () => void; onToggle: () => void }) {
   return (
-    <div className="grid grid-cols-[28px_1fr_1fr_24px] items-center gap-2 rounded-[11px] px-1 py-2 transition-colors active:bg-[var(--rd-card-glass)]">
-      <button onClick={onSelect} className="text-left"><span className="font-num text-[13px] font-bold text-[var(--rd-text-muted)]">{n}</span></button>
-      <button onClick={onSelect} className="text-left"><span className="font-label text-[12px] text-[var(--rd-text-faint)]">{set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—'}</span></button>
-      <button onClick={onSelect} className="text-left">
-        <span className="font-label text-[12px]" style={{ color: set.done ? 'var(--rd-lime)' : 'var(--rd-text-faint)' }}>
-          {set.done ? `${formatWeight(set.weightLb, unit)} × ${set.reps}` : 'tap to edit'}
-        </span>
-      </button>
-      <button onClick={onToggle} aria-label="Toggle logged" className="flex justify-center">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      className="grid cursor-pointer select-none grid-cols-[28px_1fr_1fr_24px] items-center gap-2 rounded-[11px] px-1 py-2.5 transition-colors active:bg-[var(--rd-card-glass)]"
+      style={{ WebkitUserSelect: 'none', WebkitTapHighlightColor: 'transparent' }}
+    >
+      <span className="font-num text-[13px] font-bold text-[var(--rd-text-muted)]">{n}</span>
+      <span className="font-label text-[12px] text-[var(--rd-text-faint)]">{set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—'}</span>
+      <span className="font-label text-[12px]" style={{ color: set.done ? 'var(--rd-lime)' : 'var(--rd-text-faint)' }}>
+        {set.done ? `${formatWeight(set.weightLb, unit)} × ${set.reps}` : 'tap to edit'}
+      </span>
+      <button onClick={(e) => { e.stopPropagation(); onToggle(); }} aria-label="Toggle logged" className="flex justify-center">
         {set.done ? <span className="text-[var(--rd-lime)]"><CheckIcon size={15} /></span> : <span className="h-4 w-4 rounded-full border border-[var(--rd-border-strong)]" />}
       </button>
     </div>
