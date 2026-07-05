@@ -25,7 +25,9 @@ export default function SessionPage() {
   const [elapsed, setElapsed] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [inited, setInited] = useState(false);
-  const [media, setMedia] = useState<{ kind: 'gif' | 'video'; src: string } | null>(null);
+  // Inline demo player (compact, in-card — never covers the sets).
+  const [demo, setDemo] = useState<'gif' | 'video' | null>(null);
+  const [gifFailed, setGifFailed] = useState(false);
   // Which set is expanded for editing. null → auto-pick the first unlogged set.
   const [activeSet, setActiveSet] = useState<number | null>(null);
 
@@ -70,7 +72,10 @@ export default function SessionPage() {
   const safeIdx = Math.min(exIdx, s.exercises.length - 1);
   const ex = s.exercises[safeIdx];
   const next = s.exercises[safeIdx + 1];
-  const goTo = (i: number) => { setActiveSet(null); setExIdx(Math.max(0, Math.min(s.exercises.length - 1, i))); };
+  const goTo = (i: number) => { setActiveSet(null); setDemo(null); setGifFailed(false); setExIdx(Math.max(0, Math.min(s.exercises.length - 1, i))); };
+  const hasGif = !!ex.gifUrl;
+  const hasVideo = !!ex.youtubeId;
+  const openDemo = () => setDemo(hasGif && !gifFailed ? 'gif' : hasVideo ? 'video' : null);
   const skip = () => goTo(safeIdx + 1);
   const barDisplay = unit === 'lb' ? barLb : lbToKg(barLb);
   // Selected set to edit: explicit choice, else first unlogged, else none.
@@ -119,20 +124,38 @@ export default function SessionPage() {
           <p className="font-label mt-0.5 text-[12px] font-bold text-[var(--rd-amber)]">PR: {formatWeight(ex.pr.weight, unit)}×{ex.pr.reps}</p>
         )}
 
-        {/* Watch how-to / demo */}
-        {(ex.gifUrl || ex.youtubeId) && (
-          <button
-            onClick={() => (ex.gifUrl ? setMedia({ kind: 'gif', src: ex.gifUrl }) : ex.youtubeId && setMedia({ kind: 'video', src: ex.youtubeId }))}
-            className="mt-3 flex w-full items-center gap-3 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card)] p-2.5"
-          >
-            <span className="flex h-9 w-12 items-center justify-center rounded-[8px]" style={{ background: 'linear-gradient(135deg,#26282f,#15171c)' }}>
-              <PlayIcon size={14} className="text-white/90" />
-            </span>
-            <span className="flex-1 text-left text-[13px] font-medium text-[var(--rd-text-secondary)]">Watch how-to</span>
-            <span className="font-label rounded-[6px] px-1.5 py-0.5 text-[9px] font-bold" style={{ background: ex.gifUrl ? 'rgba(200,255,77,.14)' : 'var(--rd-youtube)', color: ex.gifUrl ? 'var(--rd-lime)' : '#fff' }}>
-              {ex.gifUrl ? 'DEMO' : 'YT'}
-            </span>
-          </button>
+        {/* Watch how-to — inline compact player; keeps the sets visible below */}
+        {(hasGif || hasVideo) && (
+          demo ? (
+            <div className="mt-3 overflow-hidden rounded-[12px] border border-[var(--rd-border)] bg-black">
+              <div className="flex items-center justify-between px-3 py-1.5">
+                <span className="font-label text-[10px] tracking-[.12em] text-[var(--rd-text-faint)]">HOW-TO</span>
+                <div className="flex items-center gap-2">
+                  {hasVideo && demo === 'gif' && <button onClick={() => setDemo('video')} className="font-label text-[10px] font-semibold text-[var(--rd-lime)]">VIDEO</button>}
+                  {hasGif && !gifFailed && demo === 'video' && <button onClick={() => setDemo('gif')} className="font-label text-[10px] font-semibold text-[var(--rd-lime)]">GIF</button>}
+                  <button onClick={() => setDemo(null)} aria-label="Close demo" className="text-[var(--rd-text-muted)]"><CloseIcon size={15} /></button>
+                </div>
+              </div>
+              {demo === 'gif' ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={ex.gifUrl} alt={ex.name} className="max-h-[200px] w-full object-contain" onError={() => { setGifFailed(true); setDemo(hasVideo ? 'video' : null); }} />
+              ) : (
+                <div className="aspect-video w-full">
+                  <iframe className="h-full w-full" src={`https://www.youtube.com/embed/${ex.youtubeId}?autoplay=1&playsinline=1&rel=0`} title={ex.name} allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                </div>
+              )}
+            </div>
+          ) : (
+            <button onClick={openDemo} className="mt-3 flex w-full items-center gap-3 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card)] p-2.5">
+              <span className="flex h-9 w-12 items-center justify-center rounded-[8px]" style={{ background: 'linear-gradient(135deg,#26282f,#15171c)' }}>
+                <PlayIcon size={14} className="text-white/90" />
+              </span>
+              <span className="flex-1 text-left text-[13px] font-medium text-[var(--rd-text-secondary)]">Watch how-to</span>
+              <span className="font-label rounded-[6px] px-1.5 py-0.5 text-[9px] font-bold" style={{ background: hasGif && !gifFailed ? 'rgba(200,255,77,.14)' : 'var(--rd-youtube)', color: hasGif && !gifFailed ? 'var(--rd-lime)' : '#fff' }}>
+                {hasGif && !gifFailed ? 'DEMO' : 'YT'}
+              </span>
+            </button>
+          )
         )}
 
         {/* Controls row */}
@@ -227,10 +250,10 @@ export default function SessionPage() {
 
       {/* Action toolbar */}
       <div className="flex gap-1.5">
-        <ToolBtn label="Video" onClick={() => ex.youtubeId && setMedia({ kind: 'video', src: ex.youtubeId })} disabled={!ex.youtubeId}>
+        <ToolBtn label="Video" onClick={() => setDemo('video')} disabled={!hasVideo}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C18 4.8 12 4.8 12 4.8s-6 0-7.7.5A2.7 2.7 0 0 0 2.4 7.2 28 28 0 0 0 2 12a28 28 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.7.5 7.7.5 7.7.5s6 0 7.7-.5a2.7 2.7 0 0 0 1.9-1.9A28 28 0 0 0 22 12a28 28 0 0 0-.4-4.8ZM10 15V9l5 3Z" /></svg>
         </ToolBtn>
-        <ToolBtn label="Demo" color="var(--rd-lime)" active disabled={!ex.gifUrl && !ex.youtubeId} onClick={() => ex.gifUrl ? setMedia({ kind: 'gif', src: ex.gifUrl }) : ex.youtubeId && setMedia({ kind: 'video', src: ex.youtubeId })}><PlayIcon size={16} /></ToolBtn>
+        <ToolBtn label="Demo" color="var(--rd-lime)" active disabled={!hasGif && !hasVideo} onClick={openDemo}><PlayIcon size={16} /></ToolBtn>
         <ToolBtn label="Swap" onClick={() => s.swapExercise(safeIdx)}><SpinIcon size={16} /></ToolBtn>
         <ToolBtn label="Reorder" onClick={() => s.moveExercise(safeIdx, -1)}><ChevronLeftIcon size={16} className="rotate-90" /></ToolBtn>
         <ToolBtn label="Skip" onClick={skip}><ArrowRightIcon size={16} /></ToolBtn>
@@ -244,32 +267,6 @@ export default function SessionPage() {
         </div>
       </div>
 
-      {/* Floating demo / video player */}
-      {media && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center p-5" onClick={() => setMedia(null)}>
-          <div className="absolute inset-0" style={{ background: 'rgba(4,5,8,.8)', backdropFilter: 'blur(4px)' }} />
-          <div className="relative w-full max-w-[380px]" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="font-display text-[15px] font-bold text-[var(--rd-ink)]">{ex.name}</p>
-              <button onClick={() => setMedia(null)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
-            </div>
-            <div className="overflow-hidden rounded-[16px] bg-black" style={{ aspectRatio: media.kind === 'video' ? '16/9' : '1/1' }}>
-              {media.kind === 'gif' ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={media.src} alt={ex.name} className="h-full w-full object-contain" />
-              ) : (
-                <iframe
-                  className="h-full w-full"
-                  src={`https://www.youtube.com/embed/${media.src}?autoplay=1&playsinline=1&rel=0`}
-                  title={ex.name}
-                  allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
