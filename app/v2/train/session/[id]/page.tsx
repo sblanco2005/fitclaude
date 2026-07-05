@@ -157,9 +157,16 @@ export default function SessionPage() {
                 barDisplay={barDisplay}
                 onChange={(patch) => s.updateSet(safeIdx, i, patch)}
                 onLog={() => {
+                  const cur = ex.sets[i];
                   s.updateSet(safeIdx, i, { done: true });
                   const nextUnlogged = ex.sets.findIndex((st, j) => j > i && !st.done);
-                  setActiveSet(nextUnlogged >= 0 ? nextUnlogged : null);
+                  if (nextUnlogged >= 0) {
+                    // carry the weight/reps forward so the next set is pre-filled
+                    s.updateSet(safeIdx, nextUnlogged, { weightLb: cur.weightLb, reps: cur.reps });
+                    setActiveSet(nextUnlogged);
+                  } else {
+                    setActiveSet(null);
+                  }
                 }}
               />
             ) : (
