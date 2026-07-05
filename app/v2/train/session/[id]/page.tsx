@@ -90,7 +90,7 @@ export default function SessionPage() {
     <div className="animate-fadeup space-y-4">
       {/* Top bar */}
       <div className="flex items-center justify-between pt-1">
-        <button onClick={() => router.push('/v2/train')} aria-label="Close" className="text-[var(--rd-text-muted)]"><CloseIcon size={22} /></button>
+        <button onClick={() => setFinishing(true)} aria-label="Finish" className="text-[var(--rd-text-muted)]"><CloseIcon size={22} /></button>
         <div className="text-center">
           <p className="font-label text-[9px] tracking-[.16em] text-[var(--rd-ember)]">IN PROGRESS</p>
           <p className="text-[13px] font-semibold text-[var(--rd-ink)]">{s.name}</p>
@@ -117,6 +117,22 @@ export default function SessionPage() {
         )}
         {ex.pr && (
           <p className="font-label mt-0.5 text-[12px] font-bold text-[var(--rd-amber)]">PR: {formatWeight(ex.pr.weight, unit)}×{ex.pr.reps}</p>
+        )}
+
+        {/* Watch how-to / demo */}
+        {(ex.gifUrl || ex.youtubeId) && (
+          <button
+            onClick={() => (ex.gifUrl ? setMedia({ kind: 'gif', src: ex.gifUrl }) : ex.youtubeId && setMedia({ kind: 'video', src: ex.youtubeId }))}
+            className="mt-3 flex w-full items-center gap-3 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card)] p-2.5"
+          >
+            <span className="flex h-9 w-12 items-center justify-center rounded-[8px]" style={{ background: 'linear-gradient(135deg,#26282f,#15171c)' }}>
+              <PlayIcon size={14} className="text-white/90" />
+            </span>
+            <span className="flex-1 text-left text-[13px] font-medium text-[var(--rd-text-secondary)]">Watch how-to</span>
+            <span className="font-label rounded-[6px] px-1.5 py-0.5 text-[9px] font-bold" style={{ background: ex.gifUrl ? 'rgba(200,255,77,.14)' : 'var(--rd-youtube)', color: ex.gifUrl ? 'var(--rd-lime)' : '#fff' }}>
+              {ex.gifUrl ? 'DEMO' : 'YT'}
+            </span>
+          </button>
         )}
 
         {/* Controls row */}
