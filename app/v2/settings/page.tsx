@@ -15,14 +15,20 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const [p, setP] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unit, setUnit] = useState<'kg' | 'lb'>('lb');
 
   useEffect(() => {
     fetch('/api/profile')
       .then((r) => (r.ok ? r.json() : null))
-      .then(setP)
+      .then((prof) => { setP(prof); if (prof?.weightUnit) setUnit(prof.weightUnit === 'kg' ? 'kg' : 'lb'); })
       .catch(() => setP(null))
       .finally(() => setLoading(false));
   }, []);
+
+  const saveUnit = (u: 'kg' | 'lb') => {
+    setUnit(u);
+    fetch('/api/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weightUnit: u }) }).catch(() => {});
+  };
 
   const isAdmin = (session?.user as { isAdmin?: boolean } | undefined)?.isAdmin;
   const name = p?.name || session?.user?.name || 'Athlete';
@@ -70,6 +76,18 @@ export default function SettingsPage() {
               <div className="font-num text-[20px] font-bold text-[var(--rd-ink)]">{t.v}</div>
               <div className="font-label mt-1 text-[9px] tracking-[.12em] text-[var(--rd-text-faint)]">{t.label}</div>
             </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Units */}
+      <section className="rd-card flex items-center justify-between p-4">
+        <span className="text-[14px] text-[var(--rd-text-secondary)]">Weight units</span>
+        <div className="flex overflow-hidden rounded-full border border-[var(--rd-border)]">
+          {(['lb', 'kg'] as const).map((u) => (
+            <button key={u} onClick={() => saveUnit(u)} className="font-label px-4 py-1.5 text-[12px] font-semibold uppercase" style={{ background: unit === u ? 'var(--rd-violet)' : 'transparent', color: unit === u ? '#0A0C10' : 'var(--rd-text-muted)' }}>
+              {u}
+            </button>
           ))}
         </div>
       </section>
