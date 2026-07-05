@@ -26,6 +26,8 @@ export default function SessionPage() {
   const [finishing, setFinishing] = useState(false);
   const [inited, setInited] = useState(false);
   const [media, setMedia] = useState<{ kind: 'gif' | 'video'; src: string } | null>(null);
+  // Which set is expanded for editing. null → auto-pick the first unlogged set.
+  const [activeSet, setActiveSet] = useState<number | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - s.startedAt) / 1000)), 1000);
@@ -68,8 +70,12 @@ export default function SessionPage() {
   const safeIdx = Math.min(exIdx, s.exercises.length - 1);
   const ex = s.exercises[safeIdx];
   const next = s.exercises[safeIdx + 1];
-  const skip = () => setExIdx(Math.min(s.exercises.length - 1, safeIdx + 1));
+  const goTo = (i: number) => { setActiveSet(null); setExIdx(Math.max(0, Math.min(s.exercises.length - 1, i))); };
+  const skip = () => goTo(safeIdx + 1);
   const barDisplay = unit === 'lb' ? barLb : lbToKg(barLb);
+  // Selected set to edit: explicit choice, else first unlogged, else none.
+  const firstUnlogged = ex.sets.findIndex((st) => !st.done);
+  const activeIdx = activeSet != null && activeSet < ex.sets.length ? activeSet : firstUnlogged;
 
   return (
     <div className="animate-fadeup space-y-4">
@@ -86,9 +92,9 @@ export default function SessionPage() {
       {/* Current exercise card */}
       <section className="rd-card p-4">
         <div className="flex items-center justify-between">
-          <button onClick={() => setExIdx(Math.max(0, safeIdx - 1))} disabled={safeIdx === 0} className="text-[var(--rd-text-muted)] disabled:opacity-30" aria-label="Previous exercise"><ChevronLeftIcon size={20} /></button>
+          <button onClick={() => goTo(safeIdx - 1)} disabled={safeIdx === 0} className="text-[var(--rd-text-muted)] disabled:opacity-30" aria-label="Previous exercise"><ChevronLeftIcon size={20} /></button>
           <span className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">EXERCISE {safeIdx + 1} / {s.exercises.length}</span>
-          <button onClick={() => setExIdx(Math.min(s.exercises.length - 1, safeIdx + 1))} disabled={safeIdx === s.exercises.length - 1} className="rotate-180 text-[var(--rd-text-muted)] disabled:opacity-30" aria-label="Next exercise"><ChevronLeftIcon size={20} /></button>
+          <button onClick={() => goTo(safeIdx + 1)} disabled={safeIdx === s.exercises.length - 1} className="rotate-180 text-[var(--rd-text-muted)] disabled:opacity-30" aria-label="Next exercise"><ChevronLeftIcon size={20} /></button>
         </div>
 
         <h2 className="font-display mt-3 text-[22px] font-bold text-[var(--rd-ink)]">{ex.name}</h2>
@@ -141,7 +147,7 @@ export default function SessionPage() {
             <span>SET</span><span>LAST TIME</span><span>THIS SET</span><span />
           </div>
           {ex.sets.map((set, i) =>
-            i === ex.sets.findIndex((st) => !st.done) ? (
+            i === activeIdx ? (
               <ActiveSet
                 key={i}
                 n={i + 1}
@@ -150,10 +156,21 @@ export default function SessionPage() {
                 perSide={perSide && ex.isBarbell}
                 barDisplay={barDisplay}
                 onChange={(patch) => s.updateSet(safeIdx, i, patch)}
-                onLog={() => s.updateSet(safeIdx, i, { done: true })}
+                onLog={() => {
+                  s.updateSet(safeIdx, i, { done: true });
+                  const nextUnlogged = ex.sets.findIndex((st, j) => j > i && !st.done);
+                  setActiveSet(nextUnlogged >= 0 ? nextUnlogged : null);
+                }}
               />
             ) : (
-              <CompactRow key={i} n={i + 1} set={set} unit={unit} onToggle={() => s.updateSet(safeIdx, i, { done: !set.done })} />
+              <CompactRow
+                key={i}
+                n={i + 1}
+                set={set}
+                unit={unit}
+                onSelect={() => setActiveSet(i)}
+                onToggle={() => s.updateSet(safeIdx, i, { done: !set.done })}
+              />
             ),
           )}
 
@@ -238,16 +255,18 @@ function ToolBtn({ label, color, active, disabled, onClick, children }: {
   );
 }
 
-// Compact read-only row for done / upcoming sets (V2 design)
-function CompactRow({ n, set, unit, onToggle }: { n: number; set: SetEntry; unit: Unit; onToggle: () => void }) {
+// Compact row for done / upcoming sets — tap the body to re-open it for editing.
+function CompactRow({ n, set, unit, onSelect, onToggle }: { n: number; set: SetEntry; unit: Unit; onSelect: () => void; onToggle: () => void }) {
   return (
-    <div className="grid grid-cols-[28px_1fr_1fr_24px] items-center gap-2 rounded-[11px] px-1 py-2">
-      <span className="font-num text-[13px] font-bold text-[var(--rd-text-muted)]">{n}</span>
-      <span className="font-label text-[12px] text-[var(--rd-text-faint)]">{set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—'}</span>
-      <span className="font-label text-[12px]" style={{ color: set.done ? 'var(--rd-lime)' : 'var(--rd-text-faint)' }}>
-        {set.done ? `${formatWeight(set.weightLb, unit)} × ${set.reps}` : '—'}
-      </span>
-      <button onClick={onToggle} aria-label="Toggle set" className="flex justify-center">
+    <div className="grid grid-cols-[28px_1fr_1fr_24px] items-center gap-2 rounded-[11px] px-1 py-2 transition-colors active:bg-[var(--rd-card-glass)]">
+      <button onClick={onSelect} className="text-left"><span className="font-num text-[13px] font-bold text-[var(--rd-text-muted)]">{n}</span></button>
+      <button onClick={onSelect} className="text-left"><span className="font-label text-[12px] text-[var(--rd-text-faint)]">{set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—'}</span></button>
+      <button onClick={onSelect} className="text-left">
+        <span className="font-label text-[12px]" style={{ color: set.done ? 'var(--rd-lime)' : 'var(--rd-text-faint)' }}>
+          {set.done ? `${formatWeight(set.weightLb, unit)} × ${set.reps}` : 'tap to edit'}
+        </span>
+      </button>
+      <button onClick={onToggle} aria-label="Toggle logged" className="flex justify-center">
         {set.done ? <span className="text-[var(--rd-lime)]"><CheckIcon size={15} /></span> : <span className="h-4 w-4 rounded-full border border-[var(--rd-border-strong)]" />}
       </button>
     </div>
@@ -298,7 +317,7 @@ function ActiveSet({ n, set, unit, perSide, barDisplay, onChange, onLog }: {
         <p className="font-label mt-2 text-center text-[10px] text-[var(--rd-text-faint)]">= {otherLabel}</p>
       )}
       <button onClick={onLog} className="grad-lime mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-[12px] text-[14px] font-semibold text-[#0A0C10]">
-        Log set {n} <CheckIcon size={16} />
+        {set.done ? 'Update' : 'Log'} set {n} <CheckIcon size={16} />
       </button>
     </div>
   );
