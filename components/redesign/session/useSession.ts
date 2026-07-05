@@ -27,6 +27,7 @@ export type SessionExercise = {
   equipment: string;
   isBarbell: boolean;
   youtubeUrl?: string;
+  youtubeId?: string;
   gifUrl?: string;
   lastSets: PriorSet[];
   pr: PriorSet | null;
@@ -105,6 +106,7 @@ function buildExercises(w: Workout, lastByName: Map<string, PriorSet[]>, prByNam
         equipment,
         isBarbell: /barbell/i.test(name) || /barbell/i.test(equipment),
         youtubeUrl: video ? `https://youtube.com/watch?v=${video.youtubeVideoId}` : undefined,
+        youtubeId: video?.youtubeVideoId,
         gifUrl: e.exercise?.gifUrl ?? undefined,
         lastSets: last,
         pr,
@@ -210,6 +212,7 @@ export function useSession(id: string) {
                 equipment: eq,
                 isBarbell: /barbell/i.test(nm) || /barbell/i.test(eq),
                 youtubeUrl: updated.exercise?.videos?.[0] ? `https://youtube.com/watch?v=${updated.exercise.videos[0].youtubeVideoId}` : undefined,
+                youtubeId: updated.exercise?.videos?.[0]?.youtubeVideoId,
                 gifUrl: updated.exercise?.gifUrl ?? undefined,
                 lastSets: [],
                 pr: null,
