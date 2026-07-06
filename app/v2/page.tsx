@@ -71,8 +71,8 @@ export default function DashboardV2() {
         </div>
       </header>
 
-      {/* Macro hero card */}
-      <section className="rd-card flex items-center gap-5 p-5">
+      {/* Macro hero card → Nutrition */}
+      <Link href="/v2/fuel" className="rd-card flex items-center gap-5 p-5 transition-colors active:bg-[var(--rd-card-glass-hover)]">
         <MacroRing
           kcal={d.kcal}
           kcalTarget={d.kcalTarget}
@@ -101,23 +101,23 @@ export default function DashboardV2() {
             </div>
           ))}
         </div>
-      </section>
+      </Link>
 
-      {/* This week */}
+      {/* This week → Train */}
       <section>
         <div className="mb-2.5 flex items-center justify-between">
-          <p className="text-[13px] font-semibold text-[var(--rd-ink)]">
+          <Link href="/v2/train" className="text-[13px] font-semibold text-[var(--rd-ink)]">
             This week{' '}
             {d.weekNumber != null && (
               <span className="font-label text-[11px] font-normal text-[var(--rd-text-faint)]">· Week {d.weekNumber}</span>
             )}
-          </p>
+          </Link>
           <Link href="/v2/train/add" className="flex items-center gap-1 text-[var(--rd-ember)]">
             <PlusIcon size={13} />
             <span className="text-[12px] font-semibold">Add program</span>
           </Link>
         </div>
-        <div className="flex gap-2">
+        <Link href="/v2/train" className="flex gap-2">
           {d.week.map((day, i) => (
             <div
               key={i}
@@ -139,7 +139,7 @@ export default function DashboardV2() {
               )}
             </div>
           ))}
-        </div>
+        </Link>
       </section>
 
       {/* Today's plan */}
