@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import { MacroRing } from '@/components/redesign/dashboard/MacroRing';
 import { useDashboardData } from '@/components/redesign/dashboard/useDashboardData';
 import { BackButton } from '@/components/redesign/ui';
-import { CheckIcon, PlusIcon, DropletIcon, SparkleIcon } from '@/components/redesign/icons';
+import { CheckIcon, PlusIcon, DropletIcon, SparkleIcon, TrainIcon } from '@/components/redesign/icons';
 
 // Screen 01 · Dashboard ("Home") — accent: ember
 // Real data via the shared backend (same endpoints the current app uses),
@@ -181,6 +181,37 @@ export default function DashboardV2() {
           <p className="mt-1 text-[13px] text-[var(--rd-text-muted)]">
             {d.loading ? 'Fetching your plan' : 'No training scheduled. Recover well.'}
           </p>
+        </section>
+      )}
+
+      {/* Recent activity */}
+      {d.recentActivity.length > 0 && (
+        <section>
+          <p className="font-label mb-2 text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">RECENT ACTIVITY</p>
+          <div className="space-y-2.5">
+            {d.recentActivity.map((a) => {
+              const isWorkout = a.kind === 'workout';
+              const tint = isWorkout ? 'rgba(255,107,69,.14)' : 'rgba(200,255,77,.12)';
+              const color = isWorkout ? 'var(--rd-ember)' : 'var(--rd-lime)';
+              const inner = (
+                <>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]" style={{ background: tint, color }}>
+                    {isWorkout ? <TrainIcon size={17} /> : <CheckIcon size={17} />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-semibold text-[var(--rd-ink)]">{a.title}</p>
+                    <p className="font-label mt-0.5 text-[11px] text-[var(--rd-text-faint)]">{a.dateLabel} · {a.meta}</p>
+                  </div>
+                  <span className="font-num text-[13px] font-bold text-[var(--rd-text-muted)]">{a.kcal}<span className="font-label text-[9px] text-[var(--rd-text-faint)]"> kcal</span></span>
+                </>
+              );
+              return isWorkout && a.workoutId ? (
+                <Link key={a.id} href={`/v2/train/routine/${a.workoutId}`} className="rd-card flex items-center gap-3 p-3.5 active:bg-[var(--rd-card-glass-hover)]">{inner}</Link>
+              ) : (
+                <div key={a.id} className="rd-card flex items-center gap-3 p-3.5">{inner}</div>
+              );
+            })}
+          </div>
         </section>
       )}
 

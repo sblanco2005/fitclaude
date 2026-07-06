@@ -19,6 +19,18 @@ export type DayCell = {
 
 export type MacroRow = { label: string; value: number; target: number; color: string };
 
+export type ActivityItem = {
+  id: string;
+  title: string;
+  meta: string;
+  kcal: number;
+  dateLabel: string;
+  kind: 'workout' | 'activity';
+  workoutId?: string;
+};
+
+type Activity = { id: string; name: string; durationMinutes: number | null; date: string };
+
 export type DashboardData = {
   loading: boolean;
   kcal: number;
@@ -36,6 +48,7 @@ export type DashboardData = {
     muscles: string;
     completed: boolean;
   };
+  recentActivity: ActivityItem[];
 };
 
 const WEEK_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -43,6 +56,7 @@ const WEEK_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 // JS getDay(): 0=Sun..6=Sat  →  program weekday: 0=Mon..6=Sun
 const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
 const localDateKey = (iso: string | Date) => new Date(iso).toLocaleDateString('en-CA');
+const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 export function useDashboardData(): DashboardData {
   const { dataVersion } = useFitClaude();
@@ -51,6 +65,7 @@ export function useDashboardData(): DashboardData {
   const [program, setProgram] = useState<TrainingProgram | null>(null);
   const [today, setToday] = useState<TodayWorkout | null>(null);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,16 +81,18 @@ export function useDashboardData(): DashboardData {
       }
     };
     (async () => {
-      const [p, n, prog, t, w] = await Promise.all([
+      const [p, n, prog, t, w, a] = await Promise.all([
         getJson('/api/profile'),
         getJson(`/api/nutrition/today?tz=${encodeURIComponent(tz)}`),
         getJson('/api/program'),
         getJson(`/api/program/today?tz=${encodeURIComponent(tz)}`),
         getJson('/api/workouts?daysBack=30'),
+        getJson('/api/activities?daysBack=14'),
       ]);
       if (cancelled) return;
       setProfile(p ?? null);
       setNutrition(n ?? null);
+      setActivities(Array.isArray(a) ? a : []);
       // /api/program returns the program object directly, or { program: null }
       setProgram(prog?.id ? prog : null);
       // /api/program/today returns today's day object, or { program: null }
@@ -143,6 +160,45 @@ export function useDashboardData(): DashboardData {
     .slice(0, 3)
     .join(', ');
 
+  // ---- Recent activity: completed workouts + logged activities, newest first ----
+  const dateLabel = (iso: string): string => {
+    const k = localDateKey(iso);
+    const today0 = localDateKey(new Date());
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    if (k === today0) return 'Today';
+    if (k === localDateKey(y)) return 'Yesterday';
+    return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+  const wItems: ActivityItem[] = workouts
+    .filter((w) => w.completed && w.date)
+    .map((w) => {
+      const exCount = (w.exercises ?? []).length;
+      const dur = w.durationMinutes ?? 0;
+      return {
+        id: `w-${w.id}`,
+        title: titleCase(w.name?.trim() || w.workoutType || 'Workout'),
+        meta: `${exCount} ex${dur ? ` · ${dur} min` : ''}`,
+        kcal: dur ? Math.round(dur * 7) : exCount * 45,
+        dateLabel: dateLabel(w.date as string),
+        kind: 'workout' as const,
+        workoutId: w.id,
+        _t: +new Date(w.date as string),
+      } as ActivityItem & { _t: number };
+    });
+  const aItems = activities.map((a) => ({
+    id: `a-${a.id}`,
+    title: a.name || 'Activity',
+    meta: a.durationMinutes ? `${a.durationMinutes} min` : 'Activity',
+    kcal: Math.round((a.durationMinutes ?? 0) * 8),
+    dateLabel: dateLabel(a.date),
+    kind: 'activity' as const,
+    _t: +new Date(a.date),
+  }));
+  const recentActivity: ActivityItem[] = [...wItems, ...aItems]
+    .sort((x, y) => (y as ActivityItem & { _t: number })._t - (x as ActivityItem & { _t: number })._t)
+    .slice(0, 6);
+
   return {
     loading,
     kcal,
@@ -160,5 +216,6 @@ export function useDashboardData(): DashboardData {
       muscles,
       completed: !!today?.completedToday,
     },
+    recentActivity,
   };
 }
