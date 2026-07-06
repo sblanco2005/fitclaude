@@ -12,6 +12,11 @@ import { CheckIcon, CloseIcon, PlusIcon, MinusIcon, PlayIcon, ChevronLeftIcon, A
 // Screen 03 · Hit It (live workout) — accent: ember
 type Unit = 'kg' | 'lb';
 const fmtTime = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+// Reliable "select everything on focus" — deferred a frame so mobile browsers
+// don't drop the caret mid-value after positioning it.
+const selectAll = (el: HTMLInputElement) => {
+  requestAnimationFrame(() => { try { el.setSelectionRange(0, el.value.length); } catch { /* noop */ } });
+};
 
 export default function SessionPage() {
   const { id } = useParams<{ id: string }>();
@@ -187,7 +192,7 @@ export default function SessionPage() {
                   <input
                     inputMode="numeric"
                     value={barDraft !== '' ? barDraft : String(Math.round(barDisplay))}
-                    onFocus={(e) => { setBarDraft(String(Math.round(barDisplay))); e.currentTarget.select(); }}
+                    onFocus={(e) => { setBarDraft(String(Math.round(barDisplay))); selectAll(e.currentTarget); }}
                     onChange={(e) => setBarDraft(e.target.value.replace(/[^\d]/g, ''))}
                     onBlur={() => { const v = Math.max(0, Math.min(100, parseInt(barDraft || '0', 10) || 0)); setBarLb(unit === 'lb' ? v : kgToLb(v)); setBarDraft(''); }}
                     className="font-num w-12 rounded-[8px] border border-[var(--rd-border)] bg-[var(--rd-card)] py-1 text-center text-[14px] text-[var(--rd-ink)] focus:outline-none"
@@ -377,7 +382,7 @@ function NumStepper({ value, step, decimals, onChange }: { value: number; step: 
       <input
         inputMode="decimal"
         value={shown}
-        onFocus={(e) => { setDraft(shown); e.currentTarget.select(); }}
+        onFocus={(e) => { setDraft(shown); selectAll(e.currentTarget); }}
         onChange={(e) => {
           const raw = e.target.value.replace(/[^\d.]/g, '');
           setDraft(raw);
