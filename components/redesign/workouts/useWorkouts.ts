@@ -26,6 +26,10 @@ export type Featured = {
   latestId: string | null;
 } | null;
 
+export type RoutineGroup = { id: string; name: string; accent: string; routines: RoutineCard[] };
+type Collection = { id: string; name: string; emoji: string | null; color: string | null; routineNames: string[] };
+const GROUP_ACCENTS = ['255,107,69', '155,123,255', '255,178,62', '200,255,77', '255,138,91', '106,139,255'];
+
 const consolidate = (m: string): string => {
   const s = (m || '').toLowerCase();
   if (['glutes', 'hamstrings', 'quadriceps', 'quads', 'calves'].includes(s)) return 'legs';
@@ -42,6 +46,7 @@ export function useWorkouts() {
   const { dataVersion } = useFitClaude();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [today, setToday] = useState<TodayWorkout | null>(null);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [localVersion, setLocalVersion] = useState(0);
@@ -51,13 +56,15 @@ export function useWorkouts() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [w, t] = await Promise.all([
+      const [w, t, c] = await Promise.all([
         fetch('/api/workouts?daysBack=90').then((r) => (r.ok ? r.json() : [])).catch(() => []),
         fetch(`/api/program/today?tz=${encodeURIComponent(tz())}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/collections').then((r) => (r.ok ? r.json() : [])).catch(() => []),
       ]);
       if (cancelled) return;
       setWorkouts(Array.isArray(w) ? w : []);
       setToday(t && t.program === null ? null : t);
+      setCollections(Array.isArray(c) ? c : []);
       setLoading(false);
     })();
     return () => {
@@ -130,6 +137,23 @@ export function useWorkouts() {
 
   const categories = Array.from(new Set(routines.map((r) => titleCase(r.category))));
 
+  // Group routines by collection (each routine may appear under multiple);
+  // routines in no collection fall into an "Other" group.
+  const routineGroups: RoutineGroup[] = [];
+  const grouped = new Set<string>();
+  collections.forEach((col, i) => {
+    const names = new Set((col.routineNames ?? []).map((n) => n.trim().toLowerCase()));
+    const rs = routines.filter((r) => names.has(r.name.toLowerCase()));
+    rs.forEach((r) => grouped.add(r.key));
+    if (rs.length) {
+      routineGroups.push({ id: col.id, name: col.name, accent: GROUP_ACCENTS[i % GROUP_ACCENTS.length], routines: rs });
+    }
+  });
+  const ungrouped = routines.filter((r) => !grouped.has(r.key));
+  if (ungrouped.length) {
+    routineGroups.push({ id: '__other', name: 'Other', accent: GROUP_ACCENTS[routineGroups.length % GROUP_ACCENTS.length], routines: ungrouped });
+  }
+
   // Spin: regenerate via coach chat
   const spin = useCallback(async (r: RoutineCard) => {
     setBusy(r.key);
@@ -159,5 +183,5 @@ export function useWorkouts() {
     }
   }, []);
 
-  return { loading, routines, featured, categories, busy, spin, startSession, refetch };
+  return { loading, routines, routineGroups, featured, categories, busy, spin, startSession, refetch };
 }
