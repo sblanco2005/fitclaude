@@ -197,7 +197,7 @@ export function useDashboardData(): DashboardData {
   }));
   const recentActivity: ActivityItem[] = [...wItems, ...aItems]
     .sort((x, y) => (y as ActivityItem & { _t: number })._t - (x as ActivityItem & { _t: number })._t)
-    .slice(0, 6);
+    .slice(0, 3);
 
   return {
     loading,
