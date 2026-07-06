@@ -106,7 +106,7 @@ export default function DashboardV2() {
       {/* This week → Train */}
       <section>
         <div className="mb-2.5 flex items-center justify-between">
-          <Link href="/v2/train" className="text-[13px] font-semibold text-[var(--rd-ink)]">
+          <Link href="/v2/program" className="text-[13px] font-semibold text-[var(--rd-ink)]">
             This week{' '}
             {d.weekNumber != null && (
               <span className="font-label text-[11px] font-normal text-[var(--rd-text-faint)]">· Week {d.weekNumber}</span>
@@ -117,7 +117,7 @@ export default function DashboardV2() {
             <span className="text-[12px] font-semibold">Add program</span>
           </Link>
         </div>
-        <Link href="/v2/train" className="flex gap-2">
+        <Link href="/v2/program" className="flex gap-2">
           {d.week.map((day, i) => (
             <div
               key={i}
