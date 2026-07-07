@@ -73,14 +73,14 @@ export function useDashboardData(): DashboardData {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const getJson = async (url: string) => {
       try {
-        const r = await fetch(url);
+        const r = await fetch(url, { cache: 'no-store' });
         if (!r.ok) return null;
         return await r.json();
       } catch {
         return null;
       }
     };
-    (async () => {
+    const load = async () => {
       const [p, n, prog, t, w, a] = await Promise.all([
         getJson('/api/profile'),
         getJson(`/api/nutrition/today?tz=${encodeURIComponent(tz)}`),
@@ -99,9 +99,19 @@ export function useDashboardData(): DashboardData {
       setToday(t && t.program === null ? null : (t ?? null));
       setWorkouts(Array.isArray(w) ? w : []);
       setLoading(false);
-    })();
+    };
+    load();
+    // Refetch when the user returns to this screen — Next's router cache can
+    // re-show a previously-rendered page without re-running this effect, so a
+    // change made on another screen (e.g. moving a program day) would look stale.
+    const onFocus = () => load();
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [dataVersion]);
 
