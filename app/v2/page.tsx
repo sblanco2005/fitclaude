@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import { MacroRing } from '@/components/redesign/dashboard/MacroRing';
 import { useDashboardData } from '@/components/redesign/dashboard/useDashboardData';
 import { BackButton } from '@/components/redesign/ui';
-import { CheckIcon, PlusIcon, DropletIcon, SparkleIcon, TrainIcon } from '@/components/redesign/icons';
+import { CheckIcon, PlusIcon, TrainIcon } from '@/components/redesign/icons';
 
 // Screen 01 · Dashboard ("Home") — accent: ember
 // Real data via the shared backend (same endpoints the current app uses),
@@ -215,46 +215,6 @@ export default function DashboardV2() {
         </section>
       )}
 
-      {/* Quick actions */}
-      <section className="grid grid-cols-2 gap-3">
-        <QuickAction
-          href="/v2/fuel"
-          icon={<DropletIcon size={18} />}
-          accent="var(--rd-lime)"
-          tint="rgba(200,255,77,.12)"
-          title="Log a meal"
-          sub="Just type what you ate"
-        />
-        <QuickAction
-          href="/v2/coach"
-          icon={<SparkleIcon size={18} />}
-          accent="var(--rd-violet)"
-          tint="rgba(155,123,255,.14)"
-          title="Spin a routine"
-          sub="Fresh exercises, same focus"
-        />
-      </section>
     </div>
-  );
-}
-
-function QuickAction({
-  href, icon, accent, tint, title, sub,
-}: {
-  href: string; icon: React.ReactNode; accent: string; tint: string; title: string; sub: string;
-}) {
-  return (
-    <Link href={href} className="rd-card flex flex-col gap-3 p-4 transition-colors active:bg-[var(--rd-card-glass-hover)]">
-      <span
-        className="flex h-9 w-9 items-center justify-center rounded-[11px]"
-        style={{ background: tint, color: accent }}
-      >
-        {icon}
-      </span>
-      <div>
-        <p className="text-[14px] font-semibold text-[var(--rd-ink)]">{title}</p>
-        <p className="mt-0.5 text-[12px] leading-snug text-[var(--rd-text-faint)]">{sub}</p>
-      </div>
-    </Link>
   );
 }
