@@ -135,25 +135,8 @@ function CoachSheetInner({ context, onClose }: { context: CoachContext; onClose:
           )}
         </div>
 
-        {/* footer: quick chips + input */}
+        {/* footer: input */}
         <div className="border-t border-[var(--rd-border)] px-4 pb-6 pt-2.5">
-          <div className="scrollbar-hide -mx-1 mb-2.5 flex gap-2 overflow-x-auto px-1">
-            {cfg.chips.map((chip, i) => (
-              <button
-                key={chip}
-                onClick={() => chat.send(chip)}
-                disabled={chat.loading}
-                className="font-body shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-[12px] font-semibold"
-                style={
-                  i === 0
-                    ? { background: cfg.tint, borderColor: cfg.border, color: cfg.color }
-                    : { background: 'var(--rd-card-glass)', borderColor: 'var(--rd-border)', color: 'var(--rd-text-secondary)' }
-                }
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
           <form onSubmit={submit} className="flex items-center gap-2 rounded-full border border-[var(--rd-border)] bg-[var(--rd-card)] p-1.5 pl-4">
             <input
               value={input}
