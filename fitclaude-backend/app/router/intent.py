@@ -12,14 +12,18 @@ _FOOD_LOG_PATTERNS = [
     r"\b(ate|had|just had|just ate|consumed|eating|drank|drinking)\b",
     # Meal context
     r"\bfor\s+(breakfast|lunch|dinner|snack|pre.?workout|post.?workout)\b",
-    # Quantity + food unit
-    r"\b\d+\s*(eggs?|scoops?|slices?|cups?|oz|g\b|pieces?|servings?|strips?|shakes?)",
+    # Quantity + food unit (allow up to 2 adjectives between the number and unit,
+    # e.g. "15 small pieces", "3 large eggs", and "3oz" with no space)
+    r"\b\d+\s*(?:\w+\s+){0,2}(eggs?|scoops?|slices?|cups?|oz\b|g\b|grams?|ml\b|"
+    r"pieces?|servings?|strips?|shakes?|bars?|handfuls?)\b",
     # Known food brands
     r"\b(nurri|chipotle|quest|fairlife|oikos|kirkland)\b",
     # Common foods stated plainly (not as a question)
     r"^(?!.*\b(how|what is|calories in|nutrition info|recommend|suggest|should i)\b)"
     r".*\b(protein shake|chicken breast|oatmeal|bagel|banana|eggs? and|rice and|"
-    r"steak|jerky|yogurt|cereal|sandwich|burrito|wrap|pizza|pasta|salad)\b",
+    r"steak|jerky|yogurt|cereal|sandwich|burrito|wrap|pizza|pasta|salad|"
+    r"cantaloupe|melon|apple|apples|berries|strawberr|blueberr|grapes?|orange|"
+    r"almonds?|walnuts?|cashews?|peanuts?|potato|potatoes|salmon|tuna|shrimp)\b",
 ]
 
 # Patterns that should NOT be routed to nutrition agent
