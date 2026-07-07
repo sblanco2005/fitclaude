@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ProgramDay, DayType } from '@/types';
 import { useProgram, daySubtitle, DAY_ACCENT, DAY_TYPE_LABEL, todayWeekdayMon, type ProgramSummary } from '@/components/redesign/program/useProgram';
+import { useFitClaude } from '@/context/FitClaudeContext';
 import { ScreenHeader } from '@/components/redesign/ui';
 import { ChevronLeftIcon, CloseIcon } from '@/components/redesign/icons';
 
@@ -15,10 +16,13 @@ const benchName = (p: ProgramSummary, i: number) => p.name || `Program ${i + 1}`
 export default function ProgramPage() {
   const router = useRouter();
   const { loading, active, programs } = useProgram();
+  const { bumpDataVersion } = useFitClaude();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [week, setWeek] = useState(1);
   const [detail, setDetail] = useState<ProgramDay | null>(null);
   const [starting, setStarting] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveBusy, setMoveBusy] = useState(false);
 
   const activeSummary = programs.find((p) => p.isActive) ?? null;
   const selId = selectedId ?? activeSummary?.id ?? programs[0]?.id ?? null;
@@ -42,6 +46,20 @@ export default function ProgramPage() {
     const r = await fetch(`/api/workouts/${routineId}/duplicate`, { method: 'POST' }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     setStarting(false);
     if (r?.id) router.push(`/v2/train/session/${r.id}`);
+  };
+
+  const closeDetail = () => { setDetail(null); setMoving(false); };
+
+  const moveDay = async (toWeekday: number) => {
+    if (!detail || moveBusy) return;
+    setMoveBusy(true);
+    const ok = await fetch('/api/program/move-day', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weekNumber: week, fromWeekday: detail.weekday, toWeekday }),
+    }).then((r) => r.ok).catch(() => false);
+    setMoveBusy(false);
+    if (ok) { closeDetail(); bumpDataVersion(); }
   };
 
   if (loading) return <div className="rd-card mt-6 h-[400px] animate-pulse-soft" />;
@@ -144,15 +162,15 @@ export default function ProgramPage() {
 
       {/* Day detail sheet */}
       {detail && (
-        <div className="absolute inset-0 z-50 flex items-end" onClick={() => setDetail(null)}>
+        <div className="absolute inset-0 z-50 flex items-end" onClick={closeDetail}>
           <div className="absolute inset-0" style={{ background: 'rgba(4,5,8,.6)', backdropFilter: 'blur(2px)' }} />
           <div className="relative max-h-[80%] w-full overflow-y-auto rounded-t-[24px] border-t border-[var(--rd-border)] p-5 pb-8" style={{ background: '#0F1117' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-label text-[10px] tracking-[.14em]" style={{ color: `rgb(${DAY_ACCENT[detail.dayType]})` }}>{DAY_TYPE_LABEL[detail.dayType].toUpperCase()}</p>
+                <p className="font-label text-[10px] tracking-[.14em]" style={{ color: `rgb(${DAY_ACCENT[detail.dayType]})` }}>{DAY_TYPE_LABEL[detail.dayType].toUpperCase()} · {WEEKDAYS[detail.weekday]}</p>
                 <h3 className="font-display mt-1 text-[20px] font-bold text-[var(--rd-ink)]">{detail.dayLabel}</h3>
               </div>
-              <button onClick={() => setDetail(null)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
+              <button onClick={closeDetail} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
             </div>
 
             <DayExercises day={detail} />
@@ -165,11 +183,50 @@ export default function ProgramPage() {
               ) : detail.dayType !== 'rest' ? (
                 <button onClick={() => router.push('/v2/coach')} className="rounded-[13px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] py-3 text-[14px] font-semibold text-[var(--rd-text-secondary)] w-full">Log with Coach</button>
               ) : null}
+
+              {/* Move / reschedule */}
+              {isViewingActive && (
+                !moving ? (
+                  <button onClick={() => setMoving(true)} className="flex h-11 w-full items-center justify-center gap-2 rounded-[13px] border border-dashed border-[var(--rd-border-strong)] bg-transparent text-[13px] font-semibold text-[var(--rd-text-muted)]">
+                    <SwapIcon size={15} /> Move to another day
+                  </button>
+                ) : (
+                  <div className="rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] p-3">
+                    <p className="font-label mb-2 text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">MOVE {WEEKDAYS[detail.weekday].toUpperCase()} TO…</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {rows.filter((r) => r.wd !== detail.weekday).map(({ wd, label, day }) => {
+                        const occupied = day && day.dayType !== 'rest';
+                        return (
+                          <button
+                            key={wd}
+                            onClick={() => moveDay(wd)}
+                            disabled={moveBusy}
+                            className="flex flex-col items-start gap-0.5 rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2 text-left disabled:opacity-50 active:bg-[var(--rd-card-glass-hover)]"
+                          >
+                            <span className="font-label text-[11px] font-bold text-[var(--rd-ink)]">{label}</span>
+                            <span className="font-label truncate text-[10px] text-[var(--rd-text-faint)]">{occupied ? `Swap · ${day!.dayLabel}` : 'Rest → moves here'}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button onClick={() => setMoving(false)} disabled={moveBusy} className="mt-2 w-full py-1.5 text-[12px] font-semibold text-[var(--rd-text-faint)]">Cancel</button>
+                  </div>
+                )
+              )}
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function SwapIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 4 3 8l4 4" /><path d="M3 8h13a4 4 0 0 1 0 8h-1" />
+      <path d="m17 20 4-4-4-4" /><path d="M21 16H8" />
+    </svg>
   );
 }
 
