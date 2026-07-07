@@ -42,18 +42,26 @@ export function useProgram() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       const [a, list] = await Promise.all([
-        fetch('/api/program').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-        fetch('/api/program/list').then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        fetch('/api/program', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/program/list', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       ]);
       if (cancelled) return;
       setActive(a?.id ? a : null);
       setPrograms(Array.isArray(list) ? list : []);
       setLoading(false);
-    })();
+    };
+    load();
+    // Refetch on return so the screen reflects changes made elsewhere.
+    const onFocus = () => load();
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [dataVersion]);
 
