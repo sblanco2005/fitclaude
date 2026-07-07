@@ -80,6 +80,17 @@ export default function FuelPage() {
         <div className="mt-4"><MacroBar proteinG={n.proteinG} carbsG={n.carbsG} fatG={n.fatG} /></div>
       </section>
 
+      {/* Close day — kept up top, away from the food-log bar */}
+      {n.closed ? (
+        <div className="flex items-center justify-center gap-2 rounded-[13px] border py-3 text-[13px] font-semibold" style={{ borderColor: 'rgba(200,255,77,.28)', background: 'rgba(200,255,77,.06)', color: 'var(--rd-lime)' }}>
+          <CheckIcon size={15} /> Day closed — saved to history
+        </div>
+      ) : n.meals.length > 0 ? (
+        <button onClick={() => setCloseConfirm(true)} className="w-full rounded-[13px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] py-3 text-[14px] font-semibold text-[var(--rd-text-secondary)]">
+          Close Day &amp; save to history
+        </button>
+      ) : null}
+
       <WeeklyDeficit deficit={n.weekDeficit} kg={n.weekKg} bars={n.weekBars} goalPerWeek={-0.5} />
 
       {/* Meals / Recent */}
@@ -126,17 +137,6 @@ export default function FuelPage() {
           />
         )}
       </section>
-
-      {/* Close day */}
-      {n.closed ? (
-        <div className="flex items-center justify-center gap-2 rounded-[13px] border py-3 text-[13px] font-semibold" style={{ borderColor: 'rgba(200,255,77,.28)', background: 'rgba(200,255,77,.06)', color: 'var(--rd-lime)' }}>
-          <CheckIcon size={15} /> Day closed — saved to history
-        </div>
-      ) : n.meals.length > 0 ? (
-        <button onClick={() => setCloseConfirm(true)} className="w-full rounded-[13px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] py-3 text-[14px] font-semibold text-[var(--rd-text-secondary)]">
-          Close Day &amp; save to history
-        </button>
-      ) : null}
 
       {/* Quick-log bar */}
       <form onSubmit={submit} className="sticky bottom-2 flex items-center gap-2 rounded-full border border-[var(--rd-border)] bg-[var(--rd-card)] p-1.5 pl-4">
