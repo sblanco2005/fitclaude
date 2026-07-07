@@ -29,7 +29,10 @@ export default function ProgramPage() {
   const sel = programs.find((p) => p.id === selId) ?? null;
   const isViewingActive = !!(sel?.isActive && active?.id === sel.id);
   const totalWeeks = sel?.totalWeeks ?? active?.totalWeeks ?? 1;
-  const currentWeek = sel?.currentWeek ?? active?.currentWeek ?? 1;
+  // For the active program, trust the calendar-aware effective week from
+  // /api/program (active.currentWeek) — the list endpoint returns the raw,
+  // sometimes-stale stored currentWeek, which made this page disagree with Home.
+  const currentWeek = (isViewingActive ? active?.currentWeek : sel?.currentWeek) ?? active?.currentWeek ?? sel?.currentWeek ?? 1;
 
   useEffect(() => { if (!loading) setWeek(currentWeek); }, [loading, selId, currentWeek]);
 
