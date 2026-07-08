@@ -293,6 +293,23 @@ def _looks_like_workout_request(message: str) -> bool:
     return bool(_WORKOUT_GEN_KEYWORDS.search(message))
 
 
+# Multi-day PROGRAM generation (distinct from a single workout). MiniMax reliably
+# *designs* a program in text but often skips the generate_program tool call, so
+# the program is never saved — this detector gates a forced retry, mirroring the
+# generate_workout safety net.
+_PROGRAM_GEN_KEYWORDS = re.compile(
+    r"\b(training program|weekly program|new program|create a program|build a program|"
+    r"generate_program|multi.?week|\d+.?week program|week program|program with|"
+    r"workout split|push.?pull.?legs|ppl program|weekly split)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_program_request(message: str) -> bool:
+    """Heuristic: does the user message look like they want a multi-day program generated?"""
+    return bool(_PROGRAM_GEN_KEYWORDS.search(message))
+
+
 # ─── Parse exercises from assistant text (fallback when Haiku skips tool) ─────
 
 # Pattern A: "Exercise Name — 4 × 8-10 reps (2 min rest)" (weight-lifting style)
@@ -1692,6 +1709,7 @@ async def handle_chat(
         # Tool-use loop
         workout_id = None
         nutrition_log_id = None
+        program_id = None
         nutrition_logged_this_turn = False  # Guard: only one log_nutrition per user message
 
         logger.info(f"[Coach] Initial stop_reason: {response.stop_reason}")
@@ -1717,9 +1735,11 @@ async def handle_chat(
                     if "nutrition_log_id" in result:
                         nutrition_log_id = result["nutrition_log_id"]
                         nutrition_logged_this_turn = True
+                    if "program_id" in result:
+                        program_id = result["program_id"]
 
                     # Strip internal IDs before sending to Claude
-                    claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id")}
+                    claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id", "program_id")}
 
                     tool_results.append({
                         "type": "tool_result",
@@ -1901,6 +1921,83 @@ async def handle_chat(
                     logger.error(f"[Coach] Failed to auto-save parsed workout: {e}")
             else:
                 logger.warning("[Coach] Model skipped generate_workout and text parse failed — workout NOT saved")
+
+        # Safety net (program): MiniMax reliably designs a multi-week program in text
+        # but frequently skips the generate_program tool call, so nothing is saved.
+        # Retry once with a forced instruction so it emits the tool call. Mirrors the
+        # generate_workout forced retry above.
+        if (
+            topic == "workout"
+            and program_id is None
+            and _looks_like_program_request(user_message)
+            and response.stop_reason == "end_turn"
+        ):
+            logger.warning("[Coach] Model skipped generate_program tool — retrying with forced instruction")
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({
+                "role": "user",
+                "content": (
+                    "SYSTEM: You did NOT call the generate_program tool, so the program was "
+                    "NOT saved and the user can't see it. You MUST call generate_program now "
+                    "with the exact program you just described — pass the full 'days' array "
+                    "(every weekday for every week, with day_type, day_label, workout_type and "
+                    "the exercises for each coached day) and total_weeks. "
+                    "Do not respond with text — call the tool."
+                ),
+            })
+            try:
+                # Strongest guarantee: force the tool. Some MiniMax-compatible
+                # endpoints reject forced tool_choice — fall back to the plain
+                # forced-message retry if so.
+                response = await active_client.messages.create(
+                    model=active_model,
+                    max_tokens=4096,
+                    system=system_blocks,
+                    messages=messages,
+                    tools=cached_tools,
+                    tool_choice={"type": "tool", "name": "generate_program"},
+                )
+            except (APIStatusError, APIConnectionError, TypeError, ValueError) as e:
+                logger.warning(f"[Coach] Forced tool_choice unsupported ({e}); retrying without it")
+                response = await active_client.messages.create(
+                    model=active_model,
+                    max_tokens=4096,
+                    system=system_blocks,
+                    messages=messages,
+                    tools=cached_tools,
+                )
+            await log_token_usage(db, user_id, "chat_retry", active_model, response.usage, request_id=request_id)
+            while response.stop_reason == "tool_use":
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        logger.info(f"[Coach] Program retry tool call: {block.name}")
+                        result = await _execute_tool(block.name, block.input, user_id, db, user_tz=user_tz)
+                        if "program_id" in result:
+                            program_id = result["program_id"]
+                        claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id", "program_id")}
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": json.dumps(claude_result),
+                        })
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "user", "content": tool_results})
+                # Drop the forced tool_choice after the first call so the model can
+                # finish with a normal text turn instead of looping on the tool.
+                response = await active_client.messages.create(
+                    model=active_model,
+                    max_tokens=2048,
+                    system=system_blocks,
+                    messages=messages,
+                    tools=cached_tools,
+                )
+                await log_token_usage(db, user_id, "chat_retry", active_model, response.usage, request_id=request_id)
+            if program_id is not None:
+                logger.info(f"[Coach] Forced retry saved program {program_id}")
+            assistant_text = "".join(
+                block.text for block in response.content if hasattr(block, "text") and block.text
+            )
 
         # Tool-created records are committed immediately in each tool handler.
         # Final commit is a no-op safety net in case any tool only flushed.
