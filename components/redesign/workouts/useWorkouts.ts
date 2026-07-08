@@ -17,6 +17,7 @@ export type RoutineCard = {
   programId: string | null;
   programName: string | null;
   programActive: boolean;
+  instanceIds: string[];
 };
 
 export type Featured = {
@@ -111,6 +112,7 @@ export function useWorkouts() {
       programId: prog?.id ?? null,
       programName: prog?.name ?? null,
       programActive: !!prog?.isActive,
+      instanceIds: list.map((w) => w.id),
     };
   }).sort((a, b) => (b.latestId > a.latestId ? 1 : -1));
 
@@ -213,5 +215,18 @@ export function useWorkouts() {
     }
   }, []);
 
-  return { loading, routines, routineGroups, featured, categories, busy, spin, startSession, refetch };
+  // Bulk-delete routines (server ignores any program-linked ids).
+  const bulkDelete = useCallback(async (list: RoutineCard[]): Promise<number> => {
+    const ids = list.flatMap((r) => r.instanceIds);
+    if (!ids.length) return 0;
+    const res = await fetch('/api/workouts/bulk-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workoutIds: ids }),
+    }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    setLocalVersion((v) => v + 1);
+    return res?.deleted ?? 0;
+  }, []);
+
+  return { loading, routines, routineGroups, featured, categories, busy, spin, startSession, refetch, bulkDelete };
 }
