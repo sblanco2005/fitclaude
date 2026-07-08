@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { MacroRing } from '@/components/redesign/dashboard/MacroRing';
 import { useDashboardData } from '@/components/redesign/dashboard/useDashboardData';
@@ -28,8 +29,20 @@ function nowEyebrow(): string {
 
 export default function DashboardV2() {
   const { data: session } = useSession();
+  const router = useRouter();
   const d = useDashboardData();
+  const [starting, setStarting] = useState(false);
   const firstName = session?.user?.name?.split(' ')[0] ?? 'there';
+
+  const startToday = async () => {
+    if (starting) return;
+    if (!d.today.routineId) { router.push('/v2/train'); return; }
+    setStarting(true);
+    const r = await fetch(`/api/workouts/${d.today.routineId}/duplicate`, { method: 'POST' }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    setStarting(false);
+    if (r?.id) router.push(`/v2/train/session/${r.id}`);
+    else router.push('/v2/train');
+  };
   const avatarLetter = firstName.charAt(0).toUpperCase();
 
   const proteinPct = d.macros[0] ? d.macros[0].value / d.macros[0].target : 0;
@@ -157,20 +170,31 @@ export default function DashboardV2() {
             {d.today.estMinutes > 0 && ` · ~${d.today.estMinutes} min`}
             {d.today.muscles && ` · ${d.today.muscles}`}
           </p>
-          <Link
-            href="/v2/train"
-            className="grad-ember relative mt-4 flex h-12 items-center justify-center overflow-hidden rounded-[13px] font-semibold text-[#0A0C10]"
-            style={{ boxShadow: 'var(--rd-glow-ember)' }}
-          >
-            <span className="relative z-10">{d.today.completed ? 'View workout' : 'Hit It'}</span>
-            {!d.today.completed && (
-              <span
-                aria-hidden
-                className="animate-sheen absolute inset-y-0 -left-1/3 z-0 w-1/3"
-                style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent)' }}
-              />
-            )}
-          </Link>
+          {d.today.completed ? (
+            <Link
+              href={d.today.routineId ? `/v2/train/routine/${d.today.routineId}` : '/v2/train'}
+              className="grad-ember relative mt-4 flex h-12 items-center justify-center overflow-hidden rounded-[13px] font-semibold text-[#0A0C10]"
+              style={{ boxShadow: 'var(--rd-glow-ember)' }}
+            >
+              <span className="relative z-10">View workout</span>
+            </Link>
+          ) : (
+            <button
+              onClick={startToday}
+              disabled={starting}
+              className="grad-ember relative mt-4 flex h-12 w-full items-center justify-center overflow-hidden rounded-[13px] font-semibold text-[#0A0C10] disabled:opacity-70"
+              style={{ boxShadow: 'var(--rd-glow-ember)' }}
+            >
+              <span className="relative z-10">{starting ? 'Starting…' : 'Hit It'}</span>
+              {!starting && (
+                <span
+                  aria-hidden
+                  className="animate-sheen absolute inset-y-0 -left-1/3 z-0 w-1/3"
+                  style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent)' }}
+                />
+              )}
+            </button>
+          )}
         </section>
       ) : (
         <section className="rd-card p-5">

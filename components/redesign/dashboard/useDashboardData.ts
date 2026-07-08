@@ -47,6 +47,7 @@ export type DashboardData = {
     estMinutes: number;
     muscles: string;
     completed: boolean;
+    routineId: string | null;
   };
   recentActivity: ActivityItem[];
 };
@@ -225,6 +226,7 @@ export function useDashboardData(): DashboardData {
       estMinutes: Math.max(0, exercises.length * 8),
       muscles,
       completed: !!today?.completedToday,
+      routineId: today?.routineId ?? null,
     },
     recentActivity,
   };
