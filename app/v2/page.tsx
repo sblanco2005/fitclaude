@@ -112,7 +112,7 @@ export default function DashboardV2() {
               <span className="font-label text-[11px] font-normal text-[var(--rd-text-faint)]">· Week {d.weekNumber}</span>
             )}
           </Link>
-          <Link href="/v2/train/add" className="flex items-center gap-1 text-[var(--rd-ember)]">
+          <Link href="/v2/program?new=1" className="flex items-center gap-1 text-[var(--rd-ember)]">
             <PlusIcon size={13} />
             <span className="text-[12px] font-semibold">Add program</span>
           </Link>

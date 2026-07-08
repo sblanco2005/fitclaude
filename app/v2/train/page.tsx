@@ -35,7 +35,7 @@ export default function TrainPage() {
         title="Your workouts"
         back
         right={
-          <Link href="/v2/train/add" aria-label="Add program" className="grad-ember flex h-10 w-10 items-center justify-center rounded-[13px] text-[#0A0C10]" style={{ boxShadow: 'var(--rd-glow-ember)' }}>
+          <Link href="/v2/program?new=1" aria-label="Add program" className="grad-ember flex h-10 w-10 items-center justify-center rounded-[13px] text-[#0A0C10]" style={{ boxShadow: 'var(--rd-glow-ember)' }}>
             <PlusIcon size={19} />
           </Link>
         }
