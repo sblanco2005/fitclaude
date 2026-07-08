@@ -79,12 +79,26 @@ export const POST = withAuth(async (request, user) => {
     const body = await request.json();
     const name: string = (typeof body.name === 'string' ? body.name.trim() : '').slice(0, 40) || 'New program';
     const totalWeeks = Math.max(1, Math.min(4, Number(body.totalWeeks) || 1));
-    const splitType: SplitType = (['ppl', 'upper_lower', 'full_body'].includes(body.splitType) ? body.splitType : 'ppl');
-    const trainingDays: number[] = Array.isArray(body.trainingDays)
-      ? [...new Set(body.trainingDays.filter((d: unknown) => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6))].sort((a, b) => (a as number) - (b as number)) as number[]
-      : [];
+    // Preferred: explicit per-day assignments [{weekday, workoutType}]. Falls back
+    // to a split rotation over trainingDays (legacy / safety).
+    const validWt = (wt: unknown): wt is string => typeof wt === 'string' && wt in WT_MUSCLES;
+    const assignByWeekday = new Map<number, string>();
+    if (Array.isArray(body.assignments)) {
+      for (const a of body.assignments) {
+        if (a && Number.isInteger(a.weekday) && a.weekday >= 0 && a.weekday <= 6) {
+          assignByWeekday.set(a.weekday, validWt(a.workoutType) ? a.workoutType : 'full_body');
+        }
+      }
+    } else {
+      const splitType: SplitType = (['ppl', 'upper_lower', 'full_body'].includes(body.splitType) ? body.splitType : 'ppl');
+      const trainingDays: number[] = Array.isArray(body.trainingDays)
+        ? [...new Set(body.trainingDays.filter((d: unknown) => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6))].sort((a, b) => (a as number) - (b as number)) as number[]
+        : [];
+      const rotation = SPLIT_ROTATION[splitType];
+      trainingDays.forEach((wd, i) => assignByWeekday.set(wd, rotation[i % rotation.length]));
+    }
 
-    if (!trainingDays.length) return NextResponse.json({ error: 'Pick at least one training day' }, { status: 400 });
+    if (!assignByWeekday.size) return NextResponse.json({ error: 'Pick at least one training day' }, { status: 400 });
 
     // Cap: 3 programs per user.
     const existing = await prisma.trainingProgram.findMany({ where: { userId: user.id }, select: { id: true } });
@@ -96,8 +110,12 @@ export const POST = withAuth(async (request, user) => {
       prisma.workout.aggregate({ where: { userId: user.id }, _max: { displayId: true } }),
     ]);
 
-    // Loose equipment filter for home gyms; falls back to all in pickExercises.
-    const eqText = profile?.gymType === 'own_gym' && profile.equipmentText ? profile.equipmentText.toLowerCase() : null;
+    // Equipment for THIS program: request values override the profile, so a
+    // "Vacation / hotel gym" program can use limited equipment without changing
+    // the user's default. full_gym → no filter; own_gym → filter by equipmentText.
+    const gymType = body.gymType === 'own_gym' ? 'own_gym' : body.gymType === 'full_gym' ? 'full_gym' : (profile?.gymType ?? 'full_gym');
+    const equipmentText = (typeof body.equipmentText === 'string' && body.equipmentText.trim()) ? body.equipmentText : (profile?.equipmentText ?? '');
+    const eqText = gymType === 'own_gym' && equipmentText ? equipmentText.toLowerCase() : null;
     const allowed = (e: Ex) => {
       if (!eqText) return true;
       const req = (e.equipmentRequired ?? '').toLowerCase().trim();
@@ -106,8 +124,6 @@ export const POST = withAuth(async (request, user) => {
     };
     const pool = exercises.filter(allowed);
     let displayId = (maxDisplay._max.displayId ?? 0) + 1;
-
-    const rotation = SPLIT_ROTATION[splitType];
 
     const result = await prisma.$transaction(async (tx) => {
       // Keep the current Main as-is: a new program becomes the active Main only
@@ -120,18 +136,15 @@ export const POST = withAuth(async (request, user) => {
         select: { id: true, isActive: true },
       });
 
-      let rot = 0; // rotation counter across all training days & weeks
       for (let w = 1; w <= totalWeeks; w++) {
         for (let wd = 0; wd <= 6; wd++) {
-          const isTraining = trainingDays.includes(wd);
-          if (!isTraining) {
+          const wt = assignByWeekday.get(wd);
+          if (!wt) {
             await tx.programDay.create({
               data: { programId: program.id, weekday: wd, weekNumber: w, dayType: 'rest', dayLabel: 'Rest' },
             });
             continue;
           }
-          const wt = rotation[rot % rotation.length];
-          rot++;
           const template = pickExercises(wt, pool, exercises);
           const muscles = [...new Set(template.filter((t) => t.is_primary).map((t) => t.muscle_group))].slice(0, 3);
           const dayLabel = (muscles.length ? muscles : [wt]).map(titleCase).join(' + ');
