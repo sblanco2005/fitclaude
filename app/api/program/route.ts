@@ -113,11 +113,23 @@ export const GET = withAuth(async (_request, user) => {
   }
 });
 
-// PATCH — either promote a program to active ({ programId }) or update the
-// active program's currentWeek ({ currentWeek }, from the home-screen week nav).
+// PATCH — rename ({ name, programId? }), promote a program to active
+// ({ programId }) or update the active program's currentWeek ({ currentWeek }).
 export const PATCH = withAuth(async (request, user) => {
   try {
     const body = await request.json();
+
+    // Rename (checked before promote since a rename also carries programId).
+    if (typeof body.name === 'string') {
+      const target = await prisma.trainingProgram.findFirst({
+        where: body.programId ? { id: body.programId, userId: user.id } : { userId: user.id, isActive: true },
+        select: { id: true },
+      });
+      if (!target) return AuthErrors.notFound('Program');
+      const name = body.name.trim().slice(0, 40) || null;
+      await prisma.trainingProgram.update({ where: { id: target.id }, data: { name } });
+      return NextResponse.json({ ok: true, name });
+    }
 
     if (typeof body.programId === 'string') {
       const ok = await setActiveProgram(user.id, body.programId);
