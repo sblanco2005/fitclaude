@@ -25,6 +25,10 @@ export default function ProgramPage() {
   const [starting, setStarting] = useState(false);
   const [moving, setMoving] = useState(false);
   const [moveBusy, setMoveBusy] = useState(false);
+  const [changing, setChanging] = useState<null | 'menu' | 'existing' | 'new'>(null);
+  const [routineOpts, setRoutineOpts] = useState<{ id: string; name: string; count: number }[]>([]);
+  const [newFocus, setNewFocus] = useState('');
+  const [changeBusy, setChangeBusy] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -80,7 +84,29 @@ export default function ProgramPage() {
     if (r?.id) router.push(`/v2/train/session/${r.id}`);
   };
 
-  const closeDetail = () => { setDetail(null); setMoving(false); };
+  const closeDetail = () => { setDetail(null); setMoving(false); setChanging(null); setNewFocus(''); };
+
+  const loadRoutines = async () => {
+    const list = await fetch('/api/workouts?daysBack=365').then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    (Array.isArray(list) ? list : []).forEach((wk: { id: string; name?: string | null; workoutType?: string; exercises?: unknown[] }) => {
+      const key = (wk.name?.trim() || wk.workoutType || 'routine').toLowerCase();
+      if (!map.has(key)) map.set(key, { id: wk.id, name: titleCase(wk.name?.trim() || wk.workoutType), count: (wk.exercises ?? []).length });
+    });
+    setRoutineOpts(Array.from(map.values()));
+  };
+
+  const setDayRoutine = async (payload: { routineId: string } | { focus: string }) => {
+    if (!detail || changeBusy) return;
+    setChangeBusy(true);
+    const ok = await fetch(`/api/program/day/${detail.id}/routine`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then((r) => r.ok).catch(() => false);
+    setChangeBusy(false);
+    if (ok) { closeDetail(); bumpDataVersion(); }
+  };
 
   const doRename = async () => {
     if (!sel || renameBusy) return;
@@ -339,6 +365,43 @@ export default function ProgramPage() {
                       })}
                     </div>
                     <button onClick={() => setMoving(false)} disabled={moveBusy} className="mt-2 w-full py-1.5 text-[12px] font-semibold text-[var(--rd-text-faint)]">Cancel</button>
+                  </div>
+                )
+              )}
+
+              {/* Change routine — link existing or create new */}
+              {isViewingActive && !moving && (
+                changing === null ? (
+                  <button onClick={() => setChanging('menu')} className="flex h-11 w-full items-center justify-center gap-2 rounded-[13px] border border-dashed border-[var(--rd-border-strong)] text-[13px] font-semibold text-[var(--rd-text-muted)]">Change routine</button>
+                ) : changing === 'menu' ? (
+                  <div className="space-y-2 rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] p-3">
+                    <button onClick={async () => { setChanging('existing'); await loadRoutines(); }} className="w-full rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] py-2.5 text-[13px] font-semibold text-[var(--rd-ink)]">Link an existing routine</button>
+                    <button onClick={() => setChanging('new')} className="w-full rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] py-2.5 text-[13px] font-semibold text-[var(--rd-ink)]">Create a new routine</button>
+                    <button onClick={() => setChanging(null)} className="w-full py-1 text-[12px] font-semibold text-[var(--rd-text-faint)]">Cancel</button>
+                  </div>
+                ) : changing === 'existing' ? (
+                  <div className="rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] p-3">
+                    <p className="font-label mb-2 text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">PICK A ROUTINE</p>
+                    <div className="scrollbar-hide max-h-52 space-y-1.5 overflow-y-auto">
+                      {routineOpts.length === 0 ? (
+                        <p className="py-3 text-center text-[12px] text-[var(--rd-text-faint)]">No routines yet.</p>
+                      ) : routineOpts.map((r) => (
+                        <button key={r.id} onClick={() => setDayRoutine({ routineId: r.id })} disabled={changeBusy} className="w-full rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2 text-left disabled:opacity-50 active:bg-[var(--rd-card-glass-hover)]">
+                          <span className="block truncate text-[13px] font-semibold text-[var(--rd-ink)]">{r.name}</span>
+                          <span className="font-label text-[10px] text-[var(--rd-text-faint)]">{r.count} exercises</span>
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={() => setChanging('menu')} disabled={changeBusy} className="mt-2 w-full py-1.5 text-[12px] font-semibold text-[var(--rd-text-faint)]">Back</button>
+                  </div>
+                ) : (
+                  <div className="rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] p-3">
+                    <p className="font-label mb-2 text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">NEW ROUTINE FOCUS</p>
+                    <input value={newFocus} onChange={(e) => setNewFocus(e.target.value)} placeholder="e.g. Push & Pull, Deadlifts & Back" maxLength={60} className="font-body w-full rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2.5 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none" />
+                    <div className="mt-2 flex gap-2">
+                      <button onClick={() => setChanging('menu')} disabled={changeBusy} className="flex-1 rounded-[11px] border border-[var(--rd-border)] py-2 text-[13px] font-semibold text-[var(--rd-text-muted)]">Back</button>
+                      <button onClick={() => newFocus.trim() && setDayRoutine({ focus: newFocus.trim() })} disabled={changeBusy || !newFocus.trim()} className="grad-ember flex-1 rounded-[11px] py-2 text-[13px] font-semibold text-[#0A0C10] disabled:opacity-50">{changeBusy ? 'Building…' : 'Create'}</button>
+                    </div>
                   </div>
                 )
               )}
