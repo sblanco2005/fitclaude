@@ -16,9 +16,7 @@ export default function RoutineDetailPage() {
   const [w, setW] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const [swapping, setSwapping] = useState<string | null>(null);
-  const [menuFor, setMenuFor] = useState<string | null>(null);
   // Library picker
   const [libFor, setLibFor] = useState<WorkoutExercise | null>(null);
   const [lib, setLib] = useState<LibEx[]>([]);
@@ -61,26 +59,7 @@ export default function RoutineDetailPage() {
     }).catch(() => {});
   };
 
-  const autoSwap = async (woExId: string) => {
-    setMenuFor(null);
-    setSwapping(woExId);
-    try {
-      const sug = await fetch(`/api/workouts/${id}/exercises/${woExId}/suggest`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-      if (sug?.id) {
-        await fetch(`/api/workouts/${id}/exercises/${woExId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ newExerciseId: sug.id }),
-        });
-        await load();
-      }
-    } finally {
-      setSwapping(null);
-    }
-  };
-
   const openLibrary = async (e: WorkoutExercise) => {
-    setMenuFor(null);
     setLibFor(e);
     setLibSearch('');
     setLibLoading(true);
@@ -130,9 +109,7 @@ export default function RoutineDetailPage() {
         <p className="font-label text-[10px] tracking-[.14em] text-[var(--rd-ember)]">
           {w.displayId != null ? `#${w.displayId} · ` : ''}{titleCase(w.workoutType)}
         </p>
-        <button onClick={() => { setEditMode((v) => !v); setMenuFor(null); }} className="font-label text-[12px] font-semibold text-[var(--rd-text-secondary)]">
-          {editMode ? 'Done' : 'Edit'}
-        </button>
+        <span className="w-[22px]" />
       </div>
 
       <h1 className="font-display text-[25px] font-bold text-[var(--rd-ink)]">{name}</h1>
@@ -145,35 +122,21 @@ export default function RoutineDetailPage() {
       </div>
 
       {/* Hit it */}
-      {!editMode && (
-        <button
-          onClick={hitIt}
-          disabled={starting}
-          className="grad-ember relative flex h-12 w-full items-center justify-center overflow-hidden rounded-[14px] text-[15px] font-semibold text-[#0A0C10] disabled:opacity-60"
-          style={{ boxShadow: 'var(--rd-glow-ember)' }}
-        >
-          <span className="relative z-10">{starting ? 'Starting…' : 'Hit it'}</span>
-          {!starting && <span aria-hidden className="animate-sheen absolute inset-y-0 -left-1/3 z-0 w-1/3" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent)' }} />}
-        </button>
-      )}
-      {editMode && <p className="text-[12px] text-[var(--rd-text-faint)]">Reorder with the arrows, or tap the swap icon to replace an exercise.</p>}
+      <button
+        onClick={hitIt}
+        disabled={starting}
+        className="grad-ember relative flex h-12 w-full items-center justify-center overflow-hidden rounded-[14px] text-[15px] font-semibold text-[#0A0C10] disabled:opacity-60"
+        style={{ boxShadow: 'var(--rd-glow-ember)' }}
+      >
+        <span className="relative z-10">{starting ? 'Starting…' : 'Hit it'}</span>
+        {!starting && <span aria-hidden className="animate-sheen absolute inset-y-0 -left-1/3 z-0 w-1/3" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent)' }} />}
+      </button>
 
       {/* Exercise rows */}
       <div className="space-y-2.5">
         {exercises.map((e, i) => (
           <div key={e.id} className="rd-card flex items-center gap-3 p-3.5">
-            {editMode ? (
-              <div className="flex flex-col">
-                <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="text-[var(--rd-text-muted)] disabled:opacity-25">
-                  <ChevronLeftIcon size={16} className="rotate-90" />
-                </button>
-                <button onClick={() => move(i, 1)} disabled={i === exercises.length - 1} aria-label="Move down" className="text-[var(--rd-text-muted)] disabled:opacity-25">
-                  <ChevronLeftIcon size={16} className="-rotate-90" />
-                </button>
-              </div>
-            ) : (
-              <span className="font-num flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--rd-card)] text-[13px] font-bold text-[var(--rd-text-muted)]">{i + 1}</span>
-            )}
+            <span className="font-num flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--rd-card)] text-[13px] font-bold text-[var(--rd-text-muted)]">{i + 1}</span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-[var(--rd-ink)]">{e.exercise?.name || e.variation?.name || 'Exercise'}</p>
               <p className="font-label mt-0.5 text-[11px] text-[var(--rd-text-faint)]">
@@ -182,25 +145,21 @@ export default function RoutineDetailPage() {
                 {e.restSeconds ? ` · rest ${e.restSeconds}s` : ''}
               </p>
             </div>
-            {/* Swap menu */}
-            <div className="relative shrink-0">
-              <button onClick={() => setMenuFor(menuFor === e.id ? null : e.id)} aria-label="Swap" className="text-[var(--rd-text-muted)]">
-                <SpinIcon size={16} className={swapping === e.id ? 'animate-spinslow' : ''} />
+
+            {/* Reorder */}
+            <div className="flex flex-col">
+              <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="text-[var(--rd-text-muted)] disabled:opacity-20">
+                <ChevronLeftIcon size={16} className="rotate-90" />
               </button>
-              {menuFor === e.id && (
-                <>
-                  <button className="fixed inset-0 z-30 cursor-default" aria-hidden onClick={() => setMenuFor(null)} />
-                  <div className="absolute right-0 top-8 z-40 w-44 overflow-hidden rounded-[12px] border border-[var(--rd-border)] py-1" style={{ background: '#0F1117', boxShadow: '0 16px 40px -12px rgba(0,0,0,.7)' }}>
-                    <button onClick={() => autoSwap(e.id)} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[13px] font-medium text-[var(--rd-ink)] active:bg-[var(--rd-card-glass)]">
-                      <SpinIcon size={15} className="text-[var(--rd-ember)]" /> Auto-swap
-                    </button>
-                    <button onClick={() => openLibrary(e)} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[13px] font-medium text-[var(--rd-ink)] active:bg-[var(--rd-card-glass)]">
-                      <LibraryIcon size={15} className="text-[var(--rd-violet)]" /> From library
-                    </button>
-                  </div>
-                </>
-              )}
+              <button onClick={() => move(i, 1)} disabled={i === exercises.length - 1} aria-label="Move down" className="text-[var(--rd-text-muted)] disabled:opacity-20">
+                <ChevronLeftIcon size={16} className="-rotate-90" />
+              </button>
             </div>
+
+            {/* Replace from library */}
+            <button onClick={() => openLibrary(e)} disabled={swapping === e.id} aria-label="Replace exercise" className="shrink-0 text-[var(--rd-text-muted)]">
+              {swapping === e.id ? <SpinIcon size={17} className="animate-spinslow" /> : <LibraryIcon size={17} />}
+            </button>
           </div>
         ))}
       </div>
@@ -210,11 +169,14 @@ export default function RoutineDetailPage() {
         <div className="fixed inset-0 z-50 flex items-end" onClick={() => setLibFor(null)}>
           <div className="absolute inset-0" style={{ background: 'rgba(4,5,8,.6)', backdropFilter: 'blur(2px)' }} />
           <div className="relative flex max-h-[80%] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-[var(--rd-border)] pb-6" style={{ background: '#0F1117' }} onClick={(ev) => ev.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 pb-3 pt-5">
-              <h3 className="font-display text-[18px] font-bold text-[var(--rd-ink)]">Replace exercise</h3>
+            <div className="flex items-center justify-between px-5 pb-1 pt-5">
+              <div>
+                <p className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">REPLACING</p>
+                <h3 className="font-display mt-0.5 text-[18px] font-bold text-[var(--rd-ink)]">{libFor.exercise?.name || 'Exercise'}</h3>
+              </div>
               <button onClick={() => setLibFor(null)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
             </div>
-            <div className="px-5 pb-3">
+            <div className="px-5 pb-3 pt-3">
               <div className="flex items-center gap-2 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-3.5 py-2.5">
                 <SearchIcon size={17} className="text-[var(--rd-text-faint)]" />
                 <input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Search exercises…" autoFocus className="font-body min-w-0 flex-1 bg-transparent text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:outline-none" />
