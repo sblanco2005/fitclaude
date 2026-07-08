@@ -110,12 +110,14 @@ export const POST = withAuth(async (request, user) => {
     const rotation = SPLIT_ROTATION[splitType];
 
     const result = await prisma.$transaction(async (tx) => {
-      // Demote any current programs so the new one is the active Main.
-      await tx.trainingProgram.updateMany({ where: { userId: user.id }, data: { isActive: false } });
+      // Keep the current Main as-is: a new program becomes the active Main only
+      // if the user has none yet; otherwise it's created as a switchable secondary.
+      const hasActive = await tx.trainingProgram.findFirst({ where: { userId: user.id, isActive: true }, select: { id: true } });
+      const makeActive = !hasActive;
 
       const program = await tx.trainingProgram.create({
-        data: { userId: user.id, name, totalWeeks, currentWeek: 1, isActive: true },
-        select: { id: true },
+        data: { userId: user.id, name, totalWeeks, currentWeek: 1, isActive: makeActive },
+        select: { id: true, isActive: true },
       });
 
       let rot = 0; // rotation counter across all training days & weeks
@@ -177,7 +179,7 @@ export const POST = withAuth(async (request, user) => {
       return program;
     }, { timeout: 25000 });
 
-    return NextResponse.json({ ok: true, programId: result.id, name });
+    return NextResponse.json({ ok: true, programId: result.id, name, isActive: result.isActive });
   } catch (error) {
     console.error('Failed to build program:', error);
     return NextResponse.json({ error: 'Failed to build program' }, { status: 500 });

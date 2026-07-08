@@ -27,6 +27,9 @@ export default function ProgramPage() {
   const [showNew, setShowNew] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [renameVal, setRenameVal] = useState('');
+  const [renameBusy, setRenameBusy] = useState(false);
 
   const activeSummary = programs.find((p) => p.isActive) ?? null;
   const selId = selectedId ?? activeSummary?.id ?? programs[0]?.id ?? null;
@@ -62,6 +65,21 @@ export default function ProgramPage() {
   };
 
   const closeDetail = () => { setDetail(null); setMoving(false); };
+
+  const doRename = async () => {
+    if (!sel || renameBusy) return;
+    const v = renameVal.trim();
+    if (!v) { setRenaming(false); return; }
+    setRenameBusy(true);
+    await fetch('/api/program', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ programId: sel.id, name: v }),
+    }).catch(() => {});
+    setRenameBusy(false);
+    setRenaming(false);
+    bumpDataVersion();
+  };
 
   const makeMain = async (id: string) => {
     if (switching) return;
@@ -148,6 +166,30 @@ export default function ProgramPage() {
           <button onClick={() => setNotice(null)} aria-label="Dismiss" className="text-[var(--rd-text-muted)]"><CloseIcon size={14} /></button>
         </div>
       )}
+
+      {/* Rename the selected program */}
+      {sel && (renaming ? (
+        <div className="flex items-center gap-2">
+          <input
+            value={renameVal}
+            autoFocus
+            maxLength={40}
+            onChange={(e) => setRenameVal(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') setRenaming(false); }}
+            placeholder="Program name"
+            className="font-body min-w-0 flex-1 rounded-[11px] border border-[var(--rd-ember)] bg-[var(--rd-card)] px-3 py-2 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:outline-none"
+          />
+          <button onClick={doRename} disabled={renameBusy} className="grad-ember rounded-[11px] px-3.5 py-2 text-[13px] font-semibold text-[#0A0C10] disabled:opacity-60">Save</button>
+          <button onClick={() => setRenaming(false)} className="rounded-[11px] border border-[var(--rd-border)] px-3 py-2 text-[13px] font-semibold text-[var(--rd-text-muted)]">Cancel</button>
+        </div>
+      ) : (
+        <button
+          onClick={() => { setRenameVal(sel.name || ''); setRenaming(true); }}
+          className="font-label flex items-center gap-1.5 text-[12px] font-semibold text-[var(--rd-text-muted)]"
+        >
+          <PencilIcon size={13} /> Rename “{tabLabel(sel, programs.findIndex((p) => p.id === sel.id))}”
+        </button>
+      ))}
 
       {/* Week pills */}
       {totalWeeks > 1 && (
@@ -275,10 +317,24 @@ export default function ProgramPage() {
       {showNew && (
         <NewProgramSheet
           onClose={() => setShowNew(false)}
-          onCreated={(newName) => { setShowNew(false); setSelectedId(null); setNotice(`“${newName}” created and set as your Main. Your old program is saved — switch anytime.`); }}
+          onCreated={(newName, isActive) => {
+            setShowNew(false);
+            setSelectedId(null);
+            setNotice(isActive
+              ? `“${newName}” created and set as your Main.`
+              : `“${newName}” added as a secondary. Your Main is unchanged — tap it above and “Make it my Main” to switch.`);
+          }}
         />
       )}
     </div>
+  );
+}
+
+function PencilIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
   );
 }
 
