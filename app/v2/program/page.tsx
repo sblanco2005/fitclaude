@@ -40,6 +40,12 @@ export default function ProgramPage() {
 
   useEffect(() => { if (!loading) setWeek(currentWeek); }, [loading, selId, currentWeek]);
 
+  // Single entry point: Home's "Add program" and the empty state both land here
+  // with ?new=1 to open the create sheet directly.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') setShowNew(true);
+  }, []);
+
   const days = isViewingActive && active
     ? active.days.filter((d) => d.weekNumber === week)
     : (sel?.days ?? []).filter((d) => d.weekNumber === week);
@@ -90,8 +96,14 @@ export default function ProgramPage() {
         <div className="rd-card p-6 text-center">
           <p className="text-[14px] font-semibold text-[var(--rd-ink)]">No program yet</p>
           <p className="mt-1 text-[13px] text-[var(--rd-text-faint)]">Set up a weekly schedule to plan your training.</p>
-          <button onClick={() => router.push('/v2/train/add')} className="grad-ember mt-4 rounded-[13px] px-5 py-2.5 text-[14px] font-semibold text-[#0A0C10]">Build a program</button>
+          <button onClick={() => setShowNew(true)} className="grad-ember mt-4 rounded-[13px] px-5 py-2.5 text-[14px] font-semibold text-[#0A0C10]">Build a program</button>
         </div>
+        {showNew && (
+          <NewProgramSheet
+            onClose={() => setShowNew(false)}
+            onCreated={(newName) => { setShowNew(false); setNotice(`“${newName}” created.`); bumpDataVersion(); }}
+          />
+        )}
       </div>
     );
   }
@@ -262,7 +274,6 @@ export default function ProgramPage() {
       {/* New program creation */}
       {showNew && (
         <NewProgramSheet
-          currentActive={active?.id ? { id: active.id, name: activeSummary?.name ?? null } : null}
           onClose={() => setShowNew(false)}
           onCreated={(newName) => { setShowNew(false); setSelectedId(null); setNotice(`“${newName}” created and set as your Main. Your old program is saved — switch anytime.`); }}
         />
