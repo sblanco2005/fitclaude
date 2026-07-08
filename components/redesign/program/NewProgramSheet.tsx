@@ -35,6 +35,8 @@ export function NewProgramSheet({
   const [weekFocus, setWeekFocus] = useState<Record<number, Record<number, string>>>({ 1: { 0: 'Push', 2: 'Pull', 4: 'Legs' } });
   const [sameEveryWeek, setSameEveryWeek] = useState(true);
   const [editWeek, setEditWeek] = useState(1);
+  // Per weekday: 'coached' (Coach builds it) or 'own' (log-your-own / class day).
+  const [dayMode, setDayMode] = useState<Record<number, 'coached' | 'own'>>({});
   const [gymType, setGymType] = useState<'full_gym' | 'own_gym'>('full_gym');
   const [equipment, setEquipment] = useState('');
   const [errMsg, setErrMsg] = useState('');
@@ -53,7 +55,11 @@ export function NewProgramSheet({
   const quickFill = (rot: string[]) =>
     setWeekFocus((prev) => {
       const wf: Record<number, string> = {};
-      sortedDays.forEach((d, i) => { wf[d] = rot[i % rot.length]; });
+      let idx = 0;
+      sortedDays.forEach((d) => {
+        if (dayMode[d] === 'own') { wf[d] = prev[curWeek]?.[d] ?? ''; } // keep "my own" labels
+        else { wf[d] = rot[idx % rot.length]; idx++; }
+      });
       return { ...prev, [curWeek]: wf };
     });
 
@@ -61,12 +67,16 @@ export function NewProgramSheet({
     if (!days.length || phase === 'building') return;
     setPhase('building');
     try {
-      const assignments: { weekday: number; weekNumber?: number; focus: string }[] = [];
-      const focusFor = (w: number, d: number) => (weekFocus[w]?.[d] ?? weekFocus[1]?.[d] ?? '').trim() || 'Full Body';
+      const assignments: { weekday: number; weekNumber?: number; focus: string; kind: 'coached' | 'own' }[] = [];
+      const kindFor = (d: number) => dayMode[d] === 'own' ? 'own' : 'coached';
+      const focusFor = (w: number, d: number) => {
+        const v = (weekFocus[w]?.[d] ?? weekFocus[1]?.[d] ?? '').trim();
+        return v || (kindFor(d) === 'own' ? 'My own workout' : 'Full Body');
+      };
       if (sameEveryWeek || weeks === 1) {
-        sortedDays.forEach((d) => assignments.push({ weekday: d, focus: focusFor(1, d) }));
+        sortedDays.forEach((d) => assignments.push({ weekday: d, focus: focusFor(1, d), kind: kindFor(d) }));
       } else {
-        for (let w = 1; w <= weeks; w++) sortedDays.forEach((d) => assignments.push({ weekday: d, weekNumber: w, focus: focusFor(w, d) }));
+        for (let w = 1; w <= weeks; w++) sortedDays.forEach((d) => assignments.push({ weekday: d, weekNumber: w, focus: focusFor(w, d), kind: kindFor(d) }));
       }
       const res = await fetch('/api/program/build', {
         method: 'POST',
@@ -182,21 +192,33 @@ export function NewProgramSheet({
                   )}
 
                   <div className="mt-2 space-y-2">
-                    {sortedDays.map((d) => (
-                      <div key={`${curWeek}-${d}`} className="flex items-center gap-2">
-                        <span className="font-label w-9 shrink-0 text-[12px] font-bold text-[var(--rd-ink)]">{WD_FULL[d]}</span>
-                        <input
-                          value={focusVal(d)}
-                          onChange={(e) => setFocus(d, e.target.value)}
-                          placeholder="e.g. Push & Pull, Deadlifts & Back"
-                          maxLength={60}
-                          className="font-body min-w-0 flex-1 rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2.5 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none"
-                        />
-                      </div>
-                    ))}
+                    {sortedDays.map((d) => {
+                      const own = dayMode[d] === 'own';
+                      return (
+                        <div key={`${curWeek}-${d}`} className="flex items-center gap-2">
+                          <span className="font-label w-9 shrink-0 text-[12px] font-bold text-[var(--rd-ink)]">{WD_FULL[d]}</span>
+                          <button
+                            onClick={() => setDayMode((m) => ({ ...m, [d]: own ? 'coached' : 'own' }))}
+                            className="font-label shrink-0 rounded-[9px] border px-2 py-2 text-[10px] font-bold"
+                            style={own
+                              ? { borderColor: 'transparent', background: 'var(--rd-violet)', color: '#0A0C10' }
+                              : { borderColor: 'transparent', background: 'var(--rd-ember)', color: '#0A0C10' }}
+                          >
+                            {own ? 'My own' : 'Coach'}
+                          </button>
+                          <input
+                            value={focusVal(d)}
+                            onChange={(e) => setFocus(d, e.target.value)}
+                            placeholder={own ? 'e.g. Eddy, Alpha X, Run' : 'e.g. Push & Pull, Deadlifts & Back'}
+                            maxLength={60}
+                            className="font-body min-w-0 flex-1 rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2.5 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none"
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                   <p className="font-label mt-1.5 text-[11px] text-[var(--rd-text-faint)]">
-                    {weeks > 1 && !sameEveryWeek ? `Editing Week ${editWeek}. ` : ''}Type each day’s focus — muscles or a lift. Unselected days are rest.
+                    {weeks > 1 && !sameEveryWeek ? `Editing Week ${editWeek}. ` : ''}<span className="text-[var(--rd-ember)]">Coach</span> builds it; <span className="text-[var(--rd-violet)]">My own</span> you log yourself. Unselected days are rest.
                   </p>
                 </div>
               )}
