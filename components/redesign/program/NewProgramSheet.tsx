@@ -13,18 +13,10 @@ type Phase = 'form' | 'building' | 'error';
 const WEEK_OPTS = [1, 2, 3, 4];
 const WD = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // 0=Mon .. 6=Sun
 const WD_FULL = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const WORKOUT_TYPES = [
-  { k: 'push', l: 'Push' },
-  { k: 'pull', l: 'Pull' },
-  { k: 'legs', l: 'Legs' },
-  { k: 'upper', l: 'Upper' },
-  { k: 'lower', l: 'Lower' },
-  { k: 'full_body', l: 'Full Body' },
-];
 const QUICK: { key: string; label: string; rot: string[] }[] = [
-  { key: 'ppl', label: 'PPL', rot: ['push', 'pull', 'legs'] },
-  { key: 'ul', label: 'Upper / Lower', rot: ['upper', 'lower'] },
-  { key: 'fb', label: 'Full Body', rot: ['full_body'] },
+  { key: 'ppl', label: 'PPL', rot: ['Push', 'Pull', 'Legs'] },
+  { key: 'ul', label: 'Upper / Lower', rot: ['Upper', 'Lower'] },
+  { key: 'fb', label: 'Full Body', rot: ['Full Body'] },
 ];
 
 export function NewProgramSheet({
@@ -39,7 +31,7 @@ export function NewProgramSheet({
   const [name, setName] = useState('');
   const [weeks, setWeeks] = useState(1);
   const [days, setDays] = useState<number[]>([0, 2, 4]); // Mon / Wed / Fri
-  const [types, setTypes] = useState<Record<number, string>>({ 0: 'push', 2: 'pull', 4: 'legs' });
+  const [focus, setFocus] = useState<Record<number, string>>({ 0: 'Push', 2: 'Pull', 4: 'Legs' });
   const [gymType, setGymType] = useState<'full_gym' | 'own_gym'>('full_gym');
   const [equipment, setEquipment] = useState('');
   const [errMsg, setErrMsg] = useState('');
@@ -48,27 +40,26 @@ export function NewProgramSheet({
     setDays((prev) => {
       const on = prev.includes(d);
       const next = on ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b);
-      setTypes((t) => {
-        const nt = { ...t };
-        if (on) delete nt[d];
-        else if (!nt[d]) nt[d] = 'push';
-        return nt;
+      setFocus((f) => {
+        const nf = { ...f };
+        if (on) delete nf[d];
+        return nf;
       });
       return next;
     });
 
   const quickFill = (rot: string[]) =>
-    setTypes(() => {
-      const nt: Record<number, string> = {};
-      days.forEach((d, i) => { nt[d] = rot[i % rot.length]; });
-      return nt;
+    setFocus(() => {
+      const nf: Record<number, string> = {};
+      [...days].sort((a, b) => a - b).forEach((d, i) => { nf[d] = rot[i % rot.length]; });
+      return nf;
     });
 
   const create = async () => {
     if (!days.length || phase === 'building') return;
     setPhase('building');
     try {
-      const assignments = [...days].sort((a, b) => a - b).map((d) => ({ weekday: d, workoutType: types[d] || 'full_body' }));
+      const assignments = [...days].sort((a, b) => a - b).map((d) => ({ weekday: d, focus: (focus[d] || '').trim() || 'Full Body' }));
       const res = await fetch('/api/program/build', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,18 +149,17 @@ export function NewProgramSheet({
                     {sortedDays.map((d) => (
                       <div key={d} className="flex items-center gap-2">
                         <span className="font-label w-9 shrink-0 text-[12px] font-bold text-[var(--rd-ink)]">{WD_FULL[d]}</span>
-                        <div className="scrollbar-hide flex flex-1 gap-1.5 overflow-x-auto">
-                          {WORKOUT_TYPES.map((wt) => {
-                            const on = (types[d] || 'push') === wt.k;
-                            return (
-                              <button key={wt.k} onClick={() => setTypes((t) => ({ ...t, [d]: wt.k }))} className="font-label shrink-0 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold" style={{ borderColor: on ? 'transparent' : 'var(--rd-border)', background: on ? 'var(--rd-ember)' : 'var(--rd-card-glass)', color: on ? '#0A0C10' : 'var(--rd-text-muted)' }}>{wt.l}</button>
-                            );
-                          })}
-                        </div>
+                        <input
+                          value={focus[d] ?? ''}
+                          onChange={(e) => setFocus((f) => ({ ...f, [d]: e.target.value }))}
+                          placeholder="e.g. Push & Pull, Deadlifts & Back"
+                          maxLength={60}
+                          className="font-body min-w-0 flex-1 rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2.5 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none"
+                        />
                       </div>
                     ))}
                   </div>
-                  <p className="font-label mt-1.5 text-[11px] text-[var(--rd-text-faint)]">Unselected days become rest days.</p>
+                  <p className="font-label mt-1.5 text-[11px] text-[var(--rd-text-faint)]">Type each day’s focus — muscles or a lift. Unselected days are rest.</p>
                 </div>
               )}
 
