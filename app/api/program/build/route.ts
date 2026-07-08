@@ -27,20 +27,25 @@ export const POST = withAuth(async (request, user) => {
     // ("Push & Pull", "Deadlifts & Back"). An assignment WITH weekNumber applies
     // only to that week; WITHOUT weekNumber it applies to every week. Falls back
     // to a split rotation over trainingDays (legacy / safety).
-    const perWeek = new Map<number, Map<number, string>>(); // week -> (weekday -> focus)
-    const allWeeks = new Map<number, string>(); // weekday -> focus, applies to every week
-    const focusOf = (a: { focus?: unknown; workoutType?: unknown }) =>
-      (typeof a.focus === 'string' && a.focus.trim())
+    // Each entry: a coached day (Coach builds a routine from `focus`) or a
+    // "my own" day (pt_session — the user logs it themselves, `focus` is the label).
+    type Entry = { focus: string; kind: 'coached' | 'own' };
+    const perWeek = new Map<number, Map<number, Entry>>(); // week -> (weekday -> entry)
+    const allWeeks = new Map<number, Entry>(); // weekday -> entry, applies to every week
+    const entryOf = (a: { focus?: unknown; workoutType?: unknown; kind?: unknown }): Entry => ({
+      focus: (typeof a.focus === 'string' && a.focus.trim())
         ? a.focus.trim().slice(0, 60)
-        : (typeof a.workoutType === 'string' && a.workoutType ? a.workoutType : 'full body');
+        : (typeof a.workoutType === 'string' && a.workoutType ? a.workoutType : 'full body'),
+      kind: a.kind === 'own' ? 'own' : 'coached',
+    });
     if (Array.isArray(body.assignments)) {
       for (const a of body.assignments) {
         if (a && Number.isInteger(a.weekday) && a.weekday >= 0 && a.weekday <= 6) {
           if (Number.isInteger(a.weekNumber) && a.weekNumber >= 1) {
             if (!perWeek.has(a.weekNumber)) perWeek.set(a.weekNumber, new Map());
-            perWeek.get(a.weekNumber)!.set(a.weekday, focusOf(a));
+            perWeek.get(a.weekNumber)!.set(a.weekday, entryOf(a));
           } else {
-            allWeeks.set(a.weekday, focusOf(a));
+            allWeeks.set(a.weekday, entryOf(a));
           }
         }
       }
@@ -50,7 +55,7 @@ export const POST = withAuth(async (request, user) => {
         ? [...new Set(body.trainingDays.filter((d: unknown) => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6))].sort((a, b) => (a as number) - (b as number)) as number[]
         : [];
       const rotation = SPLIT_ROTATION[splitType];
-      trainingDays.forEach((wd, i) => allWeeks.set(wd, rotation[i % rotation.length]));
+      trainingDays.forEach((wd, i) => allWeeks.set(wd, { focus: rotation[i % rotation.length], kind: 'coached' }));
     }
 
     if (!perWeek.size && !allWeeks.size) return NextResponse.json({ error: 'Pick at least one training day' }, { status: 400 });
@@ -93,17 +98,24 @@ export const POST = withAuth(async (request, user) => {
 
       for (let w = 1; w <= totalWeeks; w++) {
         for (let wd = 0; wd <= 6; wd++) {
-          const focus = perWeek.get(w)?.get(wd) ?? allWeeks.get(wd);
-          if (!focus) {
+          const entry = perWeek.get(w)?.get(wd) ?? allWeeks.get(wd);
+          if (!entry) {
             await tx.programDay.create({
               data: { programId: program.id, weekday: wd, weekNumber: w, dayType: 'rest', dayLabel: 'Rest' },
             });
             continue;
           }
-          const template = pickForFocus(focus, pool, exercises);
+          // "My own" day — logged by the user, no generated routine.
+          if (entry.kind === 'own') {
+            await tx.programDay.create({
+              data: { programId: program.id, weekday: wd, weekNumber: w, dayType: 'pt_session', dayLabel: titleCase(entry.focus) || 'My own workout' },
+            });
+            continue;
+          }
+          const template = pickForFocus(entry.focus, pool, exercises);
           // The day is labeled with the user's own focus text ("Deadlifts & Back").
-          const dayLabel = titleCase(focus);
-          const wtLabel = typeForFocus(focus);
+          const dayLabel = titleCase(entry.focus);
+          const wtLabel = typeForFocus(entry.focus);
 
           const day = await tx.programDay.create({
             data: {
