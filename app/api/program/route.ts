@@ -62,11 +62,13 @@ async function computeEffectiveWeek(programId: string, anchorDate: Date, totalWe
   return weeksElapsed >= totalWeeks ? calendarWeek : Math.max(currentWeek, calendarWeek);
 }
 
-// GET — fetch user's active training program
-export const GET = withAuth(async (_request, user) => {
+// GET — fetch the user's active training program, or a specific one with
+// ?programId= (owned) so bench programs can be inspected without activating.
+export const GET = withAuth(async (request, user) => {
   try {
+    const programId = new URL(request.url).searchParams.get('programId');
     const program = await prisma.trainingProgram.findFirst({
-      where: { userId: user.id, isActive: true },
+      where: programId ? { id: programId, userId: user.id } : { userId: user.id, isActive: true },
       include: {
         days: {
           orderBy: [{ weekNumber: 'asc' }, { weekday: 'asc' }],
@@ -89,7 +91,11 @@ export const GET = withAuth(async (_request, user) => {
     return NextResponse.json({
       id: program.id,
       totalWeeks: program.totalWeeks,
-      currentWeek: await computeEffectiveWeek(program.id, program.createdAt, program.totalWeeks, program.currentWeek),
+      // Calendar-aware week only makes sense for the active program; bench
+      // programs just report their stored currentWeek.
+      currentWeek: program.isActive
+        ? await computeEffectiveWeek(program.id, program.createdAt, program.totalWeeks, program.currentWeek)
+        : program.currentWeek,
       isActive: program.isActive,
       days: program.days.map((d) => {
         const routine = d.workouts?.[0] || null;
