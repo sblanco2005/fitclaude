@@ -54,6 +54,7 @@ export const GET = withAuth(async (request, user) => {
           },
           orderBy: { order: 'asc' },
         },
+        programDay: { select: { program: { select: { id: true, name: true, isActive: true } } } },
       },
       orderBy: { date: 'desc' },
     });

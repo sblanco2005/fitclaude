@@ -14,6 +14,9 @@ export type RoutineCard = {
   exerciseCount: number;
   muscles: string[];
   estMinutes: number;
+  programId: string | null;
+  programName: string | null;
+  programActive: boolean;
 };
 
 export type Featured = {
@@ -92,6 +95,9 @@ export function useWorkouts() {
       return min == null ? w.displayId : Math.min(min, w.displayId);
     }, null);
     const count = (latest.exercises ?? []).length;
+    // Program this routine belongs to (from the most recent linked instance).
+    const withProgram = [...list].sort((a, b) => +new Date(b.date || b.createdAt) - +new Date(a.date || a.createdAt)).find((w) => w.programDay?.program);
+    const prog = withProgram?.programDay?.program ?? null;
     return {
       key,
       latestId: latest.id,
@@ -102,6 +108,9 @@ export function useWorkouts() {
       exerciseCount: count,
       muscles,
       estMinutes: Math.max(0, count * 8),
+      programId: prog?.id ?? null,
+      programName: prog?.name ?? null,
+      programActive: !!prog?.isActive,
     };
   }).sort((a, b) => (b.latestId > a.latestId ? 1 : -1));
 
@@ -137,18 +146,39 @@ export function useWorkouts() {
 
   const categories = Array.from(new Set(routines.map((r) => titleCase(r.category))));
 
-  // Group routines by collection (each routine may appear under multiple);
-  // routines in no collection fall into an "Other" group.
+  // Group routines: program groups first (routines linked to a training program,
+  // grouped by that program — active/Main first), then collections, then "Other".
   const routineGroups: RoutineGroup[] = [];
   const grouped = new Set<string>();
-  collections.forEach((col, i) => {
+
+  const byProgram = new Map<string, { name: string; active: boolean; routines: RoutineCard[] }>();
+  routines.forEach((r) => {
+    if (!r.programId) return;
+    if (!byProgram.has(r.programId)) byProgram.set(r.programId, { name: r.programName || '', active: r.programActive, routines: [] });
+    byProgram.get(r.programId)!.routines.push(r);
+    grouped.add(r.key);
+  });
+  Array.from(byProgram.entries())
+    .sort((a, b) => Number(b[1].active) - Number(a[1].active))
+    .forEach(([id, g]) => {
+      const name = (g.name && titleCase(g.name)) || (g.active ? 'Main program' : 'Program');
+      routineGroups.push({
+        id: `prog-${id}`,
+        name: g.active ? `${name} · Main` : name,
+        accent: GROUP_ACCENTS[routineGroups.length % GROUP_ACCENTS.length],
+        routines: g.routines,
+      });
+    });
+
+  collections.forEach((col) => {
     const names = new Set((col.routineNames ?? []).map((n) => n.trim().toLowerCase()));
-    const rs = routines.filter((r) => names.has(r.name.toLowerCase()));
+    const rs = routines.filter((r) => !grouped.has(r.key) && names.has(r.name.toLowerCase()));
     rs.forEach((r) => grouped.add(r.key));
     if (rs.length) {
-      routineGroups.push({ id: col.id, name: col.name, accent: GROUP_ACCENTS[i % GROUP_ACCENTS.length], routines: rs });
+      routineGroups.push({ id: col.id, name: col.name, accent: GROUP_ACCENTS[routineGroups.length % GROUP_ACCENTS.length], routines: rs });
     }
   });
+
   const ungrouped = routines.filter((r) => !grouped.has(r.key));
   if (ungrouped.length) {
     routineGroups.push({ id: '__other', name: 'Other', accent: GROUP_ACCENTS[routineGroups.length % GROUP_ACCENTS.length], routines: ungrouped });

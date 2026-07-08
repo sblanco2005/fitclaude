@@ -23,7 +23,7 @@ export function NewProgramSheet({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (newName: string) => void;
+  onCreated: (newName: string, isActive: boolean) => void;
 }) {
   const { bumpDataVersion } = useFitClaude();
   const [phase, setPhase] = useState<Phase>('form');
@@ -51,7 +51,7 @@ export function NewProgramSheet({
         return;
       }
       bumpDataVersion();
-      onCreated(data?.name || name.trim() || 'New program');
+      onCreated(data?.name || name.trim() || 'New program', !!data?.isActive);
     } catch {
       setErrMsg('Network error. Please try again.');
       setPhase('error');

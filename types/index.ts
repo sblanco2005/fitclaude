@@ -119,6 +119,7 @@ export interface Workout {
   programDayId: string | null;
   createdAt: string;
   exercises: WorkoutExercise[];
+  programDay?: { program: { id: string; name: string | null; isActive: boolean } | null } | null;
 }
 
 export interface WorkoutExercise {
