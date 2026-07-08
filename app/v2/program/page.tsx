@@ -30,6 +30,8 @@ export default function ProgramPage() {
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState('');
   const [renameBusy, setRenameBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const activeSummary = programs.find((p) => p.isActive) ?? null;
   const selId = selectedId ?? activeSummary?.id ?? programs[0]?.id ?? null;
@@ -78,6 +80,16 @@ export default function ProgramPage() {
     }).catch(() => {});
     setRenameBusy(false);
     setRenaming(false);
+    bumpDataVersion();
+  };
+
+  const deleteProgram = async () => {
+    if (!sel || deleting) return;
+    setDeleting(true);
+    await fetch(`/api/program?programId=${sel.id}`, { method: 'DELETE' }).catch(() => {});
+    setDeleting(false);
+    setConfirmDelete(false);
+    setSelectedId(null);
     bumpDataVersion();
   };
 
@@ -183,12 +195,20 @@ export default function ProgramPage() {
           <button onClick={() => setRenaming(false)} className="rounded-[11px] border border-[var(--rd-border)] px-3 py-2 text-[13px] font-semibold text-[var(--rd-text-muted)]">Cancel</button>
         </div>
       ) : (
-        <button
-          onClick={() => { setRenameVal(sel.name || ''); setRenaming(true); }}
-          className="font-label flex items-center gap-1.5 text-[12px] font-semibold text-[var(--rd-text-muted)]"
-        >
-          <PencilIcon size={13} /> Rename “{tabLabel(sel, programs.findIndex((p) => p.id === sel.id))}”
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => { setRenameVal(sel.name || ''); setRenaming(true); }}
+            className="font-label flex items-center gap-1.5 text-[12px] font-semibold text-[var(--rd-text-muted)]"
+          >
+            <PencilIcon size={13} /> Rename “{tabLabel(sel, programs.findIndex((p) => p.id === sel.id))}”
+          </button>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="font-label flex items-center gap-1.5 text-[12px] font-semibold text-[var(--rd-danger,#FF6B6B)]"
+          >
+            <TrashIcon size={13} /> Delete
+          </button>
+        </div>
       ))}
 
       {/* Week pills */}
@@ -314,6 +334,21 @@ export default function ProgramPage() {
       )}
 
       {/* New program creation */}
+      {/* Delete confirmation */}
+      {confirmDelete && sel && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center p-6" onClick={() => setConfirmDelete(false)}>
+          <div className="absolute inset-0" style={{ background: 'rgba(4,5,8,.6)', backdropFilter: 'blur(2px)' }} />
+          <div className="relative w-full max-w-sm rounded-[20px] border border-[var(--rd-border)] p-5" style={{ background: '#0F1117' }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-display text-[18px] font-bold text-[var(--rd-ink)]">Delete “{tabLabel(sel, programs.findIndex((p) => p.id === sel.id))}”?</h3>
+            <p className="mt-2 text-[13px] text-[var(--rd-text-muted)]">This removes the program and its routines. Your logged workout history is kept.</p>
+            <div className="mt-5 flex gap-2">
+              <button onClick={() => setConfirmDelete(false)} disabled={deleting} className="flex-1 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] py-3 text-[14px] font-semibold text-[var(--rd-text-secondary)]">Cancel</button>
+              <button onClick={deleteProgram} disabled={deleting} className="flex-1 rounded-[12px] py-3 text-[14px] font-semibold text-white disabled:opacity-60" style={{ background: 'var(--rd-danger,#E5484D)' }}>{deleting ? 'Deleting…' : 'Delete'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showNew && (
         <NewProgramSheet
           onClose={() => setShowNew(false)}
@@ -327,6 +362,14 @@ export default function ProgramPage() {
         />
       )}
     </div>
+  );
+}
+
+function TrashIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" /><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" /><path d="M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6" />
+    </svg>
   );
 }
 
