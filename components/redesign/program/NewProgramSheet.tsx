@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { CloseIcon } from '@/components/redesign/icons';
 
-// Deterministic program creation — builds the program in code (no LLM in the save
-// path). Collects a per-day workout type + equipment and posts to
-// /api/program/build.
+// Deterministic program creation — builds the program in code (no LLM). Collects
+// a free-text focus per training day, optionally per week, plus equipment, and
+// posts to /api/program/build.
 
 type Phase = 'form' | 'building' | 'error';
 
@@ -31,45 +31,47 @@ export function NewProgramSheet({
   const [name, setName] = useState('');
   const [weeks, setWeeks] = useState(1);
   const [days, setDays] = useState<number[]>([0, 2, 4]); // Mon / Wed / Fri
-  const [focus, setFocus] = useState<Record<number, string>>({ 0: 'Push', 2: 'Pull', 4: 'Legs' });
+  // week (1-based) -> weekday -> focus text
+  const [weekFocus, setWeekFocus] = useState<Record<number, Record<number, string>>>({ 1: { 0: 'Push', 2: 'Pull', 4: 'Legs' } });
+  const [sameEveryWeek, setSameEveryWeek] = useState(true);
+  const [editWeek, setEditWeek] = useState(1);
   const [gymType, setGymType] = useState<'full_gym' | 'own_gym'>('full_gym');
   const [equipment, setEquipment] = useState('');
   const [errMsg, setErrMsg] = useState('');
 
+  const sortedDays = [...days].sort((a, b) => a - b);
+  const curWeek = sameEveryWeek ? 1 : editWeek;
+  // Value for an input: this week's focus, falling back to week 1 as the default.
+  const focusVal = (d: number) => weekFocus[curWeek]?.[d] ?? (curWeek !== 1 ? weekFocus[1]?.[d] : undefined) ?? '';
+
+  const setFocus = (d: number, val: string) =>
+    setWeekFocus((prev) => ({ ...prev, [curWeek]: { ...(prev[curWeek] ?? {}), [d]: val } }));
+
   const toggleDay = (d: number) =>
-    setDays((prev) => {
-      const on = prev.includes(d);
-      const next = on ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b);
-      setFocus((f) => {
-        const nf = { ...f };
-        if (on) delete nf[d];
-        return nf;
-      });
-      return next;
-    });
+    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b)));
 
   const quickFill = (rot: string[]) =>
-    setFocus(() => {
-      const nf: Record<number, string> = {};
-      [...days].sort((a, b) => a - b).forEach((d, i) => { nf[d] = rot[i % rot.length]; });
-      return nf;
+    setWeekFocus((prev) => {
+      const wf: Record<number, string> = {};
+      sortedDays.forEach((d, i) => { wf[d] = rot[i % rot.length]; });
+      return { ...prev, [curWeek]: wf };
     });
 
   const create = async () => {
     if (!days.length || phase === 'building') return;
     setPhase('building');
     try {
-      const assignments = [...days].sort((a, b) => a - b).map((d) => ({ weekday: d, focus: (focus[d] || '').trim() || 'Full Body' }));
+      const assignments: { weekday: number; weekNumber?: number; focus: string }[] = [];
+      const focusFor = (w: number, d: number) => (weekFocus[w]?.[d] ?? weekFocus[1]?.[d] ?? '').trim() || 'Full Body';
+      if (sameEveryWeek || weeks === 1) {
+        sortedDays.forEach((d) => assignments.push({ weekday: d, focus: focusFor(1, d) }));
+      } else {
+        for (let w = 1; w <= weeks; w++) sortedDays.forEach((d) => assignments.push({ weekday: d, weekNumber: w, focus: focusFor(w, d) }));
+      }
       const res = await fetch('/api/program/build', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          totalWeeks: weeks,
-          assignments,
-          gymType,
-          equipmentText: gymType === 'own_gym' ? equipment.trim() : '',
-        }),
+        body: JSON.stringify({ name: name.trim(), totalWeeks: weeks, assignments, gymType, equipmentText: gymType === 'own_gym' ? equipment.trim() : '' }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setErrMsg(data?.error || 'Something went wrong. Please try again.'); setPhase('error'); return; }
@@ -80,8 +82,6 @@ export function NewProgramSheet({
       setPhase('error');
     }
   };
-
-  const sortedDays = [...days].sort((a, b) => a - b);
 
   return (
     <div className="absolute inset-0 z-[60] flex items-end" onClick={phase === 'building' ? undefined : onClose}>
@@ -121,6 +121,19 @@ export function NewProgramSheet({
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Vacation" maxLength={40} className="font-body mt-1.5 w-full rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3.5 py-3 text-[15px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none" />
               </div>
 
+              {/* Weeks */}
+              <div>
+                <label className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">WEEKS</label>
+                <div className="mt-1.5 flex gap-2">
+                  {WEEK_OPTS.map((wk) => {
+                    const on = wk === weeks;
+                    return (
+                      <button key={wk} onClick={() => { setWeeks(wk); if (wk === 1) { setSameEveryWeek(true); setEditWeek(1); } else if (editWeek > wk) setEditWeek(1); }} className="font-label flex-1 rounded-[11px] border py-2.5 text-[13px] font-semibold" style={{ borderColor: on ? 'var(--rd-ember)' : 'var(--rd-border)', background: on ? 'rgba(255,107,69,.1)' : 'var(--rd-card-glass)', color: on ? 'var(--rd-ember)' : 'var(--rd-text-muted)' }}>{wk} wk</button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Training days */}
               <div>
                 <label className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">TRAINING DAYS</label>
@@ -134,7 +147,7 @@ export function NewProgramSheet({
                 </div>
               </div>
 
-              {/* Per-day workout type */}
+              {/* Per-day (optionally per-week) focus */}
               {sortedDays.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between">
@@ -145,13 +158,36 @@ export function NewProgramSheet({
                       ))}
                     </div>
                   </div>
+
+                  {/* Same-every-week toggle + week tabs */}
+                  {weeks > 1 && (
+                    <div className="mt-2">
+                      <button onClick={() => setSameEveryWeek((v) => !v)} className="flex items-center gap-2">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-[5px] border" style={{ borderColor: sameEveryWeek ? 'var(--rd-ember)' : 'var(--rd-border-strong)', background: sameEveryWeek ? 'var(--rd-ember)' : 'transparent', color: '#0A0C10' }}>
+                          {sameEveryWeek && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>}
+                        </span>
+                        <span className="text-[13px] font-medium text-[var(--rd-text-secondary)]">Same every week</span>
+                      </button>
+                      {!sameEveryWeek && (
+                        <div className="mt-2 flex gap-2">
+                          {Array.from({ length: weeks }, (_, i) => i + 1).map((wk) => {
+                            const on = wk === editWeek;
+                            return (
+                              <button key={wk} onClick={() => setEditWeek(wk)} className="font-label flex-1 rounded-[10px] border py-1.5 text-[12px] font-semibold" style={{ borderColor: on ? 'var(--rd-ember)' : 'var(--rd-border)', background: on ? 'rgba(255,107,69,.1)' : 'var(--rd-card-glass)', color: on ? 'var(--rd-ember)' : 'var(--rd-text-muted)' }}>Wk {wk}</button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="mt-2 space-y-2">
                     {sortedDays.map((d) => (
-                      <div key={d} className="flex items-center gap-2">
+                      <div key={`${curWeek}-${d}`} className="flex items-center gap-2">
                         <span className="font-label w-9 shrink-0 text-[12px] font-bold text-[var(--rd-ink)]">{WD_FULL[d]}</span>
                         <input
-                          value={focus[d] ?? ''}
-                          onChange={(e) => setFocus((f) => ({ ...f, [d]: e.target.value }))}
+                          value={focusVal(d)}
+                          onChange={(e) => setFocus(d, e.target.value)}
                           placeholder="e.g. Push & Pull, Deadlifts & Back"
                           maxLength={60}
                           className="font-body min-w-0 flex-1 rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2.5 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none"
@@ -159,7 +195,9 @@ export function NewProgramSheet({
                       </div>
                     ))}
                   </div>
-                  <p className="font-label mt-1.5 text-[11px] text-[var(--rd-text-faint)]">Type each day’s focus — muscles or a lift. Unselected days are rest.</p>
+                  <p className="font-label mt-1.5 text-[11px] text-[var(--rd-text-faint)]">
+                    {weeks > 1 && !sameEveryWeek ? `Editing Week ${editWeek}. ` : ''}Type each day’s focus — muscles or a lift. Unselected days are rest.
+                  </p>
                 </div>
               )}
 
@@ -177,19 +215,6 @@ export function NewProgramSheet({
                 {gymType === 'own_gym' && (
                   <textarea value={equipment} onChange={(e) => setEquipment(e.target.value)} placeholder="e.g. dumbbells, pull-up bar, bench, resistance bands, kettlebell" rows={2} className="font-body mt-2 w-full resize-none rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3.5 py-3 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none" />
                 )}
-              </div>
-
-              {/* Weeks */}
-              <div>
-                <label className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">WEEKS</label>
-                <div className="mt-1.5 flex gap-2">
-                  {WEEK_OPTS.map((w) => {
-                    const on = w === weeks;
-                    return (
-                      <button key={w} onClick={() => setWeeks(w)} className="font-label flex-1 rounded-[11px] border py-2.5 text-[13px] font-semibold" style={{ borderColor: on ? 'var(--rd-ember)' : 'var(--rd-border)', background: on ? 'rgba(255,107,69,.1)' : 'var(--rd-card-glass)', color: on ? 'var(--rd-ember)' : 'var(--rd-text-muted)' }}>{w} wk</button>
-                    );
-                  })}
-                </div>
               </div>
             </div>
 
