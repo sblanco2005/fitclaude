@@ -16,7 +16,7 @@ const SPLIT_ROTATION: Record<SplitType, string[]> = {
   full_body: ['full_body'],
 };
 
-// workout_type → target muscle groups, in selection priority order.
+// Category / synonym → target muscle groups. Used to expand a free-text focus.
 const WT_MUSCLES: Record<string, string[]> = {
   push: ['chest', 'shoulders', 'triceps'],
   pull: ['back', 'biceps'],
@@ -26,31 +26,85 @@ const WT_MUSCLES: Record<string, string[]> = {
   full_body: ['full_body', 'chest', 'back', 'quadriceps', 'shoulders'],
 };
 
+// Direct muscle-name keywords (substring) → muscle group.
+const MUSCLE_KEYWORDS: [RegExp, string][] = [
+  [/chest|pec/, 'chest'],
+  [/\bback\b|lat|row/, 'back'],
+  [/shoulder|delt|press|ohp/, 'shoulders'],
+  [/bicep|curl/, 'biceps'],
+  [/tricep/, 'triceps'],
+  [/quad|squat/, 'quadriceps'],
+  [/hamstring|\bham\b|rdl/, 'hamstrings'],
+  [/glute/, 'glutes'],
+  [/calf|calv/, 'calves'],
+  [/core|\bab\b|abs/, 'core'],
+  [/deadlift/, 'back'],
+  [/bench/, 'chest'],
+];
+
 const TARGET_COUNT = 6;
 const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const singular = (w: string) => (w.length > 4 && w.endsWith('s') ? w.slice(0, -1) : w);
 
 type Ex = { id: string; name: string; muscleGroup: string; exerciseType: string; equipmentRequired: string | null };
 type TemplateItem = { name: string; muscle_group: string; sets: number; reps: string; is_primary: boolean; notes: string; _id: string | null };
 
-// Pick a coherent set of exercises for a workout_type. `pool` is equipment-filtered;
-// `all` is the fallback so a filter never leaves a muscle group empty.
-function pickExercises(wt: string, pool: Ex[], all: Ex[]): TemplateItem[] {
-  const muscles = WT_MUSCLES[wt] ?? ['full_body'];
+// Parse a free-text day focus ("Push & Pull", "Deadlifts & Back") into target
+// muscle groups. Falls back to full-body if nothing recognizable is found.
+function musclesForFocus(focus: string): string[] {
+  const t = focus.toLowerCase();
+  const set = new Set<string>();
+  // Category words first (push/pull/legs/upper/lower/full body/arms).
+  if (/\bpush\b/.test(t)) WT_MUSCLES.push.forEach((m) => set.add(m));
+  if (/\bpull\b/.test(t)) WT_MUSCLES.pull.forEach((m) => set.add(m));
+  if (/\blegs?\b|lower/.test(t)) WT_MUSCLES.legs.forEach((m) => set.add(m));
+  if (/\bupper\b/.test(t)) WT_MUSCLES.upper.forEach((m) => set.add(m));
+  if (/full.?body/.test(t)) WT_MUSCLES.full_body.forEach((m) => set.add(m));
+  if (/\barms?\b/.test(t)) { set.add('biceps'); set.add('triceps'); }
+  // Direct muscle / lift keywords.
+  for (const [re, m] of MUSCLE_KEYWORDS) if (re.test(t)) set.add(m);
+  return set.size ? Array.from(set) : WT_MUSCLES.full_body;
+}
+
+// Best-effort single workout_type label for analytics/grouping.
+function typeForFocus(focus: string): string {
+  const t = focus.toLowerCase();
+  for (const k of ['push', 'pull', 'legs', 'upper', 'lower']) if (new RegExp(`\\b${k}\\b`).test(t)) return k;
+  if (/full.?body/.test(t)) return 'full_body';
+  return 'custom';
+}
+
+// Exercises explicitly named in the focus text (e.g. "deadlift" → Barbell Deadlift).
+function explicitMatches(focus: string, src: Ex[]): Ex[] {
+  const words = new Set(focus.toLowerCase().split(/[^a-z]+/).filter((x) => x.length >= 4).map(singular));
+  if (!words.size) return [];
+  return src.filter((e) => e.name.toLowerCase().split(/[^a-z]+/).some((w) => w.length >= 4 && words.has(singular(w))));
+}
+
+// Build a coherent set of exercises for a free-text focus. `pool` is
+// equipment-filtered; `all` is the fallback so filtering never empties a group.
+function pickForFocus(focus: string, pool: Ex[], all: Ex[]): TemplateItem[] {
+  const muscles = musclesForFocus(focus);
   const chosen: { e: Ex; primary: boolean }[] = [];
   const used = new Set<string>();
-
   const forMuscle = (m: string, src: Ex[]) => src.filter((e) => e.muscleGroup === m && !used.has(e.id));
 
-  // Pass 1 — one compound per muscle group as the primary lift.
+  // Explicitly-named lifts first (as primary if compound), max 3.
+  explicitMatches(focus, pool.length ? pool : all).slice(0, 3).forEach((e) => {
+    if (!used.has(e.id)) { chosen.push({ e, primary: e.exerciseType === 'compound' }); used.add(e.id); }
+  });
+
+  // One compound per target muscle as the primary lift.
   for (const m of muscles) {
-    let compounds = forMuscle(m, pool).filter((e) => e.exerciseType === 'compound');
-    if (!compounds.length) compounds = forMuscle(m, all).filter((e) => e.exerciseType === 'compound');
-    if (!compounds.length) compounds = forMuscle(m, pool);
-    if (!compounds.length) compounds = forMuscle(m, all);
-    if (compounds.length) { chosen.push({ e: compounds[0], primary: true }); used.add(compounds[0].id); }
+    if (chosen.length >= TARGET_COUNT) break;
+    let c = forMuscle(m, pool).filter((e) => e.exerciseType === 'compound');
+    if (!c.length) c = forMuscle(m, all).filter((e) => e.exerciseType === 'compound');
+    if (!c.length) c = forMuscle(m, pool);
+    if (!c.length) c = forMuscle(m, all);
+    if (c.length) { chosen.push({ e: c[0], primary: true }); used.add(c[0].id); }
   }
 
-  // Pass 2 — fill with accessories, round-robin across the muscle groups.
+  // Fill with accessories, round-robin across the muscle groups.
   let guard = 0;
   while (chosen.length < TARGET_COUNT && guard < muscles.length * 5) {
     const m = muscles[guard % muscles.length];
@@ -79,14 +133,17 @@ export const POST = withAuth(async (request, user) => {
     const body = await request.json();
     const name: string = (typeof body.name === 'string' ? body.name.trim() : '').slice(0, 40) || 'New program';
     const totalWeeks = Math.max(1, Math.min(4, Number(body.totalWeeks) || 1));
-    // Preferred: explicit per-day assignments [{weekday, workoutType}]. Falls back
-    // to a split rotation over trainingDays (legacy / safety).
-    const validWt = (wt: unknown): wt is string => typeof wt === 'string' && wt in WT_MUSCLES;
+    // Preferred: per-day assignments [{weekday, focus}] where focus is free text
+    // ("Push & Pull", "Deadlifts & Back"). Falls back to workoutType, then to a
+    // split rotation over trainingDays (legacy / safety). Value stored = focus text.
     const assignByWeekday = new Map<number, string>();
     if (Array.isArray(body.assignments)) {
       for (const a of body.assignments) {
         if (a && Number.isInteger(a.weekday) && a.weekday >= 0 && a.weekday <= 6) {
-          assignByWeekday.set(a.weekday, validWt(a.workoutType) ? a.workoutType : 'full_body');
+          const focus = (typeof a.focus === 'string' && a.focus.trim())
+            ? a.focus.trim().slice(0, 60)
+            : (typeof a.workoutType === 'string' && a.workoutType ? a.workoutType : 'full body');
+          assignByWeekday.set(a.weekday, focus);
         }
       }
     } else {
@@ -138,16 +195,17 @@ export const POST = withAuth(async (request, user) => {
 
       for (let w = 1; w <= totalWeeks; w++) {
         for (let wd = 0; wd <= 6; wd++) {
-          const wt = assignByWeekday.get(wd);
-          if (!wt) {
+          const focus = assignByWeekday.get(wd);
+          if (!focus) {
             await tx.programDay.create({
               data: { programId: program.id, weekday: wd, weekNumber: w, dayType: 'rest', dayLabel: 'Rest' },
             });
             continue;
           }
-          const template = pickExercises(wt, pool, exercises);
-          const muscles = [...new Set(template.filter((t) => t.is_primary).map((t) => t.muscle_group))].slice(0, 3);
-          const dayLabel = (muscles.length ? muscles : [wt]).map(titleCase).join(' + ');
+          const template = pickForFocus(focus, pool, exercises);
+          // The day is labeled with the user's own focus text ("Deadlifts & Back").
+          const dayLabel = titleCase(focus);
+          const wtLabel = typeForFocus(focus);
 
           const day = await tx.programDay.create({
             data: {
@@ -156,7 +214,7 @@ export const POST = withAuth(async (request, user) => {
               weekNumber: w,
               dayType: 'coached',
               dayLabel,
-              workoutType: wt,
+              workoutType: wtLabel,
               exerciseTemplate: JSON.stringify(template.map(({ _id, ...t }) => t)),
             },
             select: { id: true },
@@ -167,7 +225,7 @@ export const POST = withAuth(async (request, user) => {
             data: {
               userId: user.id,
               name: dayLabel.toLowerCase(),
-              workoutType: wt,
+              workoutType: wtLabel,
               category: 'lifting',
               source: 'coach',
               displayId: displayId++,
