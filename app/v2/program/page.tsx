@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { ProgramDay, DayType } from '@/types';
+import type { ProgramDay, DayType, TrainingProgram } from '@/types';
 import { useProgram, daySubtitle, DAY_ACCENT, DAY_TYPE_LABEL, todayWeekdayMon, type ProgramSummary } from '@/components/redesign/program/useProgram';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { NewProgramSheet } from '@/components/redesign/program/NewProgramSheet';
@@ -17,7 +17,8 @@ const tabLabel = (p: ProgramSummary, i: number) => p.name || (p.isActive ? 'Main
 export default function ProgramPage() {
   const router = useRouter();
   const { loading, active, programs } = useProgram();
-  const { bumpDataVersion } = useFitClaude();
+  const { bumpDataVersion, dataVersion } = useFitClaude();
+  const [selFull, setSelFull] = useState<TrainingProgram | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [week, setWeek] = useState(1);
   const [detail, setDetail] = useState<ProgramDay | null>(null);
@@ -51,9 +52,22 @@ export default function ProgramPage() {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') setShowNew(true);
   }, []);
 
-  const days = isViewingActive && active
-    ? active.days.filter((d) => d.weekNumber === week)
-    : (sel?.days ?? []).filter((d) => d.weekNumber === week);
+  // Load full days (with exercises) for a non-active selected program so it can
+  // be inspected without making it Main.
+  useEffect(() => {
+    if (!selId || isViewingActive) { setSelFull(null); return; }
+    let cancelled = false;
+    fetch(`/api/program?programId=${selId}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled) setSelFull(d?.id ? d : null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [selId, isViewingActive, dataVersion]);
+
+  const days = ((isViewingActive && active ? active.days : selFull ? selFull.days : (sel?.days ?? [])) as ProgramDay[])
+    .filter((d) => d.weekNumber === week);
+  // Detail (exercises) is available for the active program or a loaded bench program.
+  const canViewDetail = isViewingActive || !!selFull;
 
   const rows = WEEKDAYS.map((label, wd) => ({ wd, label, day: days.find((d) => d.weekday === wd) as ProgramDay | undefined }));
   const todayWd = todayWeekdayMon();
@@ -238,9 +252,9 @@ export default function ProgramPage() {
           const isToday = isViewingActive && week === currentWeek && wd === todayWd;
           const dayLabel = day?.dayLabel || 'Rest';
           const sub = day
-            ? (isViewingActive ? daySubtitle(day) : (type === 'rest' ? '' : DAY_TYPE_LABEL[type]))
+            ? (canViewDetail ? daySubtitle(day) : (type === 'rest' ? '' : DAY_TYPE_LABEL[type]))
             : '';
-          const tappable = isViewingActive && !!day && type !== 'rest';
+          const tappable = canViewDetail && !!day && type !== 'rest';
           return (
             <div
               key={wd}
@@ -291,11 +305,11 @@ export default function ProgramPage() {
             <DayExercises day={detail} />
 
             <div className="mt-5 space-y-2">
-              {detail.dayType === 'coached' && detail.routineId && week === currentWeek && todayWd === detail.weekday ? (
+              {isViewingActive && detail.dayType === 'coached' && detail.routineId && week === currentWeek && todayWd === detail.weekday ? (
                 <button onClick={() => hitIt(detail.routineId)} disabled={starting} className="grad-ember flex h-12 w-full items-center justify-center rounded-[13px] text-[15px] font-semibold text-[#0A0C10] disabled:opacity-60">{starting ? 'Starting…' : 'Hit it'}</button>
               ) : detail.dayType === 'coached' && detail.routineId ? (
                 <button onClick={() => router.push(`/v2/train/routine/${detail.routineId}`)} className="rounded-[13px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] py-3 text-[14px] font-semibold text-[var(--rd-text-secondary)] w-full">View routine</button>
-              ) : detail.dayType !== 'rest' ? (
+              ) : isViewingActive && detail.dayType !== 'rest' ? (
                 <button onClick={() => router.push('/v2/coach')} className="rounded-[13px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] py-3 text-[14px] font-semibold text-[var(--rd-text-secondary)] w-full">Log with Coach</button>
               ) : null}
 
