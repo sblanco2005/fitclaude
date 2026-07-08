@@ -133,17 +133,25 @@ export const POST = withAuth(async (request, user) => {
     const body = await request.json();
     const name: string = (typeof body.name === 'string' ? body.name.trim() : '').slice(0, 40) || 'New program';
     const totalWeeks = Math.max(1, Math.min(4, Number(body.totalWeeks) || 1));
-    // Preferred: per-day assignments [{weekday, focus}] where focus is free text
-    // ("Push & Pull", "Deadlifts & Back"). Falls back to workoutType, then to a
-    // split rotation over trainingDays (legacy / safety). Value stored = focus text.
-    const assignByWeekday = new Map<number, string>();
+    // Per-day assignments [{weekday, focus, weekNumber?}]. focus is free text
+    // ("Push & Pull", "Deadlifts & Back"). An assignment WITH weekNumber applies
+    // only to that week; WITHOUT weekNumber it applies to every week. Falls back
+    // to a split rotation over trainingDays (legacy / safety).
+    const perWeek = new Map<number, Map<number, string>>(); // week -> (weekday -> focus)
+    const allWeeks = new Map<number, string>(); // weekday -> focus, applies to every week
+    const focusOf = (a: { focus?: unknown; workoutType?: unknown }) =>
+      (typeof a.focus === 'string' && a.focus.trim())
+        ? a.focus.trim().slice(0, 60)
+        : (typeof a.workoutType === 'string' && a.workoutType ? a.workoutType : 'full body');
     if (Array.isArray(body.assignments)) {
       for (const a of body.assignments) {
         if (a && Number.isInteger(a.weekday) && a.weekday >= 0 && a.weekday <= 6) {
-          const focus = (typeof a.focus === 'string' && a.focus.trim())
-            ? a.focus.trim().slice(0, 60)
-            : (typeof a.workoutType === 'string' && a.workoutType ? a.workoutType : 'full body');
-          assignByWeekday.set(a.weekday, focus);
+          if (Number.isInteger(a.weekNumber) && a.weekNumber >= 1) {
+            if (!perWeek.has(a.weekNumber)) perWeek.set(a.weekNumber, new Map());
+            perWeek.get(a.weekNumber)!.set(a.weekday, focusOf(a));
+          } else {
+            allWeeks.set(a.weekday, focusOf(a));
+          }
         }
       }
     } else {
@@ -152,10 +160,10 @@ export const POST = withAuth(async (request, user) => {
         ? [...new Set(body.trainingDays.filter((d: unknown) => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6))].sort((a, b) => (a as number) - (b as number)) as number[]
         : [];
       const rotation = SPLIT_ROTATION[splitType];
-      trainingDays.forEach((wd, i) => assignByWeekday.set(wd, rotation[i % rotation.length]));
+      trainingDays.forEach((wd, i) => allWeeks.set(wd, rotation[i % rotation.length]));
     }
 
-    if (!assignByWeekday.size) return NextResponse.json({ error: 'Pick at least one training day' }, { status: 400 });
+    if (!perWeek.size && !allWeeks.size) return NextResponse.json({ error: 'Pick at least one training day' }, { status: 400 });
 
     // Cap: 3 programs per user.
     const existing = await prisma.trainingProgram.findMany({ where: { userId: user.id }, select: { id: true } });
@@ -195,7 +203,7 @@ export const POST = withAuth(async (request, user) => {
 
       for (let w = 1; w <= totalWeeks; w++) {
         for (let wd = 0; wd <= 6; wd++) {
-          const focus = assignByWeekday.get(wd);
+          const focus = perWeek.get(w)?.get(wd) ?? allWeeks.get(wd);
           if (!focus) {
             await tx.programDay.create({
               data: { programId: program.id, weekday: wd, weekNumber: w, dayType: 'rest', dayLabel: 'Rest' },
