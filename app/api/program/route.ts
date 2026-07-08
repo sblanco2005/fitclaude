@@ -167,7 +167,23 @@ export const DELETE = withAuth(async (request, user) => {
       return NextResponse.json({ error: 'No program' }, { status: 404 });
     }
 
-    await prisma.trainingProgram.delete({ where: { id: program.id } });
+    await prisma.$transaction(async (tx) => {
+      const dayIds = (await tx.programDay.findMany({ where: { programId: program.id }, select: { id: true } })).map((d) => d.id);
+      if (dayIds.length) {
+        // Delete the routine TEMPLATES linked to this program (incomplete, "Hit It"-able
+        // routines shown on Train). Completed sessions are training history — they're
+        // preserved (their programDayId is nulled when the days cascade-delete).
+        await tx.workout.deleteMany({ where: { programDayId: { in: dayIds }, completed: false } });
+      }
+      await tx.trainingProgram.delete({ where: { id: program.id } });
+
+      // If we removed the active Main, promote the most recent remaining program.
+      if (program.isActive) {
+        const next = await tx.trainingProgram.findFirst({ where: { userId: user.id }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+        if (next) await tx.trainingProgram.update({ where: { id: next.id }, data: { isActive: true } });
+      }
+    });
+
     return NextResponse.json({ deleted: true });
   } catch (error) {
     console.error('Failed to delete program:', error);
