@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import type { ProgramDay, DayType } from '@/types';
 import { useProgram, daySubtitle, DAY_ACCENT, DAY_TYPE_LABEL, todayWeekdayMon, type ProgramSummary } from '@/components/redesign/program/useProgram';
 import { useFitClaude } from '@/context/FitClaudeContext';
+import { NewProgramSheet } from '@/components/redesign/program/NewProgramSheet';
 import { ScreenHeader } from '@/components/redesign/ui';
-import { ChevronLeftIcon, CloseIcon } from '@/components/redesign/icons';
+import { ChevronLeftIcon, CloseIcon, PlusIcon } from '@/components/redesign/icons';
 
-// Screen 14 · Program — accent: ember (Phase 1: view)
+// Screen 14 · Program — accent: ember
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const titleCase = (s?: string | null) => (s ? s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '');
-const benchName = (p: ProgramSummary, i: number) => p.name || `Program ${i + 1}`;
+const tabLabel = (p: ProgramSummary, i: number) => p.name || (p.isActive ? 'Main' : `Program ${i + 1}`);
 
 export default function ProgramPage() {
   const router = useRouter();
@@ -23,6 +24,9 @@ export default function ProgramPage() {
   const [starting, setStarting] = useState(false);
   const [moving, setMoving] = useState(false);
   const [moveBusy, setMoveBusy] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const activeSummary = programs.find((p) => p.isActive) ?? null;
   const selId = selectedId ?? activeSummary?.id ?? programs[0]?.id ?? null;
@@ -52,6 +56,18 @@ export default function ProgramPage() {
   };
 
   const closeDetail = () => { setDetail(null); setMoving(false); };
+
+  const makeMain = async (id: string) => {
+    if (switching) return;
+    setSwitching(true);
+    const ok = await fetch('/api/program', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ programId: id }),
+    }).then((r) => r.ok).catch(() => false);
+    setSwitching(false);
+    if (ok) { setSelectedId(null); bumpDataVersion(); }
+  };
 
   const moveDay = async (toWeekday: number) => {
     if (!detail || moveBusy) return;
@@ -89,22 +105,35 @@ export default function ProgramPage() {
         onBack={() => router.push('/v2')}
       />
 
-      {/* Program switcher */}
-      {programs.length > 1 && (
-        <div className="scrollbar-hide -mx-5 flex gap-2 overflow-x-auto px-5">
-          {programs.map((p, i) => {
-            const on = p.id === selId;
-            return (
-              <button
-                key={p.id}
-                onClick={() => { setSelectedId(p.id); }}
-                className="font-label shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] font-semibold"
-                style={{ borderColor: on ? 'transparent' : 'var(--rd-border)', background: on ? 'var(--rd-ember)' : 'var(--rd-card-glass)', color: on ? '#0A0C10' : 'var(--rd-text-muted)' }}
-              >
-                {p.isActive ? '★ Main' : benchName(p, i)}
-              </button>
-            );
-          })}
+      {/* Program switcher + add */}
+      <div className="scrollbar-hide -mx-5 flex gap-2 overflow-x-auto px-5">
+        {programs.map((p, i) => {
+          const on = p.id === selId;
+          return (
+            <button
+              key={p.id}
+              onClick={() => { setSelectedId(p.id); }}
+              className="font-label shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] font-semibold"
+              style={{ borderColor: on ? 'transparent' : 'var(--rd-border)', background: on ? 'var(--rd-ember)' : 'var(--rd-card-glass)', color: on ? '#0A0C10' : 'var(--rd-text-muted)' }}
+            >
+              {p.isActive ? '★ ' : ''}{tabLabel(p, i)}
+            </button>
+          );
+        })}
+        {programs.length < 3 && (
+          <button
+            onClick={() => setShowNew(true)}
+            className="font-label flex shrink-0 items-center gap-1 rounded-full border border-dashed border-[var(--rd-border-strong)] px-3 py-1.5 text-[12px] font-semibold text-[var(--rd-text-muted)]"
+          >
+            <PlusIcon size={13} /> New
+          </button>
+        )}
+      </div>
+
+      {notice && (
+        <div className="flex items-center justify-between rounded-[12px] border px-3.5 py-2.5" style={{ borderColor: 'rgba(200,255,77,.28)', background: 'rgba(200,255,77,.1)' }}>
+          <span className="text-[13px] font-medium text-[var(--rd-ink)]">{notice}</span>
+          <button onClick={() => setNotice(null)} aria-label="Dismiss" className="text-[var(--rd-text-muted)]"><CloseIcon size={14} /></button>
         </div>
       )}
 
@@ -160,7 +189,16 @@ export default function ProgramPage() {
       </div>
 
       {!isViewingActive && sel && !sel.isActive && (
-        <p className="text-center text-[11px] text-[var(--rd-text-faint)]">Viewing a bench program — activate it to train from it.</p>
+        <div className="space-y-2 pt-1">
+          <p className="text-center text-[11px] text-[var(--rd-text-faint)]">This is a secondary program. Make it your Main to train from it.</p>
+          <button
+            onClick={() => makeMain(sel.id)}
+            disabled={switching}
+            className="grad-ember h-12 w-full rounded-[13px] text-[15px] font-semibold text-[#0A0C10] disabled:opacity-60"
+          >
+            {switching ? 'Switching…' : `Make “${tabLabel(sel, programs.findIndex((p) => p.id === sel.id))}” my Main`}
+          </button>
+        </div>
       )}
 
       {/* Day detail sheet */}
@@ -219,6 +257,15 @@ export default function ProgramPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* New program creation */}
+      {showNew && (
+        <NewProgramSheet
+          currentActive={active?.id ? { id: active.id, name: activeSummary?.name ?? null } : null}
+          onClose={() => setShowNew(false)}
+          onCreated={(newName) => { setShowNew(false); setSelectedId(null); setNotice(`“${newName}” created and set as your Main. Your old program is saved — switch anytime.`); }}
+        />
       )}
     </div>
   );
