@@ -7,6 +7,7 @@ import {
   type SessionExercise, type SetEntry,
 } from '@/components/redesign/session/useSession';
 import { FinishRate } from '@/components/redesign/session/FinishRate';
+import { YouTubeAutoplay } from '@/components/redesign/session/YouTubeAutoplay';
 import { CheckIcon, CloseIcon, PlusIcon, MinusIcon, PlayIcon, ChevronLeftIcon, ArrowRightIcon, SpinIcon } from '@/components/redesign/icons';
 
 // Screen 03 · Hit It (live workout) — accent: ember
@@ -148,9 +149,8 @@ export default function SessionPage() {
               ) : demo === 'video' ? (
                 <div>
                   <div className="aspect-video w-full">
-                    {/* mute=1 + playsinline=1 are REQUIRED for iOS to autoplay; without mute
-                        Safari/WKWebView blocks autoplay and just shows the play button. */}
-                    <iframe className="h-full w-full" src={`https://www.youtube.com/embed/${ex.youtubeId}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&controls=1`} title={ex.name} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                    {/* Driven by the YT IFrame API so it actually autoplays muted on iOS. */}
+                    <YouTubeAutoplay key={ex.youtubeId} videoId={ex.youtubeId!} title={ex.name} />
                   </div>
                   <a href={`https://youtube.com/watch?v=${ex.youtubeId}`} target="_blank" rel="noreferrer" className="font-label block px-3 py-1.5 text-center text-[10px] font-semibold text-[var(--rd-text-faint)]">
                     Open in YouTube ↗
