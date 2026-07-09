@@ -7,7 +7,7 @@ import { MacroBar } from '@/components/redesign/nutrition/MacroBar';
 import { useNutrition, type MealItem } from '@/components/redesign/nutrition/useNutrition';
 import { BarcodeScanner } from '@/components/redesign/nutrition/BarcodeScanner';
 import { ScreenHeader, Pill } from '@/components/redesign/ui';
-import { PlusIcon, BarcodeIcon, CheckIcon, SpinIcon } from '@/components/redesign/icons';
+import { PlusIcon, BarcodeIcon, CheckIcon, SpinIcon, DropletIcon } from '@/components/redesign/icons';
 import { useToast } from '@/components/ui/Toast';
 
 // Screen 04 · Nutrition ("Fuel") — accent: lime
@@ -138,11 +138,23 @@ export default function FuelPage() {
         )}
       </section>
 
-      {/* Quick-log bar */}
-      <form onSubmit={submit} className="sticky bottom-2 flex items-center gap-2 rounded-full border border-[var(--rd-border)] bg-[var(--rd-card)] p-1.5 pl-4">
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={n.logging ? 'Logging…' : '"a handful of almonds…"'} disabled={n.logging} className="font-body min-w-0 flex-1 bg-transparent text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:outline-none" />
-        <button type="submit" disabled={n.logging || !input.trim()} aria-label="Log meal" className="grad-lime flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#0A0C10] disabled:opacity-50">
-          <PlusIcon size={18} />
+      {/* Quick-log bar — the primary "log food here" input, styled in the lime
+          Fuel accent so it stands out from the food cards. */}
+      <form
+        onSubmit={submit}
+        className="sticky bottom-2 flex items-center gap-2.5 rounded-[16px] border p-2 pl-3.5"
+        style={{ borderColor: 'rgba(200,255,77,.5)', background: 'rgba(200,255,77,.09)', boxShadow: '0 10px 34px -10px rgba(200,255,77,.3)' }}
+      >
+        <DropletIcon size={19} className="shrink-0 text-[var(--rd-lime)]" />
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={n.logging ? 'Logging…' : 'Log food — “a handful of almonds”'}
+          disabled={n.logging}
+          className="font-body min-w-0 flex-1 bg-transparent text-[15px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-muted)] focus:outline-none"
+        />
+        <button type="submit" disabled={n.logging || !input.trim()} aria-label="Log meal" className="grad-lime flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] text-[#0A0C10] disabled:opacity-50">
+          <PlusIcon size={20} />
         </button>
       </form>
 
