@@ -143,7 +143,8 @@ export default function FuelPage() {
       <form
         onSubmit={submit}
         className="sticky bottom-2 flex items-center gap-2.5 rounded-[16px] border p-2 pl-3.5"
-        style={{ borderColor: 'rgba(200,255,77,.5)', background: 'rgba(200,255,77,.09)', boxShadow: '0 10px 34px -10px rgba(200,255,77,.3)' }}
+        // Opaque base (so scrolled cards don't show through) with the lime tint on top.
+        style={{ borderColor: 'rgba(200,255,77,.5)', background: 'linear-gradient(rgba(200,255,77,.1), rgba(200,255,77,.1)), #0C0E12', boxShadow: '0 10px 34px -10px rgba(200,255,77,.35)' }}
       >
         <DropletIcon size={19} className="shrink-0 text-[var(--rd-lime)]" />
         <input
