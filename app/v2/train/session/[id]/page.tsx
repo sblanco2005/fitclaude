@@ -99,15 +99,17 @@ export default function SessionPage() {
   };
 
   return (
-    <div className="animate-fadeup space-y-4">
-      {/* Top bar */}
+    <div className="animate-fadeup space-y-4 pb-28">
+      {/* Top bar — Finish lives here (deliberate), not as a big bottom button. */}
       <div className="flex items-center justify-between pt-1">
-        <button onClick={() => setFinishing(true)} aria-label="Finish" className="text-[var(--rd-text-muted)]"><CloseIcon size={22} /></button>
+        <span className="font-label text-[16px] font-bold text-[var(--rd-ink)]">{fmtTime(elapsed)}</span>
         <div className="text-center">
           <p className="font-label text-[9px] tracking-[.16em] text-[var(--rd-ember)]">IN PROGRESS</p>
           <p className="text-[13px] font-semibold text-[var(--rd-ink)]">{s.name}</p>
         </div>
-        <span className="font-label text-[16px] font-bold text-[var(--rd-ink)]">{fmtTime(elapsed)}</span>
+        <button onClick={() => setFinishing(true)} className="font-label flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold" style={{ borderColor: 'rgba(255,107,69,.45)', background: 'rgba(255,107,69,.1)', color: 'var(--rd-ember)' }}>
+          <CheckIcon size={13} /> Finish
+        </button>
       </div>
 
       {/* Current exercise card */}
@@ -209,7 +211,7 @@ export default function SessionPage() {
         {/* Sets */}
         <div className="mt-4 space-y-2">
           <div className="font-label grid grid-cols-[28px_1fr_1fr_24px] gap-2 px-1 text-[9px] tracking-[.1em] text-[var(--rd-text-faint)]">
-            <span>SET</span><span>LAST TIME</span><span>THIS SET</span><span />
+            <span>SET</span><span>{perSide && ex.isBarbell ? 'PER SIDE' : 'LAST TIME'}</span><span>THIS SET</span><span />
           </div>
           {ex.sets.map((set, i) =>
             i === activeIdx ? (
@@ -224,11 +226,12 @@ export default function SessionPage() {
                 onLog={() => {
                   const cur = ex.sets[i];
                   s.updateSet(safeIdx, i, { done: true });
-                  const nextUnlogged = ex.sets.findIndex((st, j) => j > i && !st.done);
-                  if (nextUnlogged >= 0) {
-                    // carry the weight/reps forward so the next set is pre-filled
-                    s.updateSet(safeIdx, nextUnlogged, { weightLb: cur.weightLb, reps: cur.reps });
-                    setActiveSet(nextUnlogged);
+                  // Always advance to the immediate next set (even if it's already
+                  // logged, so you can review/edit it); pre-fill it only if empty.
+                  const nextIdx = i + 1;
+                  if (nextIdx < ex.sets.length) {
+                    if (!ex.sets[nextIdx].done) s.updateSet(safeIdx, nextIdx, { weightLb: cur.weightLb, reps: cur.reps });
+                    setActiveSet(nextIdx);
                   } else {
                     setActiveSet(null);
                   }
@@ -240,6 +243,8 @@ export default function SessionPage() {
                 n={i + 1}
                 set={set}
                 unit={unit}
+                perSide={perSide && ex.isBarbell}
+                barDisplay={barDisplay}
                 onSelect={() => selectSet(i)}
                 onToggle={() => s.updateSet(safeIdx, i, { done: !set.done })}
               />
@@ -254,17 +259,6 @@ export default function SessionPage() {
         </div>
       </section>
 
-      {/* Next up */}
-      {next && (
-        <section className="rd-card flex items-center justify-between p-4">
-          <div>
-            <p className="font-label text-[9px] tracking-[.14em] text-[var(--rd-text-faint)]">NEXT UP</p>
-            <p className="mt-0.5 text-[14px] font-semibold text-[var(--rd-ink)]">{next.name}</p>
-          </div>
-          <button onClick={skip} className="text-[var(--rd-ember)]" aria-label="Go to next"><ArrowRightIcon size={20} /></button>
-        </section>
-      )}
-
       {/* Action toolbar */}
       <div className="flex gap-1.5">
         <ToolBtn label="Video" onClick={() => setDemo('video')} disabled={!hasVideo}>
@@ -277,10 +271,21 @@ export default function SessionPage() {
         <ToolBtn label="Delete" color="#FF6B6B" onClick={() => s.removeExercise(safeIdx)}><CloseIcon size={16} /></ToolBtn>
       </div>
 
-      {/* Finish bar */}
+      {/* Bottom bar — go to the NEXT exercise (prominent, clickable). On the last
+          exercise there's no next, so it becomes Finish. Finish is also at the top. */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center">
         <div className="pointer-events-auto w-full max-w-[430px] px-5 pb-6 pt-2" style={{ background: 'linear-gradient(180deg, transparent, var(--rd-bg) 40%)' }}>
-          <button onClick={() => setFinishing(true)} className="grad-ember flex h-12 w-full items-center justify-center rounded-[14px] text-[15px] font-semibold text-[#0A0C10]" style={{ boxShadow: 'var(--rd-glow-ember)' }}>Finish &amp; rate workout</button>
+          {next ? (
+            <button onClick={skip} className="flex h-14 w-full items-center justify-between rounded-[14px] border px-5 text-left" style={{ borderColor: 'rgba(255,107,69,.45)', background: 'rgba(255,107,69,.12)', boxShadow: '0 10px 30px -12px rgba(255,107,69,.4)' }}>
+              <span className="min-w-0">
+                <span className="font-label block text-[9px] tracking-[.16em] text-[var(--rd-ember)]">NEXT UP</span>
+                <span className="block truncate text-[15px] font-bold text-[var(--rd-ink)]">{next.name}</span>
+              </span>
+              <ArrowRightIcon size={22} className="shrink-0 text-[var(--rd-ember)]" />
+            </button>
+          ) : (
+            <button onClick={() => setFinishing(true)} className="grad-ember flex h-12 w-full items-center justify-center rounded-[14px] text-[15px] font-semibold text-[#0A0C10]" style={{ boxShadow: 'var(--rd-glow-ember)' }}>Finish &amp; rate workout</button>
+          )}
         </div>
       </div>
 
@@ -302,7 +307,12 @@ function ToolBtn({ label, color, active, disabled, onClick, children }: {
 }
 
 // Compact row for done / upcoming sets — tap anywhere to open it for editing.
-function CompactRow({ n, set, unit, onSelect, onToggle }: { n: number; set: SetEntry; unit: Unit; onSelect: () => void; onToggle: () => void }) {
+function CompactRow({ n, set, unit, perSide, barDisplay, onSelect, onToggle }: { n: number; set: SetEntry; unit: Unit; perSide: boolean; barDisplay: number; onSelect: () => void; onToggle: () => void }) {
+  const toDisp = (lb: number) => (unit === 'lb' ? lb : lbToKg(lb));
+  const perSideVal = Math.max(0, Math.round((toDisp(set.weightLb) - barDisplay) / 2));
+  const midText = perSide
+    ? (set.weightLb > 0 ? `2×${perSideVal}${unit} /side` : '—')
+    : (set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—');
   return (
     <div
       role="button"
@@ -312,7 +322,7 @@ function CompactRow({ n, set, unit, onSelect, onToggle }: { n: number; set: SetE
       style={{ WebkitUserSelect: 'none', WebkitTapHighlightColor: 'transparent' }}
     >
       <span className="font-num text-[13px] font-bold text-[var(--rd-text-muted)]">{n}</span>
-      <span className="font-label text-[12px] text-[var(--rd-text-faint)]">{set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—'}</span>
+      <span className="font-label text-[12px]" style={{ color: perSide ? 'var(--rd-ember)' : 'var(--rd-text-faint)' }}>{midText}</span>
       <span className="font-label text-[12px]" style={{ color: set.done ? 'var(--rd-lime)' : 'var(--rd-text-faint)' }}>
         {set.done ? `${formatWeight(set.weightLb, unit)} × ${set.reps}` : 'tap to edit'}
       </span>
