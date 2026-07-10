@@ -96,7 +96,7 @@ export default function ProgramPage() {
     setRoutineOpts(Array.from(map.values()));
   };
 
-  const setDayRoutine = async (payload: { routineId: string } | { focus: string }) => {
+  const setDayRoutine = async (payload: { routineId: string } | { focus: string } | { rest: true }) => {
     if (!detail || changeBusy) return;
     setChangeBusy(true);
     const ok = await fetch(`/api/program/day/${detail.id}/routine`, {
@@ -404,6 +404,13 @@ export default function ProgramPage() {
                     </div>
                   </div>
                 )
+              )}
+
+              {/* Override the day to Rest */}
+              {isViewingActive && !moving && changing === null && detail.dayType !== 'rest' && (
+                <button onClick={() => setDayRoutine({ rest: true })} disabled={changeBusy} className="flex h-11 w-full items-center justify-center gap-2 rounded-[13px] border border-dashed border-[var(--rd-border-strong)] text-[13px] font-semibold text-[var(--rd-text-muted)] disabled:opacity-60">
+                  Make it a rest day
+                </button>
               )}
             </div>
           </div>
