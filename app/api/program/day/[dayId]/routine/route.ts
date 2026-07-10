@@ -18,6 +18,16 @@ export const POST = withAuth(async (request, user, params) => {
     const day = await prisma.programDay.findFirst({ where: { id: dayId, program: { userId: user.id } }, select: { id: true } });
     if (!day) return AuthErrors.notFound('Day');
 
+    // Override the day to Rest — clear its routine template (incomplete workout)
+    // and reset the day. Completed sessions stay as history.
+    if (body.rest === true) {
+      await prisma.$transaction(async (tx) => {
+        await tx.workout.deleteMany({ where: { programDayId: day.id, completed: false } });
+        await tx.programDay.update({ where: { id: day.id }, data: { dayType: 'rest', dayLabel: 'Rest', workoutType: null, exerciseTemplate: null } });
+      });
+      return NextResponse.json({ ok: true });
+    }
+
     let rows: Row[] = [];
     let dayLabel = 'Workout';
     let workoutType = 'custom';
