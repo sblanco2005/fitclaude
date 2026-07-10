@@ -8,7 +8,7 @@ import {
 } from '@/components/redesign/session/useSession';
 import { FinishRate } from '@/components/redesign/session/FinishRate';
 import { YouTubeAutoplay } from '@/components/redesign/session/YouTubeAutoplay';
-import { CheckIcon, CloseIcon, PlusIcon, MinusIcon, PlayIcon, ChevronLeftIcon, ArrowRightIcon, SpinIcon } from '@/components/redesign/icons';
+import { CheckIcon, CloseIcon, PlusIcon, MinusIcon, PlayIcon, ChevronLeftIcon, ArrowRightIcon } from '@/components/redesign/icons';
 
 // Screen 03 · Hit It (live workout) — accent: ember
 type Unit = 'kg' | 'lb';
@@ -149,14 +149,10 @@ export default function SessionPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={ex.gifUrl} alt={ex.name} className="max-h-[200px] w-full object-contain" onError={() => { setGifFailed(true); setDemo(hasVideo ? 'video' : 'unavailable'); }} />
               ) : demo === 'video' ? (
-                <div>
-                  <div className="aspect-video w-full">
-                    {/* Driven by the YT IFrame API so it actually autoplays muted on iOS. */}
-                    <YouTubeAutoplay key={ex.youtubeId} videoId={ex.youtubeId!} title={ex.name} />
-                  </div>
-                  <a href={`https://youtube.com/watch?v=${ex.youtubeId}`} target="_blank" rel="noreferrer" className="font-label block px-3 py-1.5 text-center text-[10px] font-semibold text-[var(--rd-text-faint)]">
-                    Open in YouTube ↗
-                  </a>
+                <div className="aspect-video w-full">
+                  {/* Driven by the YT IFrame API so it autoplays muted inline on iOS.
+                      No "Open in YouTube" link — keeps the user in-app. */}
+                  <YouTubeAutoplay key={ex.youtubeId} videoId={ex.youtubeId!} title={ex.name} />
                 </div>
               ) : (
                 <div className="px-4 py-6 text-center">
@@ -259,24 +255,17 @@ export default function SessionPage() {
         </div>
       </section>
 
-      {/* Action toolbar */}
-      <div className="flex gap-1.5">
-        <ToolBtn label="Video" onClick={() => setDemo('video')} disabled={!hasVideo}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C18 4.8 12 4.8 12 4.8s-6 0-7.7.5A2.7 2.7 0 0 0 2.4 7.2 28 28 0 0 0 2 12a28 28 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.7.5 7.7.5 7.7.5s6 0 7.7-.5a2.7 2.7 0 0 0 1.9-1.9A28 28 0 0 0 22 12a28 28 0 0 0-.4-4.8ZM10 15V9l5 3Z" /></svg>
-        </ToolBtn>
-        <ToolBtn label="Demo" color="var(--rd-lime)" active disabled={!hasGif && !hasVideo} onClick={openDemo}><PlayIcon size={16} /></ToolBtn>
-        <ToolBtn label="Swap" onClick={() => s.swapExercise(safeIdx)}><SpinIcon size={16} /></ToolBtn>
-        <ToolBtn label="Reorder" onClick={() => s.moveExercise(safeIdx, -1)}><ChevronLeftIcon size={16} className="rotate-90" /></ToolBtn>
-        <ToolBtn label="Skip" onClick={skip}><ArrowRightIcon size={16} /></ToolBtn>
-        <ToolBtn label="Delete" color="#FF6B6B" onClick={() => s.removeExercise(safeIdx)}><CloseIcon size={16} /></ToolBtn>
-      </div>
-
       {/* Bottom bar — go to the NEXT exercise (prominent, clickable). On the last
           exercise there's no next, so it becomes Finish. Finish is also at the top. */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center">
-        <div className="pointer-events-auto w-full max-w-[430px] px-5 pb-6 pt-2" style={{ background: 'linear-gradient(180deg, transparent, var(--rd-bg) 40%)' }}>
+        <div className="pointer-events-auto flex w-full max-w-[430px] gap-2 px-5 pb-6 pt-2" style={{ background: 'linear-gradient(180deg, transparent, var(--rd-bg) 40%)' }}>
+          {safeIdx > 0 && (
+            <button onClick={() => goTo(safeIdx - 1)} aria-label="Previous exercise" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] border" style={{ borderColor: 'var(--rd-border)', background: 'var(--rd-card)' }}>
+              <ChevronLeftIcon size={22} className="text-[var(--rd-text-secondary)]" />
+            </button>
+          )}
           {next ? (
-            <button onClick={skip} className="flex h-14 w-full items-center justify-between rounded-[14px] border px-5 text-left" style={{ borderColor: 'rgba(255,107,69,.45)', background: 'rgba(255,107,69,.12)', boxShadow: '0 10px 30px -12px rgba(255,107,69,.4)' }}>
+            <button onClick={skip} className="flex h-14 flex-1 items-center justify-between rounded-[14px] border px-5 text-left" style={{ borderColor: 'rgba(255,107,69,.45)', background: 'rgba(255,107,69,.12)', boxShadow: '0 10px 30px -12px rgba(255,107,69,.4)' }}>
               <span className="min-w-0">
                 <span className="font-label block text-[9px] tracking-[.16em] text-[var(--rd-ember)]">NEXT UP</span>
                 <span className="block truncate text-[15px] font-bold text-[var(--rd-ink)]">{next.name}</span>
@@ -284,25 +273,12 @@ export default function SessionPage() {
               <ArrowRightIcon size={22} className="shrink-0 text-[var(--rd-ember)]" />
             </button>
           ) : (
-            <button onClick={() => setFinishing(true)} className="grad-ember flex h-12 w-full items-center justify-center rounded-[14px] text-[15px] font-semibold text-[#0A0C10]" style={{ boxShadow: 'var(--rd-glow-ember)' }}>Finish &amp; rate workout</button>
+            <button onClick={() => setFinishing(true)} className="grad-ember flex h-14 flex-1 items-center justify-center rounded-[14px] text-[15px] font-semibold text-[#0A0C10]" style={{ boxShadow: 'var(--rd-glow-ember)' }}>Finish &amp; rate workout</button>
           )}
         </div>
       </div>
 
     </div>
-  );
-}
-
-function ToolBtn({ label, color, active, disabled, onClick, children }: {
-  label: string; color?: string; active?: boolean; disabled?: boolean; onClick: () => void; children: React.ReactNode;
-}) {
-  const c = color ?? 'var(--rd-text-muted)';
-  return (
-    <button onClick={onClick} disabled={disabled} className="flex flex-1 flex-col items-center gap-1 rounded-[12px] border py-2.5 disabled:opacity-30"
-      style={active ? { borderColor: 'rgba(200,255,77,.2)', background: 'rgba(200,255,77,.07)', color } : { borderColor: 'var(--rd-border)', background: 'var(--rd-card-glass)', color: c }}>
-      {children}
-      <span className="font-label text-[8px] font-semibold" style={{ color: active ? color : 'var(--rd-text-faint)' }}>{label}</span>
-    </button>
   );
 }
 
