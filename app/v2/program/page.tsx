@@ -280,7 +280,10 @@ export default function ProgramPage() {
           const sub = day
             ? (canViewDetail ? daySubtitle(day) : (type === 'rest' ? '' : DAY_TYPE_LABEL[type]))
             : '';
-          const tappable = canViewDetail && !!day && type !== 'rest';
+          // Non-rest days open on the active OR a loaded bench program (read-only);
+          // rest days open only on the active program, where they can be turned into
+          // a workout (Move / Change routine).
+          const tappable = !!day && (type !== 'rest' ? canViewDetail : isViewingActive);
           return (
             <div
               key={wd}
