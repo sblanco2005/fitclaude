@@ -8,9 +8,12 @@ export type CoachMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  image?: string; // data URL, for preview of an attached photo
   meal?: LoggedMeal;
   routine?: GeneratedRoutine;
 };
+
+export type ChatImage = { base64: string; mediaType: string; dataUrl: string };
 
 const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 let localId = 0;
@@ -96,17 +99,22 @@ export function useCoachChat(context: CoachContext = 'workout') {
   }, [scrollToBottom, context]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, image?: ChatImage) => {
       const clean = text.trim();
-      if (!clean || loading) return;
-      setMessages((m) => [...m, { id: nextId(), role: 'user', content: clean }]);
+      if ((!clean && !image) || loading) return;
+      setMessages((m) => [...m, { id: nextId(), role: 'user', content: clean, image: image?.dataUrl }]);
       setLoading(true);
       scrollToBottom();
       try {
         const r = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: clean, topic: context, timezone: tz() }),
+          body: JSON.stringify({
+            message: clean,
+            topic: context,
+            timezone: tz(),
+            ...(image ? { image_base64: image.base64, image_media_type: image.mediaType, use_vision: true } : {}),
+          }),
         });
         const data = r.ok ? await r.json() : { response: 'Something went wrong. Try again.' };
         const [meal, routine] = await Promise.all([
