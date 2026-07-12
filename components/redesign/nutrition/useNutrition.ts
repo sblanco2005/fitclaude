@@ -40,6 +40,7 @@ export type NutritionData = {
   weekBars: WeekBar[];
   refetch: () => Promise<void>;
   logText: (text: string) => Promise<void>;
+  logPhoto: (image: { base64: string; mediaType: string }, note?: string) => Promise<void>;
   logBarcode: (code: string) => Promise<'logged' | 'notfound' | 'error'>;
   editMeal: (id: string, patch: MealEdit) => Promise<boolean>;
   deleteMeal: (id: string) => Promise<boolean>;
@@ -126,6 +127,30 @@ export function useNutrition(): NutritionData {
     } finally {
       setLogging(false);
       setLocalVersion((v) => v + 1); // trigger refetch of profile+today
+    }
+  }, []);
+
+  const logPhoto = useCallback(async (image: { base64: string; mediaType: string }, note?: string) => {
+    if (!image?.base64) return;
+    setLogging(true);
+    try {
+      await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: (note && note.trim()) || 'Log this meal from the photo — estimate the calories and macros and log it.',
+          topic: 'nutrition',
+          timezone: tz(),
+          image_base64: image.base64,
+          image_media_type: image.mediaType,
+          use_vision: true,
+        }),
+      });
+    } catch {
+      /* ignore; refetch reflects state */
+    } finally {
+      setLogging(false);
+      setLocalVersion((v) => v + 1);
     }
   }, []);
 
@@ -284,6 +309,7 @@ export function useNutrition(): NutritionData {
     weekBars,
     refetch,
     logText,
+    logPhoto,
     logBarcode,
     editMeal,
     deleteMeal,

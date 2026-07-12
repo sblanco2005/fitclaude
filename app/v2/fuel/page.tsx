@@ -1,14 +1,24 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { RecentNutritionItem } from '@/types';
 import { MacroBar } from '@/components/redesign/nutrition/MacroBar';
 import { useNutrition, type MealItem } from '@/components/redesign/nutrition/useNutrition';
 import { BarcodeScanner } from '@/components/redesign/nutrition/BarcodeScanner';
 import { ScreenHeader, Pill } from '@/components/redesign/ui';
-import { PlusIcon, BarcodeIcon, CheckIcon, SpinIcon, DropletIcon } from '@/components/redesign/icons';
+import { PlusIcon, BarcodeIcon, CheckIcon, SpinIcon, CloseIcon } from '@/components/redesign/icons';
 import { useToast } from '@/components/ui/Toast';
+import { readImageCompressed, type CompressedImage } from '@/lib/image';
+
+function CameraIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  );
+}
 
 // Screen 04 · Nutrition ("Fuel") — accent: lime
 const MEAL_STYLE: Record<string, { letter: string; color: string; tint: string }> = {
@@ -30,6 +40,9 @@ export default function FuelPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [photo, setPhoto] = useState<CompressedImage | null>(null);
+  const [attaching, setAttaching] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (view === 'recent') n.fetchRecent();
@@ -38,11 +51,23 @@ export default function FuelPage() {
 
   const over = n.remaining < 0;
 
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setAttaching(true);
+    try { setPhoto(await readImageCompressed(f)); } catch { /* ignore */ } finally { setAttaching(false); }
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if ((!input.trim() && !photo) || n.logging) return;
     const text = input;
+    const img = photo;
     setInput('');
-    await n.logText(text);
+    setPhoto(null);
+    if (img) await n.logPhoto(img, text);
+    else await n.logText(text);
   };
 
   const doClose = async () => {
@@ -138,26 +163,44 @@ export default function FuelPage() {
         )}
       </section>
 
-      {/* Quick-log bar — the primary "log food here" input, styled in the lime
-          Fuel accent so it stands out from the food cards. */}
-      <form
-        onSubmit={submit}
-        className="sticky bottom-2 flex items-center gap-2.5 rounded-[16px] border p-2 pl-3.5"
-        // Opaque base (so scrolled cards don't show through) with the lime tint on top.
-        style={{ borderColor: 'rgba(200,255,77,.5)', background: 'linear-gradient(rgba(200,255,77,.1), rgba(200,255,77,.1)), #0C0E12', boxShadow: '0 10px 34px -10px rgba(200,255,77,.35)' }}
-      >
-        <DropletIcon size={19} className="shrink-0 text-[var(--rd-lime)]" />
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={n.logging ? 'Logging…' : 'Log food — “a handful of almonds”'}
-          disabled={n.logging}
-          className="font-body min-w-0 flex-1 bg-transparent text-[15px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-muted)] focus:outline-none"
-        />
-        <button type="submit" disabled={n.logging || !input.trim()} aria-label="Log meal" className="grad-lime flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] text-[#0A0C10] disabled:opacity-50">
-          <PlusIcon size={20} />
-        </button>
-      </form>
+      {/* Quick-log — log food by text OR snap a meal photo for a calorie estimate. */}
+      <div className="sticky bottom-2 space-y-2">
+        {(photo || attaching) && (
+          <div className="flex items-center gap-2 rounded-[14px] border p-2" style={{ borderColor: 'rgba(200,255,77,.4)', background: '#0C0E12' }}>
+            {attaching ? (
+              <span className="flex h-14 w-14 items-center justify-center rounded-[10px] bg-[var(--rd-card)] text-[var(--rd-text-faint)]">
+                <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.5" /></svg>
+              </span>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photo!.dataUrl} alt="meal" className="h-14 w-14 rounded-[10px] object-cover" />
+            )}
+            <span className="flex-1 text-[12px] text-[var(--rd-text-muted)]">{attaching ? 'Preparing photo…' : 'Meal photo — add a note or log for a calorie estimate.'}</span>
+            {!attaching && <button onClick={() => setPhoto(null)} aria-label="Remove photo" className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-[var(--rd-border)] text-[var(--rd-text-secondary)]"><CloseIcon size={15} /></button>}
+          </div>
+        )}
+        <form
+          onSubmit={submit}
+          className="flex items-center gap-2 rounded-[16px] border p-2 pl-2"
+          // Opaque base (so scrolled cards don't show through) with the lime tint on top.
+          style={{ borderColor: 'rgba(200,255,77,.5)', background: 'linear-gradient(rgba(200,255,77,.1), rgba(200,255,77,.1)), #0C0E12', boxShadow: '0 10px 34px -10px rgba(200,255,77,.35)' }}
+        >
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={n.logging || attaching} aria-label="Photo of meal" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] border border-[rgba(200,255,77,.4)] text-[var(--rd-lime)] disabled:opacity-50">
+            <CameraIcon size={19} />
+          </button>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={photo ? 'Add a note (optional)…' : n.logging ? 'Logging…' : 'Log food — “a handful of almonds”'}
+            disabled={n.logging}
+            className="font-body min-w-0 flex-1 bg-transparent text-[15px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-muted)] focus:outline-none"
+          />
+          <button type="submit" disabled={n.logging || attaching || (!input.trim() && !photo)} aria-label="Log meal" className="grad-lime flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] text-[#0A0C10] disabled:opacity-50">
+            <PlusIcon size={20} />
+          </button>
+        </form>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
+      </div>
 
       {/* Overlays */}
       {scannerOpen && <BarcodeScanner onLogged={() => n.refetch()} onClose={() => setScannerOpen(false)} />}
