@@ -1,36 +1,10 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { useCoachChat, type ChatImage } from '@/components/redesign/coach/useCoachChat';
+import { useCoachChat } from '@/components/redesign/coach/useCoachChat';
 import { UserBubble, CoachBubble, LoggedMealCard, GeneratedRoutineCard } from '@/components/redesign/coach/ChatCards';
 import { SparkleIcon, ArrowRightIcon, CloseIcon } from '@/components/redesign/icons';
-
-// Client-side downscale + JPEG compress so phone photos fit the request-size
-// limit before going to the vision model.
-async function readImageCompressed(file: File, maxDim = 1280, quality = 0.82): Promise<ChatImage> {
-  const src = await new Promise<string>((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result as string);
-    r.onerror = () => rej(new Error('read'));
-    r.readAsDataURL(file);
-  });
-  const img = await new Promise<HTMLImageElement>((res, rej) => {
-    const i = new Image();
-    i.onload = () => res(i);
-    i.onerror = () => rej(new Error('img'));
-    i.src = src;
-  });
-  const scale = Math.min(1, maxDim / Math.max(img.width || 1, img.height || 1));
-  const w = Math.max(1, Math.round((img.width || 1) * scale));
-  const h = Math.max(1, Math.round((img.height || 1) * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (ctx) ctx.drawImage(img, 0, 0, w, h);
-  const dataUrl = canvas.toDataURL('image/jpeg', quality);
-  return { dataUrl, base64: dataUrl.split(',')[1] ?? '', mediaType: 'image/jpeg' };
-}
+import { readImageCompressed, type CompressedImage } from '@/lib/image';
 
 function CameraIcon({ size = 18 }: { size?: number }) {
   return (
@@ -45,7 +19,7 @@ function CameraIcon({ size = 18 }: { size?: number }) {
 export default function CoachPage() {
   const chat = useCoachChat();
   const [input, setInput] = useState('');
-  const [image, setImage] = useState<ChatImage | null>(null);
+  const [image, setImage] = useState<CompressedImage | null>(null);
   const [attaching, setAttaching] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
