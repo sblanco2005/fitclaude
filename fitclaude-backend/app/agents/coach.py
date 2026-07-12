@@ -25,6 +25,7 @@ from app.agents.workout.tools import TOOL_DEFINITIONS
 from app.agents.minimax_fallback import handle_chat_fallback
 from app.config import settings
 from app.services.usage_service import check_rate_limit, get_model_for_tier, log_token_usage
+from app.services.vision_cli import extract_nutrition_from_image, describe_image_for_coach
 from app.models import (
     Activity,
     ConversationHistory,
@@ -1531,11 +1532,12 @@ async def handle_chat(
                 "model_used": None,
             }
 
-        logger.info("[Coach] Routing to vision nutrition agent")
+        logger.info("[Coach] Routing food photo to Claude CLI (vision)")
         try:
-            # Use the user's weight unit preference (lb → oz, kg → grams)
+            # Use the user's weight unit preference (lb → oz, kg → grams). Vision runs
+            # through the local Claude CLI (subscription) since MiniMax-M2.7 is blind.
             weight_unit = user.weight_unit or "kg"
-            result = await vision_nutrition_agent.extract_and_validate(
+            result = await extract_nutrition_from_image(
                 image_base64, image_media_type, user_text=user_message, weight_unit=weight_unit
             )
             if "error" not in result:
@@ -1642,14 +1644,21 @@ async def handle_chat(
     context = build_user_context(user_data, user_tz=user_tz)
     history = await _load_conversation_history(db, user_id, topic=topic)
 
-    # Build user content — text only, or text + image for vision
+    # MiniMax-M2.7 is blind to images. For any remaining photo (e.g. a workout /
+    # routine board — food photos are handled by the fast path above), extract its
+    # contents to text with the Claude CLI (subscription), then let MiniMax act on
+    # that text with its tools.
     if image_base64 and image_media_type:
-        user_content = [
-            {"type": "image", "source": {"type": "base64", "media_type": image_media_type, "data": image_base64}},
-            {"type": "text", "text": user_message or "Analyze this image and log the nutrition info."},
-        ]
-    else:
-        user_content = user_message
+        logger.info("[Coach] Image detected — extracting contents via Claude CLI")
+        desc = await describe_image_for_coach(image_base64, image_media_type, user_message)
+        if desc:
+            base = (user_message or "").strip()
+            user_message = (base + "\n\n" if base else "") + f"[Photo contents (extracted from the user's image): {desc}]"
+        image_base64 = None
+        image_media_type = None
+
+    # Build user content (text only — images have been converted to text above)
+    user_content = user_message
 
     # Build messages
     messages = history + [{"role": "user", "content": user_content}]
