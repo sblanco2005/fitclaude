@@ -26,6 +26,10 @@ CLAUDE_HOME = os.environ.get("CLAUDE_CLI_HOME", "/home/clawd")
 # A dir OUTSIDE the git repo (so `git pull` never conflicts) that the CLI can Read.
 TMP_DIR = os.environ.get("CLAUDE_VISION_TMP", "/home/clawd/.fc_vision_tmp")
 VISION_TIMEOUT = int(os.environ.get("CLAUDE_VISION_TIMEOUT", "150"))
+# Model for vision calls. `--model` is per-invocation, so this does NOT change the
+# default for other projects (e.g. Alpha Firm) using the same CLI/subscription.
+# Haiku is fast + light on the plan; override with CLAUDE_VISION_MODEL if needed.
+VISION_MODEL = os.environ.get("CLAUDE_VISION_MODEL", "haiku")
 
 # Cap concurrent CLI processes — each spawns Node/Claude Code (heavy on a small VPS).
 _SEM = asyncio.Semaphore(int(os.environ.get("CLAUDE_VISION_CONCURRENCY", "2")))
@@ -54,6 +58,7 @@ async def _run_claude_on_image(image_base64: str, media_type: str | None, prompt
             try:
                 proc = await asyncio.create_subprocess_exec(
                     CLAUDE_BIN, "-p", full_prompt,
+                    "--model", VISION_MODEL,
                     "--allowedTools", "Read",
                     "--output-format", "json",
                     cwd=TMP_DIR,
