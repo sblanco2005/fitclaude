@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useCoachChat } from '@/components/redesign/coach/useCoachChat';
 import { UserBubble, CoachBubble, LoggedMealCard, GeneratedRoutineCard } from '@/components/redesign/coach/ChatCards';
 import { SparkleIcon, ArrowRightIcon, CloseIcon } from '@/components/redesign/icons';
@@ -17,6 +18,7 @@ function CameraIcon({ size = 18 }: { size?: number }) {
 
 // Screen 02 · AI Coach Chat — accent: violet
 export default function CoachPage() {
+  const router = useRouter();
   const chat = useCoachChat();
   const [input, setInput] = useState('');
   const [image, setImage] = useState<CompressedImage | null>(null);
@@ -82,7 +84,7 @@ export default function CoachPage() {
             <div key={m.id} className="space-y-2">
               {m.content && <CoachBubble>{m.content}</CoachBubble>}
               {m.meal && <LoggedMealCard meal={m.meal} />}
-              {m.routine && <GeneratedRoutineCard routine={m.routine} />}
+              {m.routine && <GeneratedRoutineCard routine={m.routine} onOpen={m.routine.id ? () => router.push(`/v2/train/routine/${m.routine!.id}`) : undefined} />}
             </div>
           ),
         )}
