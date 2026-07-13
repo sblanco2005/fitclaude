@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useCoachChat, type CoachContext } from './useCoachChat';
 import { UserBubble, CoachBubble, LoggedMealCard, GeneratedRoutineCard } from './ChatCards';
 import { SparkleIcon, ArrowRightIcon, TrainIcon, DropletIcon } from '@/components/redesign/icons';
@@ -54,6 +55,7 @@ export function CoachSheet({
 }
 
 function CoachSheetInner({ context, onClose }: { context: CoachContext; onClose: () => void }) {
+  const router = useRouter();
   const chat = useCoachChat(context);
   const [input, setInput] = useState('');
   const cfg = CTX[context];
@@ -120,7 +122,7 @@ function CoachSheetInner({ context, onClose }: { context: CoachContext; onClose:
               <div key={m.id} className="space-y-2">
                 {m.content && <CoachBubble>{m.content}</CoachBubble>}
                 {m.meal && <LoggedMealCard meal={m.meal} />}
-                {m.routine && <GeneratedRoutineCard routine={m.routine} />}
+                {m.routine && <GeneratedRoutineCard routine={m.routine} onOpen={m.routine.id ? () => { onClose(); router.push(`/v2/train/routine/${m.routine!.id}`); } : undefined} />}
               </div>
             ),
           )}

@@ -68,6 +68,7 @@ export function LoggedMealCard({ meal }: { meal: LoggedMeal }) {
 }
 
 export type GeneratedRoutine = {
+  id?: string; // saved workout id — the routine is already persisted server-side
   name: string;
   spicyLevel?: number;
   moves: { name: string; sets?: number; reps?: string | number }[];
@@ -75,11 +76,13 @@ export type GeneratedRoutine = {
 
 export function GeneratedRoutineCard({
   routine,
+  onOpen,
   onSave,
   onSpin,
   saving,
 }: {
   routine: GeneratedRoutine;
+  onOpen?: () => void;
   onSave?: () => void;
   onSpin?: () => void;
   saving?: boolean;
@@ -120,18 +123,20 @@ export function GeneratedRoutineCard({
       {extra > 0 && <p className="mt-2 text-[12px] text-[var(--rd-text-faint)]">+{extra} more</p>}
       <div className="mt-3 flex gap-2">
         <button
-          onClick={onSave}
+          onClick={onOpen ?? onSave}
           disabled={saving}
           className="grad-coach flex-1 rounded-[11px] py-2 text-[13px] font-semibold text-[#0A0C10] disabled:opacity-60"
         >
-          {saving ? 'Saving…' : 'Save routine'}
+          {onOpen ? 'View routine' : saving ? 'Saving…' : 'Save routine'}
         </button>
-        <button
-          onClick={onSpin}
-          className="rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-4 py-2 text-[13px] font-semibold text-[var(--rd-text-secondary)]"
-        >
-          Spin
-        </button>
+        {onSpin && (
+          <button
+            onClick={onSpin}
+            className="rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-4 py-2 text-[13px] font-semibold text-[var(--rd-text-secondary)]"
+          >
+            Spin
+          </button>
+        )}
       </div>
     </div>
   );

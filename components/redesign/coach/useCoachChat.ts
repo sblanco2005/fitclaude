@@ -49,6 +49,7 @@ async function buildRoutineCard(workoutId: string): Promise<GeneratedRoutine | u
       .map((e: { variation?: { spicyLevel?: number } | null }) => e.variation?.spicyLevel ?? 0)
       .reduce((a: number, b: number) => Math.max(a, b), 0);
     return {
+      id: workoutId,
       name: w.name?.trim() || w.workoutType || 'Routine',
       spicyLevel: spicy || undefined,
       moves: (w.exercises ?? []).map((e: { exercise?: { name?: string } | null; variation?: { name?: string } | null; sets?: number; reps?: string | null }) => ({
