@@ -147,6 +147,93 @@ async def extract_nutrition_from_image(
         return {"error": "Couldn't parse the nutrition from the photo."}
 
 
+async def _run_claude_text(prompt: str) -> str | None:
+    """Headless text generation via the CLI (no image). Returns the final text."""
+    env = {**os.environ, "HOME": CLAUDE_HOME}
+    async with _SEM:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                CLAUDE_BIN, "-p", prompt,
+                "--model", VISION_MODEL,
+                "--output-format", "json",
+                cwd=CLAUDE_HOME,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except FileNotFoundError:
+            logger.error(f"[cli] claude binary not found at {CLAUDE_BIN}")
+            return None
+        try:
+            out, err = await asyncio.wait_for(proc.communicate(), timeout=VISION_TIMEOUT)
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            logger.error("[cli] claude text timed out")
+            return None
+    if proc.returncode != 0:
+        logger.error(f"[cli] claude text exited {proc.returncode}: {err.decode(errors='ignore')[:300]}")
+        return None
+    raw = out.decode(errors="ignore").strip()
+    try:
+        env_json = json.loads(raw)
+        if isinstance(env_json, dict) and "result" in env_json:
+            return str(env_json["result"])
+    except Exception:
+        pass
+    return raw
+
+
+async def generate_workout_via_cli(user_request: str, exercise_names: list[str] | None = None) -> dict | None:
+    """Design a workout from a free-text request. Returns generate_workout params or None.
+
+    Used as the last-resort safety net when MiniMax skips generate_workout and the
+    text-parser can't recover it — Claude reliably emits structured JSON.
+    """
+    lib = ""
+    if exercise_names:
+        lib = " Prefer these library exercises when they fit: " + ", ".join(exercise_names[:120]) + "."
+    prompt = (
+        f'Design a gym workout for this request: "{user_request}".{lib} '
+        "Respond with ONLY a JSON object — no prose, no code fences — with keys: "
+        "name (short title), workout_type (one of: push, pull, legs, upper, lower, full_body, cardio, custom), "
+        "category ('lifting' unless it is clearly cardio/conditioning), "
+        "exercises (array of 5-7 objects, each with: name, muscle_group, sets (integer), reps (string like '8-10'), "
+        "rest_seconds (integer), notes (short cue or empty string))."
+    )
+    data = _extract_json(await _run_claude_text(prompt))
+    if not isinstance(data, dict) or not isinstance(data.get("exercises"), list):
+        return None
+    clean: list[dict] = []
+    for e in data["exercises"]:
+        if not isinstance(e, dict) or not e.get("name"):
+            continue
+        try:
+            clean.append({
+                "name": str(e.get("name")).strip(),
+                "muscle_group": str(e.get("muscle_group") or "").strip(),
+                "sets": int(e.get("sets") or 3),
+                "reps": str(e.get("reps") or "8-12"),
+                "rest_seconds": int(e.get("rest_seconds") or 90),
+                "notes": str(e.get("notes") or ""),
+            })
+        except Exception:
+            continue
+    if len(clean) < 3:
+        return None
+    cat = str(data.get("category") or "lifting")
+    if cat not in ("lifting", "cardio", "hiit", "mobility", "calisthenics", "sport"):
+        cat = "lifting"
+    return {
+        "name": str(data.get("name") or "Custom Workout"),
+        "workout_type": str(data.get("workout_type") or "custom"),
+        "category": cat,
+        "exercises": clean,
+    }
+
+
 async def describe_image_for_coach(image_base64: str, media_type: str | None, user_text: str = "") -> str | None:
     """Plain-text extraction of a photo so the (blind) text model can act on it via tools."""
     prompt = (

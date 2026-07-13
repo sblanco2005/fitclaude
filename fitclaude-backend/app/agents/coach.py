@@ -25,7 +25,7 @@ from app.agents.workout.tools import TOOL_DEFINITIONS
 from app.agents.minimax_fallback import handle_chat_fallback
 from app.config import settings
 from app.services.usage_service import check_rate_limit, get_model_for_tier, log_token_usage
-from app.services.vision_cli import extract_nutrition_from_image, describe_image_for_coach
+from app.services.vision_cli import extract_nutrition_from_image, describe_image_for_coach, generate_workout_via_cli
 from app.models import (
     Activity,
     ConversationHistory,
@@ -1929,7 +1929,32 @@ async def handle_chat(
                 except Exception as e:
                     logger.error(f"[Coach] Failed to auto-save parsed workout: {e}")
             else:
-                logger.warning("[Coach] Model skipped generate_workout and text parse failed — workout NOT saved")
+                logger.warning("[Coach] Model skipped generate_workout and text parse failed — trying Claude CLI")
+
+        # Safety net 3: MiniMax skipped generate_workout AND the text-parser couldn't
+        # recover it. Generate the workout reliably with the local Claude CLI
+        # (subscription) and save it — Claude emits structured JSON dependably.
+        if (
+            topic == "workout"
+            and workout_id is None
+            and _looks_like_workout_request(user_message)
+            and response.stop_reason == "end_turn"
+        ):
+            try:
+                names_res = await db.execute(select(Exercise.name))
+                lib_names = [row[0] for row in names_res.all()]
+                cli_params = await generate_workout_via_cli(user_message, lib_names)
+                if cli_params and len(cli_params.get("exercises", [])) >= 3:
+                    if re.search(r"\b(i did|this morning|log this|log my|we did)\b", user_message, re.IGNORECASE):
+                        cli_params["source"] = "manual"
+                    logger.warning(f"[Coach] CLI generated workout ({len(cli_params['exercises'])} exercises) after MiniMax failed")
+                    result = await _tool_generate_workout(db, user_id, cli_params, user_tz=user_tz)
+                    workout_id = result.get("workout_id")
+                    logger.info(f"[Coach] CLI safety-net saved workout {workout_id}")
+                else:
+                    logger.warning("[Coach] CLI workout generation returned nothing usable — workout NOT saved")
+            except Exception as e:
+                logger.error(f"[Coach] CLI workout generation failed: {e}")
 
         # Safety net (program): MiniMax reliably designs a multi-week program in text
         # but frequently skips the generate_program tool call, so nothing is saved.
