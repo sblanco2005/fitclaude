@@ -6,6 +6,7 @@ import {
   useSession, formatWeight, lbToKg, kgToLb,
   type SessionExercise, type SetEntry,
 } from '@/components/redesign/session/useSession';
+import { toDisplay, fromDisplay, perSideDisplay, totalLbFromPerSide, totalLbFromDisplay } from '@/components/redesign/session/weightMath';
 import { FinishRate } from '@/components/redesign/session/FinishRate';
 import { YouTubeAutoplay } from '@/components/redesign/session/YouTubeAutoplay';
 import { CheckIcon, CloseIcon, PlusIcon, MinusIcon, PlayIcon, ChevronLeftIcon, ArrowRightIcon } from '@/components/redesign/icons';
@@ -284,8 +285,7 @@ export default function SessionPage() {
 
 // Compact row for done / upcoming sets — tap anywhere to open it for editing.
 function CompactRow({ n, set, unit, perSide, barDisplay, onSelect, onToggle }: { n: number; set: SetEntry; unit: Unit; perSide: boolean; barDisplay: number; onSelect: () => void; onToggle: () => void }) {
-  const toDisp = (lb: number) => (unit === 'lb' ? lb : lbToKg(lb));
-  const perSideVal = Math.max(0, Math.round((toDisp(set.weightLb) - barDisplay) / 2));
+  const perSideVal = Math.round(perSideDisplay(set.weightLb, unit, barDisplay));
   const midText = perSide
     ? (set.weightLb > 0 ? `2×${perSideVal}${unit} /side` : '—')
     : (set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—');
@@ -313,16 +313,12 @@ function CompactRow({ n, set, unit, perSide, barDisplay, onSelect, onToggle }: {
 function ActiveSet({ n, set, unit, perSide, barDisplay, onChange, onLog }: {
   n: number; set: SetEntry; unit: Unit; perSide: boolean; barDisplay: number; onChange: (p: Partial<SetEntry>) => void; onLog: () => void;
 }) {
-  const toDisp = (lb: number) => (unit === 'lb' ? lb : lbToKg(lb));
-  const fromDisp = (v: number) => (unit === 'lb' ? v : kgToLb(v));
-  const totalDisplay = toDisp(set.weightLb);
-  const perSideDisplay = perSide ? Math.max(0, Math.round(((totalDisplay - barDisplay) / 2) * 10) / 10) : totalDisplay;
-  const shown = perSide ? perSideDisplay : totalDisplay;
+  const totalDisplay = toDisplay(set.weightLb, unit);
+  const perSideVal = perSide ? perSideDisplay(set.weightLb, unit, barDisplay) : totalDisplay;
+  const shown = perSide ? perSideVal : totalDisplay;
   const step = perSide ? 5 : unit === 'kg' ? 2.5 : 5;
   const setShown = (v: number) => {
-    const clamped = Math.max(0, Math.round(v * 10) / 10);
-    const newTotal = perSide ? clamped * 2 + barDisplay : clamped;
-    onChange({ weightLb: fromDisp(newTotal) });
+    onChange({ weightLb: perSide ? totalLbFromPerSide(v, unit, barDisplay) : totalLbFromDisplay(v, unit) });
   };
   const otherLabel = unit === 'lb' ? `${lbToKg(set.weightLb)}kg` : `${Math.round(set.weightLb)}lb`;
 
@@ -346,7 +342,7 @@ function ActiveSet({ n, set, unit, perSide, barDisplay, onChange, onLog }: {
       </div>
       {perSide && set.weightLb > 0 && (
         <p className="font-label mt-2 text-center text-[10px] text-[var(--rd-lime)]">
-          = {Math.round(totalDisplay)}{unit} total · {Math.round(barDisplay)}{unit} bar + 2×{perSideDisplay}{unit}  <span className="text-[var(--rd-text-faint)]">= {otherLabel}</span>
+          = {Math.round(totalDisplay)}{unit} total · {Math.round(barDisplay)}{unit} bar + 2×{perSideVal}{unit}  <span className="text-[var(--rd-text-faint)]">= {otherLabel}</span>
         </p>
       )}
       {!perSide && set.weightLb > 0 && (

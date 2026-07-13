@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Workout, WorkoutExercise } from '@/types';
+import { LB_PER_KG, lbToKg, kgToLb, formatWeight, buildSetLogs, sessionVolumeLb } from './weightMath';
 
-// V1 stores every setLogs weight in POUNDS. We match that so Last/PR computed
-// from workout history are consistent across both apps.
-export const LB_PER_KG = 2.20462;
-export const lbToKg = (lb: number) => Math.round((lb / LB_PER_KG) * 10) / 10;
-export const kgToLb = (kg: number) => Math.round(kg * LB_PER_KG);
-export const formatWeight = (lb: number, unit: 'kg' | 'lb') => (unit === 'lb' ? `${Math.round(lb)}lb` : `${lbToKg(lb)}kg`);
+// Weights are canonicalized to POUNDS (matches V1) so Last/PR from history are
+// consistent. Conversion/log helpers live in ./weightMath (unit-tested); re-export
+// the ones existing imports use.
+export { LB_PER_KG, lbToKg, kgToLb, formatWeight };
 
 export type PriorSet = { weight: number; reps: number }; // weight in lb
 
@@ -243,14 +242,10 @@ export function useSession(id: string) {
   const stats = useMemo(() => {
     let volumeLb = 0;
     let setsLogged = 0;
-    exercises.forEach((ex) =>
-      ex.sets.forEach((s) => {
-        if (s.done) {
-          setsLogged += 1;
-          volumeLb += s.weightLb * s.reps;
-        }
-      }),
-    );
+    exercises.forEach((ex) => {
+      volumeLb += sessionVolumeLb(ex.sets);
+      setsLogged += ex.sets.filter((s) => s.done).length;
+    });
     return { volumeKg: Math.round(lbToKg(volumeLb)), volumeLb: Math.round(volumeLb), setsLogged };
   }, [exercises]);
 
@@ -261,9 +256,7 @@ export function useSession(id: string) {
       const payload = {
         exercises: exercises.map((ex) => ({
           exerciseId: ex.woExerciseId,
-          setLogs: JSON.stringify(
-            ex.sets.filter((s) => s.done).map((s, i) => ({ set: i + 1, weight: Math.round(s.weightLb), reps: s.reps })),
-          ),
+          setLogs: JSON.stringify(buildSetLogs(ex.sets)),
         })),
         durationMinutes,
       };
