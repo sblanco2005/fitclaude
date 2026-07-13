@@ -27,6 +27,7 @@ class User(Base):
     # Fitness profile
     age: Mapped[Optional[int]] = mapped_column(nullable=True)
     weight_kg: Mapped[Optional[float]] = mapped_column("weightKg", nullable=True)
+    weight_unit: Mapped[Optional[str]] = mapped_column("weightUnit", String, nullable=True)
     height_cm: Mapped[Optional[float]] = mapped_column("heightCm", nullable=True)
     fitness_goal: Mapped[Optional[str]] = mapped_column(
         "fitnessGoal", String, nullable=True
