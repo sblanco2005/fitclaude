@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withAuth, AuthErrors } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 import { pickForFocus, typeForFocus, titleCase, type Ex } from '@/lib/program/exercises';
+import { parseCardioSegments, segmentLabel } from '@/lib/program/cardio';
 
 // Deterministic program builder — no LLM in the save path. MiniMax reliably
 // *designs* a split but won't emit the generate_program tool call (even forced),
@@ -29,14 +30,14 @@ export const POST = withAuth(async (request, user) => {
     // to a split rotation over trainingDays (legacy / safety).
     // Each entry: a coached day (Coach builds a routine from `focus`) or a
     // "my own" day (pt_session — the user logs it themselves, `focus` is the label).
-    type Entry = { focus: string; kind: 'coached' | 'own' };
+    type Entry = { focus: string; kind: 'coached' | 'cardio' | 'own' };
     const perWeek = new Map<number, Map<number, Entry>>(); // week -> (weekday -> entry)
     const allWeeks = new Map<number, Entry>(); // weekday -> entry, applies to every week
     const entryOf = (a: { focus?: unknown; workoutType?: unknown; kind?: unknown }): Entry => ({
       focus: (typeof a.focus === 'string' && a.focus.trim())
-        ? a.focus.trim().slice(0, 60)
+        ? a.focus.trim().slice(0, 120)
         : (typeof a.workoutType === 'string' && a.workoutType ? a.workoutType : 'full body'),
-      kind: a.kind === 'own' ? 'own' : 'coached',
+      kind: a.kind === 'own' ? 'own' : a.kind === 'cardio' ? 'cardio' : 'coached',
     });
     if (Array.isArray(body.assignments)) {
       for (const a of body.assignments) {
@@ -83,6 +84,7 @@ export const POST = withAuth(async (request, user) => {
       return req.split(/[,/&]/).some((tok) => tok.trim() && eqText.includes(tok.trim()));
     };
     const pool = exercises.filter(allowed);
+    const cardioPool = exercises.filter((e) => e.exerciseType === 'cardio');
     let displayId = (maxDisplay._max.displayId ?? 0) + 1;
 
     const result = await prisma.$transaction(async (tx) => {
@@ -112,6 +114,35 @@ export const POST = withAuth(async (request, user) => {
             });
             continue;
           }
+
+          // Cardio day — parse free-text into segments; the routine is a
+          // Workout(category='cardio') with WorkoutExercise segment rows.
+          if (entry.kind === 'cardio') {
+            const segments = parseCardioSegments(entry.focus, cardioPool);
+            const dayLabel = titleCase(entry.focus).slice(0, 60);
+            const day = await tx.programDay.create({
+              data: {
+                programId: program.id, weekday: wd, weekNumber: w,
+                dayType: 'coached', dayLabel, workoutType: 'cardio',
+                exerciseTemplate: JSON.stringify(segments.map((s) => ({ name: s.name, durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, reps: s.reps, rounds: s.rounds }))),
+              },
+              select: { id: true },
+            });
+            const routine = await tx.workout.create({
+              data: { userId: user.id, name: dayLabel.toLowerCase(), workoutType: 'cardio', category: 'cardio', source: 'coach', displayId: displayId++, programDayId: day.id, completed: false },
+              select: { id: true },
+            });
+            await tx.workoutExercise.createMany({
+              data: segments.map((s, i) => ({
+                workoutId: routine.id, exerciseId: s.exerciseId, order: i + 1,
+                sets: s.rounds, reps: s.reps, restSeconds: s.restSeconds,
+                durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit,
+                notes: `${s.name}||${segmentLabel(s)}`,
+              })),
+            });
+            continue;
+          }
+
           const template = pickForFocus(entry.focus, pool, exercises);
           // The day is labeled with the user's own focus text ("Deadlifts & Back").
           const dayLabel = titleCase(entry.focus);

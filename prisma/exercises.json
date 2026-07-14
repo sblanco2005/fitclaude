@@ -1014,6 +1014,17 @@
           "description": "Holding the kettlebell upside-down by the handle demands extreme grip strength and shoulder stabilizer activation throughout the entire movement."
         }
       ]
-    }
+    },
+    { "name": "Rower", "muscle_group": "full_body", "secondary_muscles": "back, legs", "equipment_required": "rower", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Drive with the legs, then swing the torso back and pull the handle to the sternum; reverse the sequence to return.", "variations": [] },
+    { "name": "Air Bike", "muscle_group": "full_body", "secondary_muscles": "legs, shoulders", "equipment_required": "air bike", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Push and pull the handles while driving the pedals; effort scales with how hard you go.", "variations": [] },
+    { "name": "Ski Erg", "muscle_group": "full_body", "secondary_muscles": "back, core", "equipment_required": "ski erg", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Hinge at the hips and drive the handles down and back, engaging lats and core each stroke.", "variations": [] },
+    { "name": "Echo Bike", "muscle_group": "full_body", "secondary_muscles": "legs, shoulders", "equipment_required": "echo bike", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Fan bike with simultaneous arm and leg drive for full-body conditioning.", "variations": [] },
+    { "name": "Stationary Bike", "muscle_group": "quadriceps", "secondary_muscles": "hamstrings, calves", "equipment_required": "bike", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Steady or interval cycling; adjust resistance and cadence for intensity.", "variations": [] },
+    { "name": "Treadmill Run", "muscle_group": "full_body", "secondary_muscles": "legs, core", "equipment_required": "treadmill", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Run at a set pace/incline; maintain relaxed posture and quick cadence.", "variations": [] },
+    { "name": "Run", "muscle_group": "full_body", "secondary_muscles": "legs, core", "equipment_required": "none", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Outdoor or track running at the target distance or duration.", "variations": [] },
+    { "name": "Walk", "muscle_group": "full_body", "secondary_muscles": "legs", "equipment_required": "none", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Brisk walking for recovery or zone-2 conditioning.", "variations": [] },
+    { "name": "Jump Rope", "muscle_group": "calves", "secondary_muscles": "shoulders, core", "equipment_required": "jump rope", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Bounce on the balls of the feet, turning the rope from the wrists.", "variations": [] },
+    { "name": "Stair Climber", "muscle_group": "glutes", "secondary_muscles": "quadriceps, calves", "equipment_required": "stair climber", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Continuous stepping; stand tall and avoid leaning on the rails.", "variations": [] },
+    { "name": "Elliptical", "muscle_group": "full_body", "secondary_muscles": "legs, arms", "equipment_required": "elliptical", "difficulty": "beginner", "exercise_type": "cardio", "instructions": "Low-impact striding with arm drive; adjust resistance for intensity.", "variations": [] }
   ]
 }

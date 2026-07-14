@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withAuth, AuthErrors } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 import { pickForFocus, typeForFocus, titleCase, type Ex } from '@/lib/program/exercises';
+import { parseCardioSegments, segmentLabel } from '@/lib/program/cardio';
 
 // POST /api/program/day/[dayId]/routine — set a program day's routine, either by
 // linking an EXISTING routine ({ routineId }) or CREATING a new one from a
@@ -25,6 +26,34 @@ export const POST = withAuth(async (request, user, params) => {
         await tx.workout.deleteMany({ where: { programDayId: day.id, completed: false } });
         await tx.programDay.update({ where: { id: day.id }, data: { dayType: 'rest', dayLabel: 'Rest', workoutType: null, exerciseTemplate: null } });
       });
+      return NextResponse.json({ ok: true });
+    }
+
+    // Create a new CARDIO routine from a free-text focus ("rower 5min + run 400m").
+    if ((body.mode === 'cardio' || body.cardio === true) && typeof body.focus === 'string' && body.focus.trim()) {
+      const focus = body.focus.trim().slice(0, 120);
+      const cardioPool = (await prisma.exercise.findMany({ where: { exerciseType: 'cardio' }, select: { id: true, name: true, muscleGroup: true, exerciseType: true, equipmentRequired: true } })) as Ex[];
+      const segments = parseCardioSegments(focus, cardioPool);
+      const label = titleCase(focus).slice(0, 60);
+      await prisma.$transaction(async (tx) => {
+        await tx.programDay.update({
+          where: { id: day.id },
+          data: { dayType: 'coached', dayLabel: label, workoutType: 'cardio', exerciseTemplate: JSON.stringify(segments.map((s) => ({ name: s.name, durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, reps: s.reps, rounds: s.rounds }))) },
+        });
+        const existing = await tx.workout.findFirst({ where: { programDayId: day.id, completed: false }, select: { id: true } });
+        let routineId = existing?.id;
+        if (routineId) {
+          await tx.workoutExercise.deleteMany({ where: { workoutId: routineId } });
+          await tx.workout.update({ where: { id: routineId }, data: { name: label.toLowerCase(), workoutType: 'cardio', category: 'cardio' } });
+        } else {
+          const maxD = await tx.workout.aggregate({ where: { userId: user.id }, _max: { displayId: true } });
+          const wk = await tx.workout.create({ data: { userId: user.id, name: label.toLowerCase(), workoutType: 'cardio', category: 'cardio', source: 'coach', displayId: (maxD._max.displayId ?? 0) + 1, programDayId: day.id, completed: false }, select: { id: true } });
+          routineId = wk.id;
+        }
+        await tx.workoutExercise.createMany({
+          data: segments.map((s, i) => ({ workoutId: routineId!, exerciseId: s.exerciseId, order: i + 1, sets: s.rounds, reps: s.reps, restSeconds: s.restSeconds, durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, notes: `${s.name}||${segmentLabel(s)}` })),
+        });
+      }, { timeout: 20000 });
       return NextResponse.json({ ok: true });
     }
 
