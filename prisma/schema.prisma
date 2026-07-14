@@ -191,11 +191,14 @@ model WorkoutExercise {
   variationId   String?
   order         Int
   sets          Int
-  reps          String? // e.g. "8-12" or "10"
+  reps          String? // e.g. "8-12" or "10"  (also rep-based cardio, e.g. "20")
   weightKg      Float?
   restSeconds   Int?
+  durationSeconds Int? // cardio: timed segment target (seconds)
+  distance      Float? // cardio: distance target
+  distanceUnit  String? // cardio: 'm' | 'km' | 'mi'
   notes         String?
-  setLogs       String? @db.Text // JSON: [{"set":1,"weight":195,"reps":4},...]
+  setLogs       String? @db.Text // JSON: lifting [{"set":1,"weight":195,"reps":4}]; cardio [{"durationSec":300,"distance":1000,"distanceUnit":"m","reps":null}]
   wasSpicy      Boolean @default(false)
   supersetGroup String? // "A", "B", etc. — exercises with same group form a superset pair
 

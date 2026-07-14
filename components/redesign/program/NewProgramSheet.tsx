@@ -19,6 +19,14 @@ const QUICK: { key: string; label: string; rot: string[] }[] = [
   { key: 'fb', label: 'Full Body', rot: ['Full Body'] },
 ];
 
+type DayMode = 'coached' | 'cardio' | 'own';
+const MODE: Record<DayMode, { label: string; bg: string; ph: string }> = {
+  coached: { label: 'Coach', bg: 'var(--rd-ember)', ph: 'e.g. Push & Pull, Deadlifts & Back' },
+  cardio: { label: 'Cardio', bg: '#22D3EE', ph: 'e.g. rower 5min + air bike 2min + run 400m' },
+  own: { label: 'My own', bg: 'var(--rd-violet)', ph: 'e.g. Eddy, Alpha X, class' },
+};
+const NEXT_MODE: Record<DayMode, DayMode> = { coached: 'cardio', cardio: 'own', own: 'coached' };
+
 export function NewProgramSheet({
   onClose,
   onCreated,
@@ -35,8 +43,9 @@ export function NewProgramSheet({
   const [weekFocus, setWeekFocus] = useState<Record<number, Record<number, string>>>({ 1: { 0: 'Push', 2: 'Pull', 4: 'Legs' } });
   const [sameEveryWeek, setSameEveryWeek] = useState(true);
   const [editWeek, setEditWeek] = useState(1);
-  // Per weekday: 'coached' (Coach builds it) or 'own' (log-your-own / class day).
-  const [dayMode, setDayMode] = useState<Record<number, 'coached' | 'own'>>({});
+  // Per weekday: 'coached' (Coach builds weights), 'cardio' (Coach builds a cardio
+  // routine), or 'own' (log-your-own / class day).
+  const [dayMode, setDayMode] = useState<Record<number, DayMode>>({});
   const [gymType, setGymType] = useState<'full_gym' | 'own_gym'>('full_gym');
   const [equipment, setEquipment] = useState('');
   const [errMsg, setErrMsg] = useState('');
@@ -57,7 +66,7 @@ export function NewProgramSheet({
       const wf: Record<number, string> = {};
       let idx = 0;
       sortedDays.forEach((d) => {
-        if (dayMode[d] === 'own') { wf[d] = prev[curWeek]?.[d] ?? ''; } // keep "my own" labels
+        if (dayMode[d] === 'own' || dayMode[d] === 'cardio') { wf[d] = prev[curWeek]?.[d] ?? ''; } // keep own/cardio labels
         else { wf[d] = rot[idx % rot.length]; idx++; }
       });
       return { ...prev, [curWeek]: wf };
@@ -67,11 +76,12 @@ export function NewProgramSheet({
     if (!days.length || phase === 'building') return;
     setPhase('building');
     try {
-      const assignments: { weekday: number; weekNumber?: number; focus: string; kind: 'coached' | 'own' }[] = [];
-      const kindFor = (d: number) => dayMode[d] === 'own' ? 'own' : 'coached';
+      const assignments: { weekday: number; weekNumber?: number; focus: string; kind: DayMode }[] = [];
+      const kindFor = (d: number): DayMode => dayMode[d] ?? 'coached';
       const focusFor = (w: number, d: number) => {
         const v = (weekFocus[w]?.[d] ?? weekFocus[1]?.[d] ?? '').trim();
-        return v || (kindFor(d) === 'own' ? 'My own workout' : 'Full Body');
+        const k = kindFor(d);
+        return v || (k === 'own' ? 'My own workout' : k === 'cardio' ? 'Cardio' : 'Full Body');
       };
       if (sameEveryWeek || weeks === 1) {
         sortedDays.forEach((d) => assignments.push({ weekday: d, focus: focusFor(1, d), kind: kindFor(d) }));
@@ -193,24 +203,23 @@ export function NewProgramSheet({
 
                   <div className="mt-2 space-y-2">
                     {sortedDays.map((d) => {
-                      const own = dayMode[d] === 'own';
+                      const mode: DayMode = dayMode[d] ?? 'coached';
+                      const cfg = MODE[mode];
                       return (
                         <div key={`${curWeek}-${d}`} className="flex items-center gap-2">
                           <span className="font-label w-9 shrink-0 text-[12px] font-bold text-[var(--rd-ink)]">{WD_FULL[d]}</span>
                           <button
-                            onClick={() => setDayMode((m) => ({ ...m, [d]: own ? 'coached' : 'own' }))}
-                            className="font-label shrink-0 rounded-[9px] border px-2 py-2 text-[10px] font-bold"
-                            style={own
-                              ? { borderColor: 'transparent', background: 'var(--rd-violet)', color: '#0A0C10' }
-                              : { borderColor: 'transparent', background: 'var(--rd-ember)', color: '#0A0C10' }}
+                            onClick={() => setDayMode((m) => ({ ...m, [d]: NEXT_MODE[mode] }))}
+                            className="font-label w-[52px] shrink-0 rounded-[9px] border px-1 py-2 text-[10px] font-bold"
+                            style={{ borderColor: 'transparent', background: cfg.bg, color: '#0A0C10' }}
                           >
-                            {own ? 'My own' : 'Coach'}
+                            {cfg.label}
                           </button>
                           <input
                             value={focusVal(d)}
                             onChange={(e) => setFocus(d, e.target.value)}
-                            placeholder={own ? 'e.g. Eddy, Alpha X, Run' : 'e.g. Push & Pull, Deadlifts & Back'}
-                            maxLength={60}
+                            placeholder={cfg.ph}
+                            maxLength={mode === 'cardio' ? 120 : 60}
                             className="font-body min-w-0 flex-1 rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2.5 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none"
                           />
                         </div>
@@ -218,7 +227,7 @@ export function NewProgramSheet({
                     })}
                   </div>
                   <p className="font-label mt-1.5 text-[11px] text-[var(--rd-text-faint)]">
-                    {weeks > 1 && !sameEveryWeek ? `Editing Week ${editWeek}. ` : ''}<span className="text-[var(--rd-ember)]">Coach</span> builds it; <span className="text-[var(--rd-violet)]">My own</span> you log yourself. Unselected days are rest.
+                    {weeks > 1 && !sameEveryWeek ? `Editing Week ${editWeek}. ` : ''}Tap the chip to switch: <span className="text-[var(--rd-ember)]">Coach</span> (weights) · <span style={{ color: '#22D3EE' }}>Cardio</span> · <span className="text-[var(--rd-violet)]">My own</span>. Unselected days are rest.
                   </p>
                 </div>
               )}
