@@ -176,6 +176,11 @@ export interface ProgramDayExercise {
   reps: string;
   is_primary?: boolean;
   notes?: string;
+  // Cardio segment fields (present only on cardio days; lifting items omit them)
+  durationSeconds?: number | null;
+  distance?: number | null;
+  distanceUnit?: string | null;
+  rounds?: number;
 }
 
 export type DayType = 'coached' | 'pt_session' | 'class' | 'rest';

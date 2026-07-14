@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ProgramDay, DayType, TrainingProgram } from '@/types';
-import { useProgram, daySubtitle, DAY_ACCENT, DAY_TYPE_LABEL, todayWeekdayMon, type ProgramSummary } from '@/components/redesign/program/useProgram';
+import { useProgram, daySubtitle, DAY_ACCENT, DAY_TYPE_LABEL, dayAccent, dayTypeLabel, isCardioDay, CARDIO_ACCENT, todayWeekdayMon, type ProgramSummary } from '@/components/redesign/program/useProgram';
+import { segmentLabel } from '@/lib/program/cardio';
 import { useFitClaude } from '@/context/FitClaudeContext';
 import { NewProgramSheet } from '@/components/redesign/program/NewProgramSheet';
 import { ScreenHeader } from '@/components/redesign/ui';
@@ -28,6 +29,7 @@ export default function ProgramPage() {
   const [changing, setChanging] = useState<null | 'menu' | 'existing' | 'new'>(null);
   const [routineOpts, setRoutineOpts] = useState<{ id: string; name: string; count: number }[]>([]);
   const [newFocus, setNewFocus] = useState('');
+  const [newIsCardio, setNewIsCardio] = useState(false);
   const [changeBusy, setChangeBusy] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -84,7 +86,7 @@ export default function ProgramPage() {
     if (r?.id) router.push(`/v2/train/session/${r.id}`);
   };
 
-  const closeDetail = () => { setDetail(null); setMoving(false); setChanging(null); setNewFocus(''); };
+  const closeDetail = () => { setDetail(null); setMoving(false); setChanging(null); setNewFocus(''); setNewIsCardio(false); };
 
   const loadRoutines = async () => {
     const list = await fetch('/api/workouts?daysBack=365').then((r) => (r.ok ? r.json() : [])).catch(() => []);
@@ -96,7 +98,7 @@ export default function ProgramPage() {
     setRoutineOpts(Array.from(map.values()));
   };
 
-  const setDayRoutine = async (payload: { routineId: string } | { focus: string } | { rest: true }) => {
+  const setDayRoutine = async (payload: { routineId: string } | { focus: string } | { mode: 'cardio'; focus: string } | { rest: true }) => {
     if (!detail || changeBusy) return;
     setChangeBusy(true);
     const ok = await fetch(`/api/program/day/${detail.id}/routine`, {
@@ -274,11 +276,11 @@ export default function ProgramPage() {
       <div className="space-y-2">
         {rows.map(({ wd, label, day }) => {
           const type: DayType = day?.dayType ?? 'rest';
-          const accent = DAY_ACCENT[type];
+          const accent = day ? dayAccent(day) : DAY_ACCENT[type];
           const isToday = isViewingActive && week === currentWeek && wd === todayWd;
           const dayLabel = day?.dayLabel || 'Rest';
           const sub = day
-            ? (canViewDetail ? daySubtitle(day) : (type === 'rest' ? '' : DAY_TYPE_LABEL[type]))
+            ? (canViewDetail ? daySubtitle(day) : (type === 'rest' ? '' : dayTypeLabel(day)))
             : '';
           // Non-rest days open on the active OR a loaded bench program (read-only);
           // rest days open only on the active program, where they can be turned into
@@ -325,7 +327,7 @@ export default function ProgramPage() {
           <div className="relative max-h-[80%] w-full overflow-y-auto rounded-t-[24px] border-t border-[var(--rd-border)] p-5 pb-8" style={{ background: '#0F1117' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-label text-[10px] tracking-[.14em]" style={{ color: `rgb(${DAY_ACCENT[detail.dayType]})` }}>{DAY_TYPE_LABEL[detail.dayType].toUpperCase()} · {WEEKDAYS[detail.weekday]}</p>
+                <p className="font-label text-[10px] tracking-[.14em]" style={{ color: `rgb(${dayAccent(detail)})` }}>{dayTypeLabel(detail).toUpperCase()} · {WEEKDAYS[detail.weekday]}</p>
                 <h3 className="font-display mt-1 text-[20px] font-bold text-[var(--rd-ink)]">{detail.dayLabel}</h3>
               </div>
               <button onClick={closeDetail} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
@@ -399,11 +401,17 @@ export default function ProgramPage() {
                   </div>
                 ) : (
                   <div className="rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] p-3">
-                    <p className="font-label mb-2 text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">NEW ROUTINE FOCUS</p>
-                    <input value={newFocus} onChange={(e) => setNewFocus(e.target.value)} placeholder="e.g. Push & Pull, Deadlifts & Back" maxLength={60} className="font-body w-full rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2.5 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none" />
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">NEW ROUTINE</p>
+                      <div className="flex overflow-hidden rounded-[8px] border border-[var(--rd-border)]">
+                        <button onClick={() => setNewIsCardio(false)} className="px-2.5 py-1 text-[10px] font-bold" style={!newIsCardio ? { background: 'var(--rd-ember)', color: '#0A0C10' } : { color: 'var(--rd-text-muted)' }}>Workout</button>
+                        <button onClick={() => setNewIsCardio(true)} className="px-2.5 py-1 text-[10px] font-bold" style={newIsCardio ? { background: '#22D3EE', color: '#0A0C10' } : { color: 'var(--rd-text-muted)' }}>Cardio</button>
+                      </div>
+                    </div>
+                    <input value={newFocus} onChange={(e) => setNewFocus(e.target.value)} placeholder={newIsCardio ? 'e.g. rower 5min + air bike 2min + run 400m' : 'e.g. Push & Pull, Deadlifts & Back'} maxLength={newIsCardio ? 120 : 60} className="font-body w-full rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3 py-2.5 text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:border-[var(--rd-ember)] focus:outline-none" />
                     <div className="mt-2 flex gap-2">
                       <button onClick={() => setChanging('menu')} disabled={changeBusy} className="flex-1 rounded-[11px] border border-[var(--rd-border)] py-2 text-[13px] font-semibold text-[var(--rd-text-muted)]">Back</button>
-                      <button onClick={() => newFocus.trim() && setDayRoutine({ focus: newFocus.trim() })} disabled={changeBusy || !newFocus.trim()} className="grad-ember flex-1 rounded-[11px] py-2 text-[13px] font-semibold text-[#0A0C10] disabled:opacity-50">{changeBusy ? 'Building…' : 'Create'}</button>
+                      <button onClick={() => newFocus.trim() && setDayRoutine(newIsCardio ? { mode: 'cardio', focus: newFocus.trim() } : { focus: newFocus.trim() })} disabled={changeBusy || !newFocus.trim()} className="grad-ember flex-1 rounded-[11px] py-2 text-[13px] font-semibold text-[#0A0C10] disabled:opacity-50">{changeBusy ? 'Building…' : 'Create'}</button>
                     </div>
                   </div>
                 )
@@ -482,6 +490,20 @@ function DayExercises({ day }: { day: ProgramDay }) {
   if (day.dayType === 'rest') return <p className="mt-4 text-[13px] text-[var(--rd-text-muted)]">Recovery day — no training scheduled.</p>;
   if (day.dayType !== 'coached') return <p className="mt-4 text-[13px] text-[var(--rd-text-muted)]">Log this session yourself when it&apos;s done.</p>;
   if (!ex.length) return <p className="mt-4 text-[13px] text-[var(--rd-text-faint)]">No exercises generated yet.</p>;
+  // Cardio day — segments with duration / distance / reps (not sets×reps).
+  if (isCardioDay(day)) {
+    return (
+      <div className="mt-4 space-y-1.5">
+        <p className="font-label text-[9px] tracking-[.14em] text-[var(--rd-text-faint)]">SEGMENTS</p>
+        {ex.map((e, i) => (
+          <div key={i} className="flex items-center justify-between rounded-[10px] bg-[var(--rd-card)] px-3 py-2">
+            <p className="truncate text-[13px] font-medium text-[var(--rd-text-secondary)]">{(e.rounds && e.rounds > 1) ? `${e.rounds}× ` : ''}{e.name}</p>
+            <span className="font-label shrink-0 text-[11px]" style={{ color: `rgb(${CARDIO_ACCENT})` }}>{segmentLabel(e)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
   const primary = ex.filter((e) => e.is_primary);
   const accessory = ex.filter((e) => !e.is_primary);
   const Row = (e: (typeof ex)[number], i: number) => (

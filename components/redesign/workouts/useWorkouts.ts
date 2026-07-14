@@ -181,6 +181,14 @@ export function useWorkouts() {
     }
   });
 
+  // Cardio group — standalone cardio routines (program-linked cardio stays under
+  // its program group so mixed programs read correctly).
+  const cardioRoutines = routines.filter((r) => !grouped.has(r.key) && r.category === 'cardio');
+  if (cardioRoutines.length) {
+    cardioRoutines.forEach((r) => grouped.add(r.key));
+    routineGroups.push({ id: '__cardio', name: 'Cardio', accent: '34,211,238', routines: cardioRoutines });
+  }
+
   const ungrouped = routines.filter((r) => !grouped.has(r.key));
   if (ungrouped.length) {
     routineGroups.push({ id: '__other', name: 'Other', accent: GROUP_ACCENTS[routineGroups.length % GROUP_ACCENTS.length], routines: ungrouped });
