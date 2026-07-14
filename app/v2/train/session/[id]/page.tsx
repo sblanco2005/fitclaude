@@ -9,6 +9,7 @@ import {
 import { toDisplay, fromDisplay, perSideDisplay, totalLbFromPerSide, totalLbFromDisplay } from '@/components/redesign/session/weightMath';
 import { FinishRate } from '@/components/redesign/session/FinishRate';
 import { YouTubeAutoplay } from '@/components/redesign/session/YouTubeAutoplay';
+import { CardioSession } from '@/components/redesign/session/CardioSession';
 import { CheckIcon, CloseIcon, PlusIcon, MinusIcon, PlayIcon, ChevronLeftIcon, ArrowRightIcon } from '@/components/redesign/icons';
 
 // Screen 03 · Hit It (live workout) — accent: ember
@@ -53,7 +54,7 @@ export default function SessionPage() {
   }, [s.loading, s.defaultUnit, inited]);
 
   if (s.loading) return <div className="rd-card mt-6 h-[400px] animate-pulse-soft" />;
-  if (!s.exercises.length) {
+  if (!s.exercises.length && !s.segments.length) {
     return (
       <div className="rd-card mt-10 p-6 text-center">
         <p className="text-[14px] text-[var(--rd-text-muted)]">Couldn&apos;t load this session.</p>
@@ -68,11 +69,35 @@ export default function SessionPage() {
         elapsedSec={elapsed}
         volumeKg={s.stats.volumeKg}
         setsLogged={s.stats.setsLogged}
-        exercises={s.exercises.length}
+        exercises={s.isCardio ? s.segments.length : s.exercises.length}
         saving={s.saving}
         onSave={async (fatigue, note) => { await s.save(fatigue, note); router.push('/v2/train'); }}
         onDiscard={() => router.push('/v2/train')}
       />
+    );
+  }
+
+  // ── Cardio session — time / distance / reps per segment (no weights) ──
+  if (s.isCardio) {
+    return (
+      <div className="animate-fadeup space-y-4 pb-28">
+        <div className="flex items-center justify-between pt-1">
+          <span className="font-label text-[16px] font-bold text-[var(--rd-ink)]">{fmtTime(elapsed)}</span>
+          <div className="text-center">
+            <p className="font-label text-[9px] tracking-[.16em]" style={{ color: '#22D3EE' }}>CARDIO · IN PROGRESS</p>
+            <p className="text-[13px] font-semibold text-[var(--rd-ink)]">{s.name}</p>
+          </div>
+          <button onClick={() => setFinishing(true)} className="font-label flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold" style={{ borderColor: 'rgba(34,211,238,.5)', background: 'rgba(34,211,238,.12)', color: '#22D3EE' }}>
+            <CheckIcon size={13} /> Finish
+          </button>
+        </div>
+        <CardioSession segments={s.segments} onChange={s.updateSegment} />
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center">
+          <div className="pointer-events-auto w-full max-w-[430px] px-5 pb-6 pt-2" style={{ background: 'linear-gradient(180deg, transparent, var(--rd-bg) 40%)' }}>
+            <button onClick={() => setFinishing(true)} className="flex h-12 w-full items-center justify-center rounded-[14px] text-[15px] font-semibold text-[#0A0C10]" style={{ background: '#22D3EE' }}>Finish &amp; rate session</button>
+          </div>
+        </div>
+      </div>
     );
   }
 

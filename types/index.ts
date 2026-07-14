@@ -132,8 +132,11 @@ export interface WorkoutExercise {
   reps: string | null;
   weightKg: number | null;
   restSeconds: number | null;
+  durationSeconds?: number | null; // cardio segment target
+  distance?: number | null; // cardio segment target
+  distanceUnit?: string | null; // 'm' | 'km' | 'mi'
   notes: string | null;
-  setLogs: string | null; // JSON: [{"set":1,"weight":195,"reps":4},...]
+  setLogs: string | null; // JSON: lifting [{"set":1,"weight":195,"reps":4}]; cardio [{"durationSec":300,"distance":1000,"distanceUnit":"m","reps":null}]
   wasSpicy: boolean;
   supersetGroup?: string | null;
   exercise?: { name: string; muscleGroup: string; equipmentRequired?: string | null; gifUrl?: string | null; videos?: { youtubeVideoId: string; title: string; status?: string }[] } | null;
