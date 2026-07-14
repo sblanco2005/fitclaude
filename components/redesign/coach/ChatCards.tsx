@@ -67,12 +67,63 @@ export function LoggedMealCard({ meal }: { meal: LoggedMeal }) {
   );
 }
 
+export type LoggedActivity = {
+  name: string;
+  durationMinutes?: number | null;
+};
+
+// Flat activity log (opaque class — "Alpha Fit 60 min", "Yoga"). Mirrors LoggedMealCard.
+export function LoggedActivityCard({ activity }: { activity: LoggedActivity }) {
+  return (
+    <div
+      className="max-w-[88%] rounded-[16px] border p-3.5"
+      style={{ borderColor: 'rgba(34,211,238,.3)', background: 'rgba(34,211,238,.06)' }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="font-label text-[10px] tracking-[.14em]" style={{ color: '#22D3EE' }}>ACTIVITY LOGGED</span>
+        {activity.durationMinutes ? (
+          <span className="font-num text-[18px] font-bold text-[var(--rd-ink)]">
+            {activity.durationMinutes} <span className="font-label text-[10px] text-[var(--rd-text-faint)]">min</span>
+          </span>
+        ) : null}
+      </div>
+      <h3 className="font-display mt-1.5 text-[16px] font-bold text-[var(--rd-ink)]">{activity.name}</h3>
+    </div>
+  );
+}
+
+export type RoutineMove = {
+  name: string;
+  sets?: number;
+  reps?: string | number;
+  durationSeconds?: number | null;
+  distance?: number | null;
+  distanceUnit?: string | null;
+};
+
 export type GeneratedRoutine = {
   id?: string; // saved workout id — the routine is already persisted server-side
   name: string;
   spicyLevel?: number;
-  moves: { name: string; sets?: number; reps?: string | number }[];
+  category?: string; // 'cardio' → render segment labels instead of sets×reps
+  moves: RoutineMove[];
 };
+
+// Short metric label for a routine move ("5:00", "400 m", "×20", or "3×8-10").
+function moveLabel(m: RoutineMove, cardio: boolean): string {
+  if (cardio) {
+    if (m.durationSeconds != null) {
+      const mm = Math.floor(m.durationSeconds / 60);
+      const ss = m.durationSeconds % 60;
+      return `${mm}:${String(ss).padStart(2, '0')}`;
+    }
+    if (m.distance != null) return `${m.distance} ${m.distanceUnit ?? 'm'}`;
+    if (m.reps) return `×${m.reps}`;
+    return '';
+  }
+  if (!m.sets && !m.reps) return '';
+  return `${m.sets ?? ''}${m.sets && m.reps ? '×' : ''}${m.reps ?? ''}`;
+}
 
 export function GeneratedRoutineCard({
   routine,
@@ -89,13 +140,17 @@ export function GeneratedRoutineCard({
 }) {
   const shown = routine.moves.slice(0, 3);
   const extra = routine.moves.length - shown.length;
+  const cardio = routine.category === 'cardio';
+  const accent = cardio ? '34,211,238' : '155,123,255';
+  const accentColor = cardio ? '#22D3EE' : 'var(--rd-violet)';
+  const unit = cardio ? 'segments' : 'moves';
   return (
     <div
       className="max-w-[88%] rounded-[16px] border p-3.5"
-      style={{ borderColor: 'rgba(155,123,255,.32)', background: 'rgba(155,123,255,.06)' }}
+      style={{ borderColor: `rgba(${accent},.32)`, background: `rgba(${accent},.06)` }}
     >
       <div className="flex items-center justify-between">
-        <span className="font-label text-[10px] tracking-[.14em] text-[var(--rd-violet)]">GENERATED ROUTINE</span>
+        <span className="font-label text-[10px] tracking-[.14em]" style={{ color: accentColor }}>{cardio ? 'CARDIO WORKOUT' : 'GENERATED ROUTINE'}</span>
         {routine.spicyLevel ? (
           <span
             className="font-label rounded-[7px] px-1.5 py-0.5 text-[9px] font-bold text-[#0A0C10]"
@@ -106,19 +161,18 @@ export function GeneratedRoutineCard({
         ) : null}
       </div>
       <h3 className="font-display mt-1.5 text-[16px] font-bold text-[var(--rd-ink)]">
-        {routine.name} <span className="font-body text-[13px] font-normal text-[var(--rd-text-faint)]">· {routine.moves.length} moves</span>
+        {routine.name} <span className="font-body text-[13px] font-normal text-[var(--rd-text-faint)]">· {routine.moves.length} {unit}</span>
       </h3>
       <div className="mt-2.5 space-y-1.5">
-        {shown.map((m, i) => (
-          <div key={i} className="flex items-center justify-between rounded-[10px] bg-[var(--rd-card)] px-3 py-2">
-            <span className="text-[13px] text-[var(--rd-text-secondary)]">{m.name}</span>
-            {(m.sets || m.reps) && (
-              <span className="font-label text-[11px] text-[var(--rd-text-faint)]">
-                {m.sets ?? ''}{m.sets && m.reps ? '×' : ''}{m.reps ?? ''}
-              </span>
-            )}
-          </div>
-        ))}
+        {shown.map((m, i) => {
+          const label = moveLabel(m, cardio);
+          return (
+            <div key={i} className="flex items-center justify-between rounded-[10px] bg-[var(--rd-card)] px-3 py-2">
+              <span className="text-[13px] text-[var(--rd-text-secondary)]">{m.name}</span>
+              {label && <span className="font-label text-[11px] text-[var(--rd-text-faint)]">{label}</span>}
+            </div>
+          );
+        })}
       </div>
       {extra > 0 && <p className="mt-2 text-[12px] text-[var(--rd-text-faint)]">+{extra} more</p>}
       <div className="mt-3 flex gap-2">

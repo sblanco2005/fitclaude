@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFitClaude } from '@/context/FitClaudeContext';
-import type { LoggedMeal, GeneratedRoutine } from './ChatCards';
+import type { LoggedMeal, GeneratedRoutine, LoggedActivity } from './ChatCards';
 
 export type CoachMessage = {
   id: string;
@@ -11,7 +11,10 @@ export type CoachMessage = {
   image?: string; // data URL, for preview of an attached photo
   meal?: LoggedMeal;
   routine?: GeneratedRoutine;
+  activity?: LoggedActivity;
 };
+
+export type SessionType = 'lifting' | 'conditioning';
 
 export type ChatImage = { base64: string; mediaType: string; dataUrl: string };
 
@@ -52,10 +55,15 @@ async function buildRoutineCard(workoutId: string): Promise<GeneratedRoutine | u
       id: workoutId,
       name: w.name?.trim() || w.workoutType || 'Routine',
       spicyLevel: spicy || undefined,
-      moves: (w.exercises ?? []).map((e: { exercise?: { name?: string } | null; variation?: { name?: string } | null; sets?: number; reps?: string | null }) => ({
-        name: e.exercise?.name || e.variation?.name || 'Exercise',
+      category: w.category ?? undefined,
+      moves: (w.exercises ?? []).map((e: { exercise?: { name?: string } | null; variation?: { name?: string } | null; notes?: string | null; sets?: number; reps?: string | null; durationSeconds?: number | null; distance?: number | null; distanceUnit?: string | null }) => ({
+        // cardio segments store their label as "Name||..." in notes when unlinked
+        name: e.exercise?.name || e.variation?.name || e.notes?.split('|')[0] || 'Exercise',
         sets: e.sets,
         reps: e.reps ?? undefined,
+        durationSeconds: e.durationSeconds ?? undefined,
+        distance: e.distance ?? undefined,
+        distanceUnit: e.distanceUnit ?? undefined,
       })),
     };
   } catch {
@@ -100,7 +108,7 @@ export function useCoachChat(context: CoachContext = 'workout') {
   }, [scrollToBottom, context]);
 
   const send = useCallback(
-    async (text: string, image?: ChatImage) => {
+    async (text: string, image?: ChatImage, sessionType?: SessionType) => {
       const clean = text.trim();
       if ((!clean && !image) || loading) return;
       setMessages((m) => [...m, { id: nextId(), role: 'user', content: clean, image: image?.dataUrl }]);
@@ -114,6 +122,7 @@ export function useCoachChat(context: CoachContext = 'workout') {
             message: clean,
             topic: context,
             timezone: tz(),
+            ...(sessionType ? { session_type: sessionType } : {}),
             ...(image ? { image_base64: image.base64, image_media_type: image.mediaType, use_vision: true } : {}),
           }),
         });
@@ -122,6 +131,9 @@ export function useCoachChat(context: CoachContext = 'workout') {
           data.nutrition_log_id ? buildMealCard(data.nutrition_log_id) : Promise.resolve(undefined),
           data.workout_id ? buildRoutineCard(data.workout_id) : Promise.resolve(undefined),
         ]);
+        const activity: LoggedActivity | undefined = data.activity?.name
+          ? { name: data.activity.name, durationMinutes: data.activity.duration_minutes ?? undefined }
+          : undefined;
         setMessages((m) => [
           ...m,
           {
@@ -130,6 +142,7 @@ export function useCoachChat(context: CoachContext = 'workout') {
             content: data.response ?? data.message ?? '',
             meal,
             routine,
+            activity,
           },
         ]);
       } catch {
