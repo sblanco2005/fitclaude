@@ -87,6 +87,10 @@ TOOL_DEFINITIONS = [
                                 "enum": ["m", "km", "mi"],
                                 "description": "Unit for `distance` — only include alongside `distance`.",
                             },
+                            "calories": {
+                                "type": "integer",
+                                "description": "CARDIO segments only: target calories to burn (air bike, rower, ski erg). Omit for weight exercises.",
+                            },
                         },
                         "required": ["name", "muscle_group", "sets", "reps"],
                     },

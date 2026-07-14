@@ -46,7 +46,7 @@ export type SessionSegment = {
   youtubeUrl?: string;
   youtubeId?: string;
   gifUrl?: string;
-  target: { durationSec: number | null; distance: number | null; distanceUnit: DistUnit | null; reps: number | null };
+  target: { durationSec: number | null; distance: number | null; distanceUnit: DistUnit | null; calories: number | null; reps: number | null };
   metrics: MetricKey[]; // which metrics the user logs for this segment
   rounds: SegmentLog[]; // one per round (sets = rounds)
 };
@@ -157,14 +157,14 @@ function parseCardioLogs(raw: string | null | undefined): CardioRound[] {
 // Infer which metrics to show for a segment from its target + last logged round.
 // Falls back to 'time' (the most universal) when there's nothing to go on.
 function inferMetrics(
-  target: { durationSec: number | null; distance: number | null; reps: number | null },
+  target: { durationSec: number | null; distance: number | null; calories: number | null; reps: number | null },
   last: CardioRound | undefined,
 ): MetricKey[] {
   if (last?.metrics?.length) return last.metrics; // user's saved choice wins
   const m: MetricKey[] = [];
   if (target.durationSec != null || (last && last.durationSec > 0)) m.push('time');
   if (target.distance != null || (last && last.distance > 0)) m.push('distance');
-  if (last && last.calories > 0) m.push('calories');
+  if (target.calories != null || (last && last.calories > 0)) m.push('calories');
   if (target.reps != null || (last && last.reps != null && last.reps > 0)) m.push('reps');
   return m.length ? m : ['time'];
 }
@@ -196,6 +196,7 @@ function buildSegments(w: Workout, lastByName: Map<string, CardioRound[]>): Sess
         durationSec: e.durationSeconds ?? null,
         distance: e.distance ?? null,
         distanceUnit: (e.distanceUnit as DistUnit) ?? null,
+        calories: e.caloriesTarget ?? null,
         reps: e.reps ? (parseInt(e.reps, 10) || null) : null,
       };
       const last = lastByName.get(name.toLowerCase()) ?? [];
@@ -205,7 +206,7 @@ function buildSegments(w: Workout, lastByName: Map<string, CardioRound[]>): Sess
           durationSec: l?.durationSec ?? target.durationSec ?? 0,
           distance: l?.distance ?? target.distance ?? 0,
           distanceUnit: (l?.distanceUnit ?? target.distanceUnit ?? 'm') as DistUnit,
-          calories: l?.calories ?? 0,
+          calories: l?.calories ?? target.calories ?? 0,
           reps: l?.reps ?? target.reps ?? null,
           done: false,
         };

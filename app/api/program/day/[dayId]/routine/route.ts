@@ -38,7 +38,7 @@ export const POST = withAuth(async (request, user, params) => {
       await prisma.$transaction(async (tx) => {
         await tx.programDay.update({
           where: { id: day.id },
-          data: { dayType: 'coached', dayLabel: label, workoutType: 'cardio', exerciseTemplate: JSON.stringify(segments.map((s) => ({ name: s.name, durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, reps: s.reps, rounds: s.rounds }))) },
+          data: { dayType: 'coached', dayLabel: label, workoutType: 'cardio', exerciseTemplate: JSON.stringify(segments.map((s) => ({ name: s.name, durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, calories: s.calories, reps: s.reps, rounds: s.rounds }))) },
         });
         const existing = await tx.workout.findFirst({ where: { programDayId: day.id, completed: false }, select: { id: true } });
         let routineId = existing?.id;
@@ -51,7 +51,7 @@ export const POST = withAuth(async (request, user, params) => {
           routineId = wk.id;
         }
         await tx.workoutExercise.createMany({
-          data: segments.map((s, i) => ({ workoutId: routineId!, exerciseId: s.exerciseId, order: i + 1, sets: s.rounds, reps: s.reps, restSeconds: s.restSeconds, durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, notes: `${s.name}||${segmentLabel(s)}` })),
+          data: segments.map((s, i) => ({ workoutId: routineId!, exerciseId: s.exerciseId, order: i + 1, sets: s.rounds, reps: s.reps, restSeconds: s.restSeconds, durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, caloriesTarget: s.calories, notes: `${s.name}||${segmentLabel(s)}` })),
         });
       }, { timeout: 20000 });
       return NextResponse.json({ ok: true });

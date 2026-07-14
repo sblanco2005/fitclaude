@@ -1049,10 +1049,11 @@ async def _tool_generate_workout(
             rest_seconds=ex.get("rest_seconds"),
             notes=notes_str,
             superset_group=ex.get("superset_group"),
-            # Cardio segments carry time/distance targets instead of weights.
+            # Cardio segments carry time/distance/calorie targets instead of weights.
             duration_seconds=ex.get("duration_seconds"),
             distance=ex.get("distance"),
             distance_unit=ex.get("distance_unit"),
+            calories_target=ex.get("calories"),
         )
         db.add(we)
         stored.append({

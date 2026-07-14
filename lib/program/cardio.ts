@@ -12,6 +12,7 @@ export type CardioSegment = {
   durationSeconds: number | null;
   distance: number | null;
   distanceUnit: 'm' | 'km' | 'mi' | null;
+  calories: number | null;
   reps: string | null;
   restSeconds: number | null;
 };
@@ -32,9 +33,14 @@ function parseOne(seg: string, cardioExercises: Ex[]): CardioSegment | null {
   let durationSeconds: number | null = null;
   let distance: number | null = null;
   let distanceUnit: 'm' | 'km' | 'mi' | null = null;
+  let calories: number | null = null;
   let reps: string | null = null;
 
   const strip = (re: RegExp) => { s = s.replace(re, ' '); };
+
+  // calories — "8 cal", "12 cals", "10 calories"
+  const calM = s.match(/(\d+)\s*(?:cals?|calories?)\b/);
+  if (calM) { calories = parseInt(calM[1], 10); strip(/(\d+)\s*(?:cals?|calories?)\b/); }
 
   // duration — mm:ss
   const mmss = s.match(/(\d+):(\d{1,2})/);
@@ -61,7 +67,7 @@ function parseOne(seg: string, cardioExercises: Ex[]): CardioSegment | null {
   const rr = s.match(/(\d+)\s*reps?\b/);
   if (xr) { reps = xr[1]; strip(/[x×]\s*\d+/); }
   else if (rr) { reps = rr[1]; strip(/(\d+)\s*reps?\b/); }
-  else if (durationSeconds == null && distance == null) {
+  else if (durationSeconds == null && distance == null && calories == null) {
     const lead = s.match(/^\s*(\d+)\s+(?=\D)/);
     if (lead) { reps = lead[1]; strip(/^\s*\d+\s+/); }
   }
@@ -86,6 +92,7 @@ function parseOne(seg: string, cardioExercises: Ex[]): CardioSegment | null {
     durationSeconds,
     distance,
     distanceUnit,
+    calories,
     reps,
     restSeconds: null,
   };
@@ -97,19 +104,20 @@ export function parseCardioSegments(text: string, cardioExercises: Ex[] = []): C
     .filter((x): x is CardioSegment => !!x);
   // Fallback: nothing parsed → a single free-text segment from the whole input.
   if (!segs.length && text.trim()) {
-    return [{ name: titleCase(text.trim().slice(0, 40)), exerciseId: null, rounds: 1, durationSeconds: null, distance: null, distanceUnit: null, reps: null, restSeconds: null }];
+    return [{ name: titleCase(text.trim().slice(0, 40)), exerciseId: null, rounds: 1, durationSeconds: null, distance: null, distanceUnit: null, calories: null, reps: null, restSeconds: null }];
   }
   return segs;
 }
 
 // Short display label for a segment ("Rower · 5:00", "Run · 400 m", "Burpees · ×20").
-export function segmentLabel(s: { durationSeconds?: number | null; distance?: number | null; distanceUnit?: string | null; reps?: string | null }): string {
+export function segmentLabel(s: { durationSeconds?: number | null; distance?: number | null; distanceUnit?: string | null; calories?: number | null; reps?: string | null }): string {
   if (s.durationSeconds != null) {
     const m = Math.floor(s.durationSeconds / 60);
     const sec = s.durationSeconds % 60;
     return `${m}:${String(sec).padStart(2, '0')}`;
   }
   if (s.distance != null) return `${s.distance} ${s.distanceUnit ?? 'm'}`;
+  if (s.calories != null) return `${s.calories} cal`;
   if (s.reps != null) return `×${s.reps}`;
   return '';
 }

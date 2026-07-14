@@ -59,6 +59,7 @@ class WorkoutExercise(Base):
     duration_seconds: Mapped[Optional[int]] = mapped_column("durationSeconds", nullable=True)
     distance: Mapped[Optional[float]] = mapped_column(nullable=True)
     distance_unit: Mapped[Optional[str]] = mapped_column("distanceUnit", String, nullable=True)
+    calories_target: Mapped[Optional[int]] = mapped_column("caloriesTarget", nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     set_logs: Mapped[Optional[str]] = mapped_column("setLogs", Text, nullable=True)
     was_spicy: Mapped[bool] = mapped_column("wasSpicy", default=False)
