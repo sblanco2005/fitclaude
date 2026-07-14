@@ -91,7 +91,7 @@ export default function SessionPage() {
             <CheckIcon size={13} /> Finish
           </button>
         </div>
-        <CardioSession segments={s.segments} onChange={s.updateSegment} />
+        <CardioSession segments={s.segments} onChange={s.updateSegment} onSetMetrics={s.setSegmentMetrics} />
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center">
           <div className="pointer-events-auto w-full max-w-[430px] px-5 pb-6 pt-2" style={{ background: 'linear-gradient(180deg, transparent, var(--rd-bg) 40%)' }}>
             <button onClick={() => setFinishing(true)} className="flex h-12 w-full items-center justify-center rounded-[14px] text-[15px] font-semibold text-[#0A0C10]" style={{ background: '#22D3EE' }}>Finish &amp; rate session</button>

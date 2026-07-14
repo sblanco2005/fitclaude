@@ -35,7 +35,11 @@ export type SessionExercise = {
 
 // ── Cardio session (no weights — time / distance / reps per segment) ──────────
 export type DistUnit = 'm' | 'km' | 'mi';
-export type SegmentLog = { durationSec: number; distance: number; distanceUnit: DistUnit; reps: number | null; done: boolean };
+// How a cardio segment is logged. Different modalities suit different metrics —
+// running=distance, air bike=calories, rower=calories or meters, etc.
+export type MetricKey = 'time' | 'distance' | 'calories' | 'reps';
+export const ALL_METRICS: MetricKey[] = ['time', 'distance', 'calories', 'reps'];
+export type SegmentLog = { durationSec: number; distance: number; distanceUnit: DistUnit; calories: number; reps: number | null; done: boolean };
 export type SessionSegment = {
   woExerciseId: string;
   name: string;
@@ -43,6 +47,7 @@ export type SessionSegment = {
   youtubeId?: string;
   gifUrl?: string;
   target: { durationSec: number | null; distance: number | null; distanceUnit: DistUnit | null; reps: number | null };
+  metrics: MetricKey[]; // which metrics the user logs for this segment
   rounds: SegmentLog[]; // one per round (sets = rounds)
 };
 
@@ -134,17 +139,34 @@ function buildExercises(w: Workout, lastByName: Map<string, PriorSet[]>, prByNam
     });
 }
 
-type CardioRound = { durationSec: number; distance: number; distanceUnit: DistUnit; reps: number | null };
+type CardioRound = { durationSec: number; distance: number; distanceUnit: DistUnit; calories: number; reps: number | null; metrics?: MetricKey[] };
 function parseCardioLogs(raw: string | null | undefined): CardioRound[] {
   return parseJsonArray(raw).map((l) => {
-    const o = l as { durationSec?: number; distance?: number; distanceUnit?: string; reps?: number | null };
+    const o = l as { durationSec?: number; distance?: number; distanceUnit?: string; calories?: number; reps?: number | null; metrics?: MetricKey[] };
     return {
       durationSec: Number(o.durationSec) || 0,
       distance: Number(o.distance) || 0,
       distanceUnit: (o.distanceUnit as DistUnit) || 'm',
+      calories: Number(o.calories) || 0,
       reps: o.reps == null ? null : Number(o.reps),
+      metrics: Array.isArray(o.metrics) ? o.metrics : undefined,
     };
   });
+}
+
+// Infer which metrics to show for a segment from its target + last logged round.
+// Falls back to 'time' (the most universal) when there's nothing to go on.
+function inferMetrics(
+  target: { durationSec: number | null; distance: number | null; reps: number | null },
+  last: CardioRound | undefined,
+): MetricKey[] {
+  if (last?.metrics?.length) return last.metrics; // user's saved choice wins
+  const m: MetricKey[] = [];
+  if (target.durationSec != null || (last && last.durationSec > 0)) m.push('time');
+  if (target.distance != null || (last && last.distance > 0)) m.push('distance');
+  if (last && last.calories > 0) m.push('calories');
+  if (target.reps != null || (last && last.reps != null && last.reps > 0)) m.push('reps');
+  return m.length ? m : ['time'];
 }
 
 // Last actuals per cardio segment (most recent completed session).
@@ -183,6 +205,7 @@ function buildSegments(w: Workout, lastByName: Map<string, CardioRound[]>): Sess
           durationSec: l?.durationSec ?? target.durationSec ?? 0,
           distance: l?.distance ?? target.distance ?? 0,
           distanceUnit: (l?.distanceUnit ?? target.distanceUnit ?? 'm') as DistUnit,
+          calories: l?.calories ?? 0,
           reps: l?.reps ?? target.reps ?? null,
           done: false,
         };
@@ -195,6 +218,7 @@ function buildSegments(w: Workout, lastByName: Map<string, CardioRound[]>): Sess
         youtubeId: video?.youtubeVideoId,
         gifUrl: e.exercise?.gifUrl ?? undefined,
         target,
+        metrics: inferMetrics(target, last[0]),
         rounds: roundEntries,
       };
     });
@@ -248,6 +272,11 @@ export function useSession(id: string) {
     setSegments((prev) =>
       prev.map((seg, i) => (i !== segIdx ? seg : { ...seg, rounds: seg.rounds.map((r, j) => (j !== roundIdx ? r : { ...r, ...patch })) })),
     );
+  }, []);
+
+  // Toggle which metrics (time/distance/calories/reps) a cardio segment logs.
+  const setSegmentMetrics = useCallback((segIdx: number, metrics: MetricKey[]) => {
+    setSegments((prev) => prev.map((seg, i) => (i !== segIdx ? seg : { ...seg, metrics })));
   }, []);
 
   const addSet = useCallback((exIdx: number) => {
@@ -359,7 +388,9 @@ export function useSession(id: string) {
         exercises: cardio
           ? segments.map((seg) => ({
               exerciseId: seg.woExerciseId,
-              setLogs: seg.rounds.filter((r) => r.done).map((r) => ({ durationSec: r.durationSec, distance: r.distance, distanceUnit: r.distanceUnit, reps: r.reps })),
+              // Persist the chosen metrics with each round so the next session
+              // restores this segment's logging style (see inferMetrics).
+              setLogs: seg.rounds.filter((r) => r.done).map((r) => ({ durationSec: r.durationSec, distance: r.distance, distanceUnit: r.distanceUnit, calories: r.calories, reps: r.reps, metrics: seg.metrics })),
             }))
           : exercises.map((ex) => ({
               exerciseId: ex.woExerciseId,
@@ -400,6 +431,7 @@ export function useSession(id: string) {
     defaultUnit,
     updateSet,
     updateSegment,
+    setSegmentMetrics,
     addSet,
     removeSet,
     fillRemaining,
