@@ -135,6 +135,7 @@ export interface WorkoutExercise {
   durationSeconds?: number | null; // cardio segment target
   distance?: number | null; // cardio segment target
   distanceUnit?: string | null; // 'm' | 'km' | 'mi'
+  caloriesTarget?: number | null; // cardio calorie target
   notes: string | null;
   setLogs: string | null; // JSON: lifting [{"set":1,"weight":195,"reps":4}]; cardio [{"durationSec":300,"distance":1000,"distanceUnit":"m","reps":null}]
   wasSpicy: boolean;
@@ -183,6 +184,7 @@ export interface ProgramDayExercise {
   durationSeconds?: number | null;
   distance?: number | null;
   distanceUnit?: string | null;
+  calories?: number | null;
   rounds?: number;
 }
 

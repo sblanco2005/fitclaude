@@ -45,8 +45,16 @@ test('does not mis-parse "min" as meters or "squats" as seconds', () => {
   assert.equal(s.distance, null); // "5min" is not "5 m"
 });
 
+test('calories: air bike 8 cal + ski erg', () => {
+  const segs = parseCardioSegments('air bike 8 cal, ski erg 10 cals', CARDIO);
+  assert.deepEqual([segs[0].name, segs[0].calories], ['Air Bike', 8]);
+  assert.equal(segs[0].reps, null); // "8" is calories, not reps
+  assert.equal(segs[1].calories, 10);
+});
+
 test('segmentLabel formats', () => {
   assert.equal(segmentLabel({ durationSeconds: 300, distance: null, distanceUnit: null, reps: null }), '5:00');
   assert.equal(segmentLabel({ durationSeconds: null, distance: 400, distanceUnit: 'm', reps: null }), '400 m');
+  assert.equal(segmentLabel({ durationSeconds: null, distance: null, distanceUnit: null, calories: 12, reps: null }), '12 cal');
   assert.equal(segmentLabel({ durationSeconds: null, distance: null, distanceUnit: null, reps: '20' }), '×20');
 });

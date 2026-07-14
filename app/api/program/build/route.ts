@@ -124,7 +124,7 @@ export const POST = withAuth(async (request, user) => {
               data: {
                 programId: program.id, weekday: wd, weekNumber: w,
                 dayType: 'coached', dayLabel, workoutType: 'cardio',
-                exerciseTemplate: JSON.stringify(segments.map((s) => ({ name: s.name, durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, reps: s.reps, rounds: s.rounds }))),
+                exerciseTemplate: JSON.stringify(segments.map((s) => ({ name: s.name, durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, calories: s.calories, reps: s.reps, rounds: s.rounds }))),
               },
               select: { id: true },
             });
@@ -136,7 +136,7 @@ export const POST = withAuth(async (request, user) => {
               data: segments.map((s, i) => ({
                 workoutId: routine.id, exerciseId: s.exerciseId, order: i + 1,
                 sets: s.rounds, reps: s.reps, restSeconds: s.restSeconds,
-                durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit,
+                durationSeconds: s.durationSeconds, distance: s.distance, distanceUnit: s.distanceUnit, caloriesTarget: s.calories,
                 notes: `${s.name}||${segmentLabel(s)}`,
               })),
             });

@@ -197,6 +197,7 @@ model WorkoutExercise {
   durationSeconds Int? // cardio: timed segment target (seconds)
   distance      Float? // cardio: distance target
   distanceUnit  String? // cardio: 'm' | 'km' | 'mi'
+  caloriesTarget Int? // cardio: calorie target (air bike, rower, ski erg)
   notes         String?
   setLogs       String? @db.Text // JSON: lifting [{"set":1,"weight":195,"reps":4}]; cardio [{"durationSec":300,"distance":1000,"distanceUnit":"m","reps":null}]
   wasSpicy      Boolean @default(false)
