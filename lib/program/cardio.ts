@@ -103,7 +103,7 @@ export function parseCardioSegments(text: string, cardioExercises: Ex[] = []): C
 }
 
 // Short display label for a segment ("Rower · 5:00", "Run · 400 m", "Burpees · ×20").
-export function segmentLabel(s: { durationSeconds: number | null; distance: number | null; distanceUnit: string | null; reps: string | null }): string {
+export function segmentLabel(s: { durationSeconds?: number | null; distance?: number | null; distanceUnit?: string | null; reps?: string | null }): string {
   if (s.durationSeconds != null) {
     const m = Math.floor(s.durationSeconds / 60);
     const sec = s.durationSeconds % 60;

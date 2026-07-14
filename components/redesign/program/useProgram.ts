@@ -28,6 +28,15 @@ export const DAY_TYPE_LABEL: Record<DayType, string> = {
   rest: 'Rest',
 };
 
+// Cardio days are stored as dayType:'coached' + workoutType:'cardio'; surface them
+// with their own accent/label.
+export const CARDIO_ACCENT = '34,211,238'; // cyan
+export const isCardioDay = (d: { workoutType?: string | null }) => d.workoutType === 'cardio';
+export const dayAccent = (d: { dayType: DayType; workoutType?: string | null }) =>
+  isCardioDay(d) ? CARDIO_ACCENT : DAY_ACCENT[d.dayType];
+export const dayTypeLabel = (d: { dayType: DayType; workoutType?: string | null }) =>
+  isCardioDay(d) ? 'Cardio' : DAY_TYPE_LABEL[d.dayType];
+
 // JS getDay() Sun=0..Sat=6 → program weekday Mon=0..Sun=6
 export const todayWeekdayMon = () => {
   const d = new Date().getDay();
@@ -74,6 +83,10 @@ export function daySubtitle(day: ProgramDay): string {
   if (day.dayType === 'pt_session') return 'Log your own workout';
   if (day.dayType === 'class') return 'Log when done';
   const ex = day.exerciseTemplate ?? [];
+  if (isCardioDay(day)) {
+    const names = ex.map((e) => e.name).filter(Boolean).slice(0, 3);
+    return names.length ? names.join(' · ') : `${ex.length} segment${ex.length === 1 ? '' : 's'}`;
+  }
   const muscles = Array.from(new Set(ex.map((e) => e.muscle_group).filter(Boolean))).slice(0, 3);
   if (muscles.length) return muscles.join(', ');
   return ex.length ? `${ex.length} exercises` : 'Coached';
