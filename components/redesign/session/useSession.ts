@@ -33,6 +33,19 @@ export type SessionExercise = {
   sets: SetEntry[];
 };
 
+// ── Cardio session (no weights — time / distance / reps per segment) ──────────
+export type DistUnit = 'm' | 'km' | 'mi';
+export type SegmentLog = { durationSec: number; distance: number; distanceUnit: DistUnit; reps: number | null; done: boolean };
+export type SessionSegment = {
+  woExerciseId: string;
+  name: string;
+  youtubeUrl?: string;
+  youtubeId?: string;
+  gifUrl?: string;
+  target: { durationSec: number | null; distance: number | null; distanceUnit: DistUnit | null; reps: number | null };
+  rounds: SegmentLog[]; // one per round (sets = rounds)
+};
+
 const parseFirstInt = (s: string | null | undefined, fallback: number): number => {
   const m = (s ?? '').match(/\d+/);
   return m ? parseInt(m[0], 10) : fallback;
@@ -40,15 +53,22 @@ const parseFirstInt = (s: string | null | undefined, fallback: number): number =
 
 const exName = (e: WorkoutExercise) => (e.exercise?.name || e.variation?.name || 'Exercise');
 
-function parseSetLogs(raw: string | null | undefined): PriorSet[] {
+// Parse a setLogs JSON blob to an array, tolerating legacy DOUBLE-encoded values.
+function parseJsonArray(raw: string | null | undefined): unknown[] {
   try {
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr)
-      ? arr.map((l: { weight?: number; reps?: number }) => ({ weight: Number(l.weight) || 0, reps: Number(l.reps) || 0 }))
-      : [];
+    let v = raw ? JSON.parse(raw) : [];
+    if (typeof v === 'string') v = JSON.parse(v); // legacy double-encoded
+    return Array.isArray(v) ? v : [];
   } catch {
     return [];
   }
+}
+
+function parseSetLogs(raw: string | null | undefined): PriorSet[] {
+  return parseJsonArray(raw).map((l) => {
+    const o = l as { weight?: number; reps?: number };
+    return { weight: Number(o.weight) || 0, reps: Number(o.reps) || 0 };
+  });
 }
 
 // Build per-exercise "last session" sets + all-time PR from workout history.
@@ -114,9 +134,76 @@ function buildExercises(w: Workout, lastByName: Map<string, PriorSet[]>, prByNam
     });
 }
 
+type CardioRound = { durationSec: number; distance: number; distanceUnit: DistUnit; reps: number | null };
+function parseCardioLogs(raw: string | null | undefined): CardioRound[] {
+  return parseJsonArray(raw).map((l) => {
+    const o = l as { durationSec?: number; distance?: number; distanceUnit?: string; reps?: number | null };
+    return {
+      durationSec: Number(o.durationSec) || 0,
+      distance: Number(o.distance) || 0,
+      distanceUnit: (o.distanceUnit as DistUnit) || 'm',
+      reps: o.reps == null ? null : Number(o.reps),
+    };
+  });
+}
+
+// Last actuals per cardio segment (most recent completed session).
+function buildCardioLast(all: Workout[], currentId: string): Map<string, CardioRound[]> {
+  const sorted = [...all].sort((a, b) => +new Date(b.date || b.createdAt) - +new Date(a.date || a.createdAt));
+  const lastByName = new Map<string, CardioRound[]>();
+  for (const w of sorted) {
+    if (w.id === currentId) continue;
+    for (const we of w.exercises ?? []) {
+      const name = (we.exercise?.name || we.notes?.split('|')[0] || '').toLowerCase();
+      if (!name) continue;
+      const logs = parseCardioLogs(we.setLogs);
+      if (logs.length && !lastByName.has(name)) lastByName.set(name, logs);
+    }
+  }
+  return lastByName;
+}
+
+function buildSegments(w: Workout, lastByName: Map<string, CardioRound[]>): SessionSegment[] {
+  return (w.exercises ?? [])
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((e) => {
+      const name = e.exercise?.name || e.notes?.split('|')[0] || 'Segment';
+      const rounds = Math.max(1, e.sets || 1);
+      const target = {
+        durationSec: e.durationSeconds ?? null,
+        distance: e.distance ?? null,
+        distanceUnit: (e.distanceUnit as DistUnit) ?? null,
+        reps: e.reps ? (parseInt(e.reps, 10) || null) : null,
+      };
+      const last = lastByName.get(name.toLowerCase()) ?? [];
+      const roundEntries: SegmentLog[] = Array.from({ length: rounds }, (_, i) => {
+        const l = last[i];
+        return {
+          durationSec: l?.durationSec ?? target.durationSec ?? 0,
+          distance: l?.distance ?? target.distance ?? 0,
+          distanceUnit: (l?.distanceUnit ?? target.distanceUnit ?? 'm') as DistUnit,
+          reps: l?.reps ?? target.reps ?? null,
+          done: false,
+        };
+      });
+      const video = e.exercise?.videos?.[0];
+      return {
+        woExerciseId: e.id,
+        name,
+        youtubeUrl: video ? `https://youtube.com/watch?v=${video.youtubeVideoId}` : undefined,
+        youtubeId: video?.youtubeVideoId,
+        gifUrl: e.exercise?.gifUrl ?? undefined,
+        target,
+        rounds: roundEntries,
+      };
+    });
+}
+
 export function useSession(id: string) {
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [exercises, setExercises] = useState<SessionExercise[]>([]);
+  const [segments, setSegments] = useState<SessionSegment[]>([]);
   const [defaultUnit, setDefaultUnit] = useState<'kg' | 'lb'>('lb');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -137,8 +224,12 @@ export function useSession(id: string) {
       setDefaultUnit(pRes?.weightUnit === 'kg' ? 'kg' : 'lb');
       setWorkout(w);
       if (w) {
-        const { lastByName, prByName } = buildHistory(all, id);
-        setExercises(buildExercises(w, lastByName, prByName));
+        if (w.category === 'cardio') {
+          setSegments(buildSegments(w, buildCardioLast(all, id)));
+        } else {
+          const { lastByName, prByName } = buildHistory(all, id);
+          setExercises(buildExercises(w, lastByName, prByName));
+        }
       }
       setLoading(false);
     })();
@@ -150,6 +241,12 @@ export function useSession(id: string) {
   const updateSet = useCallback((exIdx: number, setIdx: number, patch: Partial<SetEntry>) => {
     setExercises((prev) =>
       prev.map((ex, i) => (i !== exIdx ? ex : { ...ex, sets: ex.sets.map((s, j) => (j !== setIdx ? s : { ...s, ...patch })) })),
+    );
+  }, []);
+
+  const updateSegment = useCallback((segIdx: number, roundIdx: number, patch: Partial<SegmentLog>) => {
+    setSegments((prev) =>
+      prev.map((seg, i) => (i !== segIdx ? seg : { ...seg, rounds: seg.rounds.map((r, j) => (j !== roundIdx ? r : { ...r, ...patch })) })),
     );
   }, []);
 
@@ -246,18 +343,28 @@ export function useSession(id: string) {
       volumeLb += sessionVolumeLb(ex.sets);
       setsLogged += ex.sets.filter((s) => s.done).length;
     });
+    segments.forEach((seg) => { setsLogged += seg.rounds.filter((r) => r.done).length; });
     return { volumeKg: Math.round(lbToKg(volumeLb)), volumeLb: Math.round(volumeLb), setsLogged };
-  }, [exercises]);
+  }, [exercises, segments]);
 
   const save = useCallback(
     async (fatigueRating: number | null, note: string) => {
       setSaving(true);
       const durationMinutes = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
+      const cardio = workout?.category === 'cardio';
+      // NOTE: the /log route JSON.stringifies each entry.setLogs, so we send an
+      // ARRAY (not a pre-stringified string) — otherwise it double-encodes and
+      // history/Last can't be read back.
       const payload = {
-        exercises: exercises.map((ex) => ({
-          exerciseId: ex.woExerciseId,
-          setLogs: JSON.stringify(buildSetLogs(ex.sets)),
-        })),
+        exercises: cardio
+          ? segments.map((seg) => ({
+              exerciseId: seg.woExerciseId,
+              setLogs: seg.rounds.filter((r) => r.done).map((r) => ({ durationSec: r.durationSec, distance: r.distance, distanceUnit: r.distanceUnit, reps: r.reps })),
+            }))
+          : exercises.map((ex) => ({
+              exerciseId: ex.woExerciseId,
+              setLogs: buildSetLogs(ex.sets),
+            })),
         durationMinutes,
       };
       try {
@@ -280,16 +387,19 @@ export function useSession(id: string) {
         setSaving(false);
       }
     },
-    [exercises, id, startedAt],
+    [exercises, segments, workout, id, startedAt],
   );
 
   return {
     loading,
     saving,
     workout,
+    isCardio: workout?.category === 'cardio',
     exercises,
+    segments,
     defaultUnit,
     updateSet,
+    updateSegment,
     addSet,
     removeSet,
     fillRemaining,
