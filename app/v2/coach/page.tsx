@@ -2,10 +2,12 @@
 
 import React, { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCoachChat } from '@/components/redesign/coach/useCoachChat';
-import { UserBubble, CoachBubble, LoggedMealCard, GeneratedRoutineCard } from '@/components/redesign/coach/ChatCards';
+import { useCoachChat, type SessionType } from '@/components/redesign/coach/useCoachChat';
+import { UserBubble, CoachBubble, LoggedMealCard, GeneratedRoutineCard, LoggedActivityCard } from '@/components/redesign/coach/ChatCards';
 import { SparkleIcon, ArrowRightIcon, CloseIcon } from '@/components/redesign/icons';
 import { readImageCompressed, type CompressedImage } from '@/lib/image';
+
+const CYAN = '#22D3EE';
 
 function CameraIcon({ size = 18 }: { size?: number }) {
   return (
@@ -23,7 +25,9 @@ export default function CoachPage() {
   const [input, setInput] = useState('');
   const [image, setImage] = useState<CompressedImage | null>(null);
   const [attaching, setAttaching] = useState(false);
+  const [mode, setMode] = useState<SessionType>('lifting');
   const fileRef = useRef<HTMLInputElement>(null);
+  const cardio = mode === 'conditioning';
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -40,7 +44,7 @@ export default function CoachPage() {
     const img = image;
     setInput('');
     setImage(null);
-    await chat.send(text, img ?? undefined);
+    await chat.send(text, img ?? undefined, mode);
   };
 
   return (
@@ -84,6 +88,7 @@ export default function CoachPage() {
             <div key={m.id} className="space-y-2">
               {m.content && <CoachBubble>{m.content}</CoachBubble>}
               {m.meal && <LoggedMealCard meal={m.meal} />}
+              {m.activity && <LoggedActivityCard activity={m.activity} />}
               {m.routine && <GeneratedRoutineCard routine={m.routine} onOpen={m.routine.id ? () => router.push(`/v2/train/routine/${m.routine!.id}`) : undefined} />}
             </div>
           ),
@@ -102,6 +107,27 @@ export default function CoachPage() {
 
       {/* Composer */}
       <div>
+        {/* Workout / Cardio mode toggle */}
+        <div className="mb-2.5 flex gap-1.5 rounded-full border border-[var(--rd-border)] bg-[var(--rd-card)] p-1">
+          {(['lifting', 'conditioning'] as SessionType[]).map((m) => {
+            const active = mode === m;
+            const isCardio = m === 'conditioning';
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className="flex-1 rounded-full py-1.5 text-[12px] font-semibold transition-colors"
+                style={active
+                  ? { background: isCardio ? CYAN : 'var(--rd-violet)', color: '#0A0C10' }
+                  : { color: 'var(--rd-text-muted)' }}
+              >
+                {isCardio ? 'Cardio' : 'Workout'}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Attached-photo preview */}
         {(image || attaching) && (
           <div className="mb-2 flex items-center gap-2 rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] p-2">
@@ -126,14 +152,15 @@ export default function CoachPage() {
             onClick={() => fileRef.current?.click()}
             disabled={attaching || chat.loading}
             aria-label="Add a photo"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--rd-border)] text-[var(--rd-violet)] disabled:opacity-50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--rd-border)] disabled:opacity-50"
+            style={{ color: cardio ? CYAN : 'var(--rd-violet)' }}
           >
             <CameraIcon size={18} />
           </button>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={image ? 'Add a note (optional)…' : 'Message your coach…'}
+            placeholder={image ? 'Add a note (optional)…' : cardio ? 'e.g. rower 5min + air bike 2min + run 400m' : 'Message your coach…'}
             disabled={chat.loading}
             className="font-body min-w-0 flex-1 bg-transparent text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:outline-none"
           />

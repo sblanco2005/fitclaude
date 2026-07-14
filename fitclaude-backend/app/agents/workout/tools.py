@@ -11,7 +11,11 @@ TOOL_DEFINITIONS = [
             "CRITICAL: ONLY suggest exercises the user can perform with their listed equipment. "
             "If the user has an own_gym with no machines/cables, NEVER include machine exercises, "
             "cable exercises, or smith machine exercises. Use ONLY barbell, dumbbell, bodyweight, "
-            "and band exercises matching their equipment. Violating this is a critical error."
+            "and band exercises matching their equipment. Violating this is a critical error. "
+            "CARDIO/CONDITIONING: when category='cardio', each item in 'exercises' is a SEGMENT — "
+            "set duration_seconds and/or distance (+distance_unit) instead of weights, use 'sets' as "
+            "the number of rounds (default 1), and keep 'reps' only for rep-based moves (e.g. burpees). "
+            "Never assign weights to cardio segments."
         ),
         "input_schema": {
             "type": "object",
@@ -69,6 +73,19 @@ TOOL_DEFINITIONS = [
                             "superset_group": {
                                 "type": "string",
                                 "description": "Superset group label (A, B, etc). Exercises with the same label form a superset pair. Omit for standalone exercises.",
+                            },
+                            "duration_seconds": {
+                                "type": "integer",
+                                "description": "CARDIO segments only: target duration in seconds (e.g. 300 for a 5-minute row). Omit for weight exercises.",
+                            },
+                            "distance": {
+                                "type": "number",
+                                "description": "CARDIO segments only: target distance value (e.g. 400 for a 400m run, 5 for 5km). Omit for weight exercises.",
+                            },
+                            "distance_unit": {
+                                "type": "string",
+                                "enum": ["m", "km", "mi"],
+                                "description": "Unit for `distance` — only include alongside `distance`.",
                             },
                         },
                         "required": ["name", "muscle_group", "sets", "reps"],

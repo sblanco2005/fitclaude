@@ -1049,6 +1049,10 @@ async def _tool_generate_workout(
             rest_seconds=ex.get("rest_seconds"),
             notes=notes_str,
             superset_group=ex.get("superset_group"),
+            # Cardio segments carry time/distance targets instead of weights.
+            duration_seconds=ex.get("duration_seconds"),
+            distance=ex.get("distance"),
+            distance_unit=ex.get("distance_unit"),
         )
         db.add(we)
         stored.append({
@@ -1498,7 +1502,15 @@ async def handle_chat(
     # When user explicitly chose "conditioning" from the home screen type picker,
     # prepend a directive so the coach uses log_activity instead of generate_workout.
     if session_type == "conditioning":
-        prefix = "[SYSTEM NOTE: The user is logging a conditioning / cardio class session. Use the log_activity tool to record it as an activity — do NOT use generate_workout or create a lifting workout.]\n\n"
+        prefix = (
+            "[SYSTEM NOTE: The user is logging a conditioning / cardio session. "
+            "If they describe concrete SEGMENTS with durations/distances/rounds "
+            "(e.g. 'rower 5min + air bike 2min + run 400m', or a class board photo listing stations), "
+            "call generate_workout with category='cardio' and ONE exercise per segment — set "
+            "duration_seconds and/or distance (+distance_unit) instead of weights, and use 'sets' for rounds. "
+            "If it's a vague/opaque class with no breakdown (e.g. 'Alpha Fit 60 min', 'yoga'), use log_activity instead. "
+            "NEVER enter weights for cardio.]\n\n"
+        )
         user_message = prefix + (user_message or "")
     elif session_type == "lifting":
         prefix = "[SYSTEM NOTE: The user is logging a lifting/strength session.]\n\n"
@@ -1719,6 +1731,8 @@ async def handle_chat(
         workout_id = None
         nutrition_log_id = None
         program_id = None
+        activity_id = None
+        activity = None  # {name, duration_minutes} for the frontend activity card
         nutrition_logged_this_turn = False  # Guard: only one log_nutrition per user message
 
         logger.info(f"[Coach] Initial stop_reason: {response.stop_reason}")
@@ -1746,9 +1760,12 @@ async def handle_chat(
                         nutrition_logged_this_turn = True
                     if "program_id" in result:
                         program_id = result["program_id"]
+                    if "activity_id" in result:
+                        activity_id = result["activity_id"]
+                        activity = {"name": result.get("name"), "duration_minutes": result.get("duration_minutes")}
 
                     # Strip internal IDs before sending to Claude
-                    claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id", "program_id")}
+                    claude_result = {k: v for k, v in result.items() if k not in ("workout_id", "nutrition_log_id", "program_id", "activity_id")}
 
                     tool_results.append({
                         "type": "tool_result",
@@ -2047,6 +2064,8 @@ async def handle_chat(
             "response": assistant_text,
             "workout_id": workout_id,
             "nutrition_log_id": nutrition_log_id,
+            "activity_id": activity_id,
+            "activity": activity,
             "model_used": active_model,
         }
 
