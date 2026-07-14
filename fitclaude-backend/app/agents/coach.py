@@ -294,6 +294,26 @@ def _looks_like_workout_request(message: str) -> bool:
     return bool(_WORKOUT_GEN_KEYWORDS.search(message))
 
 
+# Cardio / conditioning BUILD requests — "running routine", "cardio workout",
+# "rowing session", etc. These don't match the lifting-oriented keywords above,
+# so we detect them separately to fire the forced-retry safety net (the prod
+# model tends to refuse or describe cardio as text instead of calling the tool).
+_CARDIO_BUILD_KEYWORDS = re.compile(
+    r"\b("
+    r"(?:running|cardio|rowing|row|jog(?:ging)?|conditioning|hiit|circuit|treadmill|air\s?bike|ski\s?erg|walk(?:ing)?|sprint|erg|elliptical|stair\s?climber)"
+    r"\s+(?:routine|workout|program|session|plan|intervals?|circuit)"
+    r"|(?:routine|workout|program|plan)\s+(?:for\s+|based\s+on\s+)?(?:running|cardio|rowing|conditioning|a?\s*run|distance|time|calories)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _wants_cardio_build(message: str, session_type: str | None) -> bool:
+    """True when the user is asking to BUILD a cardio/conditioning routine —
+    either explicitly (keywords) or by choosing the Cardio mode in the app."""
+    return session_type == "conditioning" or bool(_CARDIO_BUILD_KEYWORDS.search(message or ""))
+
+
 # Multi-day PROGRAM generation (distinct from a single workout). MiniMax reliably
 # *designs* a program in text but often skips the generate_program tool call, so
 # the program is never saved — this detector gates a forced retry, mirroring the
@@ -1867,20 +1887,29 @@ async def handle_chat(
         if (
             topic == "workout"
             and workout_id is None
-            and _looks_like_workout_request(user_message)
+            and (_looks_like_workout_request(user_message) or _wants_cardio_build(user_message, session_type))
             and response.stop_reason == "end_turn"
         ):
             logger.warning("[Coach] Model skipped generate_workout tool — retrying with forced instruction")
-            messages.append({"role": "assistant", "content": response.content})
-            messages.append({
-                "role": "user",
-                "content": (
+            is_cardio_req = _wants_cardio_build(user_message, session_type) and not _looks_like_workout_request(user_message)
+            if is_cardio_req:
+                retry_instruction = (
+                    "SYSTEM: Cardio IS in scope — do NOT refuse and do NOT tell the user to use another app. "
+                    "You MUST call generate_workout now with category='cardio' to build the cardio routine the "
+                    "user asked for. For a simple run, create ONE segment named 'Run' with the distance "
+                    "(distance + distance_unit) or duration_seconds the user specified (pick a sensible default "
+                    "like 5 km if they didn't say). For a circuit, one segment per station with "
+                    "duration_seconds / distance / calories instead of weights. Do not respond with text — call the tool."
+                )
+            else:
+                retry_instruction = (
                     "SYSTEM: You did NOT call the generate_workout tool, so the routine was "
                     "NOT saved and the user can't see it. You MUST call generate_workout now "
                     "with the exact workout you just described (same name and exercises). "
                     "Do not respond with text — call the tool."
-                ),
-            })
+                )
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": retry_instruction})
             response = await active_client.messages.create(
                 model=active_model,
                 max_tokens=2048,
