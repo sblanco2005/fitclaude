@@ -34,7 +34,9 @@ class Settings(BaseSettings):
     job_api_key: str = ""
     youtube_discovery_channels: str = "Jeff Nippard,Renaissance Periodization,AthleanX,Jeremy Ethier"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # protected_namespaces=() silences the pydantic warning about the
+    # model_api_key field colliding with the reserved "model_" namespace.
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "protected_namespaces": ()}
 
 
 settings = Settings()
