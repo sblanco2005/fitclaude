@@ -50,6 +50,17 @@ client = AsyncAnthropic(
 # MiniMax client above instead — its endpoint is vision-capable.
 vision_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
+# Meta Model API (Muse Spark) — Anthropic Messages-compatible but Bearer auth
+# (auth_token=), not x-api-key. Native tool calling + vision. When enabled it's
+# the coach's primary; on API error we fall back to MiniMax (handle_chat_fallback).
+META_ENABLED = bool(settings.use_meta and settings.model_api_key)
+meta_client = (
+    AsyncAnthropic(auth_token=settings.model_api_key, base_url=settings.meta_base_url)
+    if META_ENABLED else None
+)
+if META_ENABLED:
+    logger.info(f"[Coach] Meta Model API enabled — primary model {settings.meta_model} @ {settings.meta_base_url}")
+
 cuid_generator = Cuid()
 
 
@@ -1722,7 +1733,12 @@ async def handle_chat(
     # AND tool-use in one. Only fall back to the Anthropic vision model when MiniMax
     # isn't configured (i.e. credits exist).
     use_anthropic_for_vision = bool(image_base64 and image_media_type) and not settings.agent_base_url
-    if use_anthropic_for_vision:
+    if META_ENABLED:
+        # Primary: Meta Model API (native tool calling). MiniMax remains the
+        # on-error fallback via handle_chat_fallback in the except block.
+        active_model = settings.meta_model
+        active_client = meta_client
+    elif use_anthropic_for_vision:
         active_model = "claude-sonnet-4-20250514"
         active_client = vision_client
         logger.info("[Coach] Image detected — routing to Anthropic vision model")
@@ -1734,12 +1750,15 @@ async def handle_chat(
     else:
         active_model = await get_model_for_tier(db, user_id)
         active_client = client
+    # Reasoning models (Meta) spend thinking tokens against max_tokens; give them
+    # a bigger budget so the visible answer isn't truncated to empty.
+    active_max_tokens = settings.meta_max_tokens if META_ENABLED else 2048
     request_id = str(uuid.uuid4())[:8]
 
     try:
         response = await active_client.messages.create(
             model=active_model,
-            max_tokens=2048,
+            max_tokens=active_max_tokens,
             system=system_blocks,
             messages=messages,
             tools=cached_tools,
@@ -1799,7 +1818,7 @@ async def handle_chat(
 
             response = await active_client.messages.create(
                 model=active_model,
-                max_tokens=2048,
+                max_tokens=active_max_tokens,
                 system=system_blocks,
                 messages=messages,
                 tools=cached_tools,
@@ -1834,7 +1853,7 @@ async def handle_chat(
             })
             response = await active_client.messages.create(
                 model=active_model,
-                max_tokens=2048,
+                max_tokens=active_max_tokens,
                 system=system_blocks,
                 messages=messages,
                 tools=cached_tools,
@@ -1868,7 +1887,7 @@ async def handle_chat(
                 messages.append({"role": "user", "content": tool_results})
                 response = await active_client.messages.create(
                     model=active_model,
-                    max_tokens=2048,
+                    max_tokens=active_max_tokens,
                     system=system_blocks,
                     messages=messages,
                     tools=cached_tools,
@@ -1912,7 +1931,7 @@ async def handle_chat(
             messages.append({"role": "user", "content": retry_instruction})
             response = await active_client.messages.create(
                 model=active_model,
-                max_tokens=2048,
+                max_tokens=active_max_tokens,
                 system=system_blocks,
                 messages=messages,
                 tools=cached_tools,
@@ -1938,7 +1957,7 @@ async def handle_chat(
                 messages.append({"role": "user", "content": tool_results})
                 response = await active_client.messages.create(
                     model=active_model,
-                    max_tokens=2048,
+                    max_tokens=active_max_tokens,
                     system=system_blocks,
                     messages=messages,
                     tools=cached_tools,
@@ -2068,7 +2087,7 @@ async def handle_chat(
                 # finish with a normal text turn instead of looping on the tool.
                 response = await active_client.messages.create(
                     model=active_model,
-                    max_tokens=2048,
+                    max_tokens=active_max_tokens,
                     system=system_blocks,
                     messages=messages,
                     tools=cached_tools,
@@ -2100,9 +2119,12 @@ async def handle_chat(
         }
 
     except (APIStatusError, APIConnectionError) as e:
-        # Re-raise auth errors — fallback won't help
-        if isinstance(e, APIStatusError) and e.status_code in (401, 403):
+        # Re-raise auth errors — fallback won't help UNLESS Meta is the primary
+        # (MiniMax uses a different key, so a Meta 401 should still fall back).
+        if isinstance(e, APIStatusError) and e.status_code in (401, 403) and not META_ENABLED:
             raise
+        if META_ENABLED and isinstance(e, APIStatusError) and e.status_code in (401, 403):
+            logger.error(f"[Coach] Meta auth error ({e.status_code}) — falling back to MiniMax")
 
         status = getattr(e, 'status_code', None)
         body = getattr(e, 'body', None)
