@@ -26,6 +26,7 @@ from app.agents.minimax_fallback import handle_chat_fallback
 from app.config import settings
 from app.services.usage_service import check_rate_limit, get_model_for_tier, log_token_usage
 from app.services.vision_cli import extract_nutrition_from_image, describe_image_for_coach, generate_workout_via_cli
+from app.services.vision_meta import extract_nutrition_from_image as meta_extract_nutrition_from_image
 from app.models import (
     Activity,
     ConversationHistory,
@@ -1576,12 +1577,14 @@ async def handle_chat(
                 "model_used": None,
             }
 
-        logger.info("[Coach] Routing food photo to Claude CLI (vision)")
+        # Meta (Muse Spark) is natively multimodal — use it when enabled; else the
+        # Claude CLI (subscription) since MiniMax-M2.7 is blind to images.
+        extractor = meta_extract_nutrition_from_image if META_ENABLED else extract_nutrition_from_image
+        logger.info(f"[Coach] Routing food photo to {'Meta' if META_ENABLED else 'Claude CLI'} (vision)")
         try:
-            # Use the user's weight unit preference (lb → oz, kg → grams). Vision runs
-            # through the local Claude CLI (subscription) since MiniMax-M2.7 is blind.
+            # Use the user's weight unit preference (lb → oz, kg → grams).
             weight_unit = user.weight_unit or "kg"
-            result = await extract_nutrition_from_image(
+            result = await extractor(
                 image_base64, image_media_type, user_text=user_message, weight_unit=weight_unit
             )
             if "error" not in result:
@@ -1688,21 +1691,32 @@ async def handle_chat(
     context = build_user_context(user_data, user_tz=user_tz)
     history = await _load_conversation_history(db, user_id, topic=topic)
 
-    # MiniMax-M2.7 is blind to images. For any remaining photo (e.g. a workout /
-    # routine board — food photos are handled by the fast path above), extract its
-    # contents to text with the Claude CLI (subscription), then let MiniMax act on
-    # that text with its tools.
+    # Image handling for a remaining photo (e.g. a workout / routine board — food
+    # photos are handled by the fast path above):
+    #   • Meta (Muse Spark) is natively multimodal → pass the image straight into
+    #     the tool-use loop as an image block (one call, sees the photo + calls tools).
+    #   • Otherwise MiniMax-M2.7 is blind → extract the photo to text via the Claude
+    #     CLI (subscription), then let MiniMax act on that text with its tools.
+    native_image_block = None
     if image_base64 and image_media_type:
-        logger.info("[Coach] Image detected — extracting contents via Claude CLI")
-        desc = await describe_image_for_coach(image_base64, image_media_type, user_message)
-        if desc:
-            base = (user_message or "").strip()
-            user_message = (base + "\n\n" if base else "") + f"[Photo contents (extracted from the user's image): {desc}]"
-        image_base64 = None
-        image_media_type = None
+        if META_ENABLED:
+            logger.info("[Coach] Image detected — passing natively to Meta (Muse Spark)")
+            native_image_block = {"type": "image", "source": {"type": "base64", "media_type": image_media_type, "data": image_base64}}
+        else:
+            logger.info("[Coach] Image detected — extracting contents via Claude CLI")
+            desc = await describe_image_for_coach(image_base64, image_media_type, user_message)
+            if desc:
+                base = (user_message or "").strip()
+                user_message = (base + "\n\n" if base else "") + f"[Photo contents (extracted from the user's image): {desc}]"
+            image_base64 = None
+            image_media_type = None
 
-    # Build user content (text only — images have been converted to text above)
-    user_content = user_message
+    # Build user content — a multimodal block list when passing an image to Meta,
+    # else plain text (images already converted to text above).
+    if native_image_block is not None:
+        user_content = [{"type": "text", "text": user_message or "Here's a photo — help me with it."}, native_image_block]
+    else:
+        user_content = user_message
 
     # Build messages
     messages = history + [{"role": "user", "content": user_content}]
