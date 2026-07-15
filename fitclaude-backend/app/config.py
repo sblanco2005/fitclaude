@@ -13,6 +13,17 @@ class Settings(BaseSettings):
     minimax_api_key: str = ""
     minimax_model: str = "MiniMax-M2.7"
 
+    # Meta Model API (Muse Spark) — Anthropic Messages-compatible, Bearer auth.
+    # When model_api_key is set and use_meta is true, the coach runs on Meta
+    # (native tool calling); MiniMax stays as the on-error fallback.
+    model_api_key: str = ""
+    meta_base_url: str = "https://api.meta.ai"
+    meta_model: str = "muse-spark-1.1"
+    use_meta: bool = False
+    # Reasoning models spend "thinking" tokens against max_tokens — give the
+    # coach a generous budget so output isn't starved (empty replies otherwise).
+    meta_max_tokens: int = 4096
+
     # Qwen vision
     qwen_api_key: str = ""
     qwen_model: str = "qwen3-vl-plus"
