@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   useSession, formatWeight, lbToKg, kgToLb,
@@ -11,6 +11,21 @@ import { FinishRate } from '@/components/redesign/session/FinishRate';
 import { YouTubeAutoplay } from '@/components/redesign/session/YouTubeAutoplay';
 import { CardioSession } from '@/components/redesign/session/CardioSession';
 import { CheckIcon, CloseIcon, PlusIcon, MinusIcon, PlayIcon, ChevronLeftIcon, ArrowRightIcon } from '@/components/redesign/icons';
+import { readImageCompressed } from '@/lib/image';
+
+function CameraIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  );
+}
+
+// One option in the machine-swap picker: a library match (has id) or a
+// vision-identified exercise to create on the fly (name + muscle only).
+type SwapOption = { id?: string; name: string; muscleGroup?: string; confidence?: string };
+type SwapResult = { equipment: string; options: SwapOption[] };
 
 // Screen 03 · Hit It (live workout) — accent: ember
 type Unit = 'kg' | 'lb';
@@ -38,6 +53,12 @@ export default function SessionPage() {
   const [gifFailed, setGifFailed] = useState(false);
   // Which set is expanded for editing. null → auto-pick the first unlogged set.
   const [activeSet, setActiveSet] = useState<number | null>(null);
+  // Swap-by-photo (try a machine on the spot): upload → identify → pick → swap.
+  const swapFileRef = useRef<HTMLInputElement>(null);
+  const [swapBusy, setSwapBusy] = useState(false);
+  const [swapResult, setSwapResult] = useState<SwapResult | null>(null);
+  const [swapError, setSwapError] = useState<string | null>(null);
+  const [swapToast, setSwapToast] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - s.startedAt) / 1000)), 1000);
@@ -124,6 +145,47 @@ export default function SessionPage() {
     setActiveSet(i);
   };
 
+  // Photo a machine → identify → show options to swap the current exercise.
+  const onSwapFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setSwapBusy(true); setSwapError(null); setSwapResult(null); setSwapToast(null);
+    try {
+      const img = await readImageCompressed(f);
+      const res = await fetch('/api/exercises/identify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: img.base64, image_media_type: img.mediaType }),
+      });
+      const data = res.ok ? await res.json() : { error: 'Identify failed' };
+      const opts: SwapOption[] = (data.matches ?? []).map((m: { id: string; name: string; muscleGroup: string; confidence: string }) => ({ id: m.id, name: m.name, muscleGroup: m.muscleGroup, confidence: m.confidence }));
+      const primary = (data.primary_exercise || '').trim();
+      if (primary && !opts.some((o) => o.name.toLowerCase() === primary.toLowerCase())) {
+        opts.push({ name: primary, muscleGroup: data.muscle_group || undefined });
+      }
+      if (!opts.length) { setSwapError(data.error || 'Couldn’t identify the machine. Try a clearer photo of it or its name plate.'); return; }
+      setSwapResult({ equipment: data.raw_identification || 'this machine', options: opts });
+    } catch {
+      setSwapError('Couldn’t read the photo. Try again.');
+    } finally {
+      setSwapBusy(false);
+    }
+  };
+
+  const pickSwap = async (opt: SwapOption) => {
+    setSwapBusy(true);
+    const name = await s.photoSwapExercise(safeIdx, { exerciseId: opt.id, name: opt.name, muscleGroup: opt.muscleGroup });
+    setSwapBusy(false);
+    setSwapResult(null);
+    if (name) {
+      setActiveSet(null); setDemo(null); setGifFailed(false);
+      setSwapToast(name);
+    } else {
+      setSwapError('Swap failed. Try again.');
+    }
+  };
+
   return (
     <div className="animate-fadeup space-y-4 pb-28">
       {/* Top bar — Finish lives here (deliberate), not as a big bottom button. */}
@@ -204,6 +266,20 @@ export default function SessionPage() {
           <button onClick={() => setUnit(unit === 'lb' ? 'kg' : 'lb')} className="font-label flex items-center gap-1.5 rounded-[9px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-3 py-1.5 text-[11px] font-semibold uppercase text-[var(--rd-ember)]">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 3v18M7 3 4 6M7 3l3 3M17 21V3M17 21l-3-3M17 21l3-3" /></svg>
             {unit}
+          </button>
+          {/* Try a machine on the spot — photo it, we identify + swap in place. */}
+          <button
+            onClick={() => swapFileRef.current?.click()}
+            disabled={swapBusy}
+            className="font-label flex items-center gap-1.5 rounded-[9px] border px-3 py-1.5 text-[11px] font-semibold uppercase disabled:opacity-60"
+            style={{ borderColor: 'rgba(34,211,238,.3)', background: 'rgba(34,211,238,.1)', color: '#22D3EE' }}
+          >
+            {swapBusy && !swapResult ? (
+              <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.5" /></svg>
+            ) : (
+              <CameraIcon size={13} />
+            )}
+            {swapBusy && !swapResult ? 'Reading…' : 'Swap'}
           </button>
           {ex.isBarbell && (
             <>
@@ -304,6 +380,64 @@ export default function SessionPage() {
         </div>
       </div>
 
+      {/* Machine swap — hidden camera input, picker sheet, and result toast */}
+      <input ref={swapFileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onSwapFile} />
+      {swapResult && <SwapSheet result={swapResult} busy={swapBusy} onPick={pickSwap} onClose={() => setSwapResult(null)} />}
+      {swapError && (
+        <div className="fixed inset-x-0 bottom-24 z-40 mx-auto flex max-w-[430px] items-center gap-2 px-5">
+          <div className="flex-1 rounded-[12px] border px-3.5 py-2.5 text-[12px]" style={{ borderColor: 'rgba(255,107,69,.4)', background: 'rgba(255,107,69,.12)', color: 'var(--rd-ember)' }}>{swapError}</div>
+          <button onClick={() => setSwapError(null)} aria-label="Dismiss" className="text-[var(--rd-text-muted)]"><CloseIcon size={16} /></button>
+        </div>
+      )}
+      {swapToast && (
+        <div className="fixed inset-x-0 bottom-24 z-40 mx-auto flex max-w-[430px] items-center gap-2 px-5">
+          <div className="flex flex-1 items-center gap-2 rounded-[12px] border px-3.5 py-2.5 text-[12px] font-semibold" style={{ borderColor: 'rgba(34,211,238,.4)', background: 'rgba(34,211,238,.12)', color: '#22D3EE' }}>
+            <CheckIcon size={15} /> Swapped to {swapToast}
+          </div>
+          <button onClick={() => setSwapToast(null)} aria-label="Dismiss" className="text-[var(--rd-text-muted)]"><CloseIcon size={16} /></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Bottom-sheet picker for machine swap — library matches + the identified
+// exercise (created on the fly). Cyan accent, matching the camera affordance.
+function SwapSheet({ result, busy, onPick, onClose }: { result: SwapResult; busy: boolean; onPick: (o: SwapOption) => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50">
+      <button aria-label="Close" onClick={onClose} className="absolute inset-0" style={{ background: 'rgba(4,5,8,.6)' }} />
+      <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[430px] rounded-t-[24px] border-t p-4 pb-8" style={{ background: '#0F1117', borderColor: 'rgba(255,255,255,.08)', animation: 'rd-fadeup .24s ease-out both' }}>
+        <div className="mb-2 flex justify-center"><span className="h-1 w-10 rounded-full bg-white/20" /></div>
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="font-label text-[9px] tracking-[.16em]" style={{ color: '#22D3EE' }}>SPOTTED</p>
+            <p className="truncate text-[15px] font-bold text-[var(--rd-ink)]">{result.equipment}</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
+        </div>
+        <p className="mt-1 text-[12px] text-[var(--rd-text-faint)]">Swap this exercise to:</p>
+        <div className="mt-3 max-h-[46vh] space-y-1.5 overflow-y-auto">
+          {result.options.map((o, i) => (
+            <button
+              key={i}
+              onClick={() => onPick(o)}
+              disabled={busy}
+              className="flex w-full items-center justify-between rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3.5 py-3 text-left disabled:opacity-50"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-[14px] font-semibold text-[var(--rd-ink)]">{o.name}</span>
+                {o.muscleGroup && <span className="font-label text-[11px] capitalize text-[var(--rd-text-faint)]">{o.muscleGroup}</span>}
+              </span>
+              {o.id ? (
+                <span className="font-label ml-2 shrink-0 text-[9px] tracking-[.1em] text-[var(--rd-text-faint)]">{(o.confidence || '').toUpperCase()}</span>
+              ) : (
+                <span className="font-label ml-2 shrink-0 rounded-[6px] px-1.5 py-0.5 text-[9px] font-bold" style={{ background: 'rgba(34,211,238,.15)', color: '#22D3EE' }}>NEW</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

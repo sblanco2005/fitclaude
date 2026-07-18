@@ -16,13 +16,35 @@ export const PATCH = withAuth(async (request: NextRequest, user, params) => {
   if (!owns) return AuthErrors.notFound('Workout');
 
   const body = await request.json();
-  const { newExerciseId, sets, reps, restSeconds } = body;
+  const { sets, reps, restSeconds, newExerciseName, newExerciseMuscle } = body;
+  let { newExerciseId } = body;
 
   // Verify the workout exercise belongs to this workout
   const workoutExercise = await prisma.workoutExercise.findFirst({
     where: { id: workoutExerciseId, workoutId },
   });
   if (!workoutExercise) return AuthErrors.notFound('WorkoutExercise');
+
+  // Photo-swap to a machine not yet in the library: find-or-create it by name,
+  // then fall through to the normal swap below.
+  if (!newExerciseId && typeof newExerciseName === 'string' && newExerciseName.trim()) {
+    const nm = newExerciseName.trim();
+    let ex = await prisma.exercise.findFirst({
+      where: { name: { equals: nm, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (!ex) {
+      ex = await prisma.exercise.create({
+        data: {
+          name: nm,
+          muscleGroup: (typeof newExerciseMuscle === 'string' && newExerciseMuscle.trim()) || 'full_body',
+          exerciseType: 'compound',
+        },
+        select: { id: true },
+      });
+    }
+    newExerciseId = ex.id;
+  }
 
   // If swapping exercise
   if (newExerciseId) {

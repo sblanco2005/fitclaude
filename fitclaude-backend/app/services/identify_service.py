@@ -1,4 +1,9 @@
-"""Identify gym equipment from a photo using Claude Haiku vision."""
+"""Identify gym equipment from a photo.
+
+Vision runs on Meta (Muse Spark) when USE_META is on — it's natively multimodal
+and needs no Anthropic credits. Falls back to the Anthropic Haiku vision model
+otherwise.
+"""
 
 import json
 import re
@@ -9,7 +14,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.services.exercise_service import get_all_exercises
 
-client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+_META_ENABLED = bool(settings.use_meta and settings.model_api_key)
+if _META_ENABLED:
+    # Bearer auth (auth_token), not x-api-key.
+    client = AsyncAnthropic(auth_token=settings.model_api_key, base_url=settings.meta_base_url)
+    _IDENTIFY_MODEL = settings.meta_model
+    # Reasoning model — thinking tokens count against max_tokens, so give it room.
+    _IDENTIFY_MAX_TOKENS = 1500
+else:
+    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    _IDENTIFY_MODEL = settings.haiku_model
+    _IDENTIFY_MAX_TOKENS = 400
 
 IDENTIFY_PROMPT = """You are a gym equipment identification expert. Analyze this photo and identify the gym machine or exercise setup.
 
@@ -36,10 +51,10 @@ async def identify_exercise(
 ) -> dict:
     """Send image to Claude Haiku, then fuzzy-match results against exercise DB."""
 
-    # 1. Claude Haiku vision call
+    # 1. Vision call (Meta Muse Spark, or Anthropic Haiku fallback)
     response = await client.messages.create(
-        model=settings.haiku_model,
-        max_tokens=300,
+        model=_IDENTIFY_MODEL,
+        max_tokens=_IDENTIFY_MAX_TOKENS,
         messages=[
             {
                 "role": "user",
@@ -58,7 +73,11 @@ async def identify_exercise(
         ],
     )
 
-    text = response.content[0].text
+    # Reasoning models (Meta) emit redacted_thinking blocks before the text —
+    # concatenate only the text blocks (content[0] may not be text).
+    text = "".join(
+        b.text for b in response.content if getattr(b, "type", None) == "text" and getattr(b, "text", None)
+    )
 
     # 2. Parse JSON from response (handle potential markdown code blocks)
     identification = _parse_json(text)
@@ -76,6 +95,8 @@ async def identify_exercise(
     return {
         "matches": matches,
         "raw_identification": identification.get("equipment_name", "unknown"),
+        "primary_exercise": identification.get("primary_exercise"),
+        "muscle_group": identification.get("muscle_group"),
         "error": None,
     }
 

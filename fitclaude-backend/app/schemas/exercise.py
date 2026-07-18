@@ -45,5 +45,7 @@ class ExerciseMatch(BaseModel):
 
 class IdentifyExerciseResponse(BaseModel):
     matches: List[ExerciseMatch] = []
-    raw_identification: str = "unknown"
+    raw_identification: str = "unknown"  # equipment name (e.g. "Leg Press Machine")
+    primary_exercise: Optional[str] = None  # best exercise for this machine
+    muscle_group: Optional[str] = None
     error: Optional[str] = None

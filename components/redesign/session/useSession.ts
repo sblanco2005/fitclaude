@@ -312,6 +312,31 @@ export function useSession(id: string) {
     fetch(`/api/workouts/${id}/exercises/${ex.woExerciseId}`, { method: 'DELETE' }).catch(() => {});
   }, [exercises, id]);
 
+  // Apply a swap PATCH response to the session exercise in place: adopt the new
+  // name/muscle/equipment/demo, reset Last/PR, and clear the "done" flags.
+  const applySwapResult = useCallback((exIdx: number, updated: { exercise?: { name?: string; muscleGroup?: string; equipmentRequired?: string | null; gifUrl?: string | null; videos?: { youtubeVideoId?: string }[] } | null }, fallbackName?: string) => {
+    setExercises((prev) =>
+      prev.map((e, i) => {
+        if (i !== exIdx) return e;
+        const eq = updated.exercise?.equipmentRequired || '';
+        const nm = updated.exercise?.name || fallbackName || e.name;
+        return {
+          ...e,
+          name: nm,
+          muscle: updated.exercise?.muscleGroup || e.muscle,
+          equipment: eq,
+          isBarbell: /barbell/i.test(nm) || /barbell/i.test(eq),
+          youtubeUrl: updated.exercise?.videos?.[0] ? `https://youtube.com/watch?v=${updated.exercise.videos[0].youtubeVideoId}` : undefined,
+          youtubeId: updated.exercise?.videos?.[0]?.youtubeVideoId,
+          gifUrl: updated.exercise?.gifUrl ?? undefined,
+          lastSets: [],
+          pr: null,
+          sets: e.sets.map((s) => ({ ...s, done: false })),
+        };
+      }),
+    );
+  }, []);
+
   const swapExercise = useCallback(async (exIdx: number) => {
     const ex = exercises[exIdx];
     if (!ex) return;
@@ -324,32 +349,38 @@ export function useSession(id: string) {
         body: JSON.stringify({ newExerciseId: sug.id }),
       });
       if (!r.ok) return;
-      const updated = await r.json();
-      const eq = updated.exercise?.equipmentRequired || '';
-      const nm = updated.exercise?.name || sug.name || ex.name;
-      setExercises((prev) =>
-        prev.map((e, i) =>
-          i !== exIdx
-            ? e
-            : {
-                ...e,
-                name: nm,
-                muscle: updated.exercise?.muscleGroup || e.muscle,
-                equipment: eq,
-                isBarbell: /barbell/i.test(nm) || /barbell/i.test(eq),
-                youtubeUrl: updated.exercise?.videos?.[0] ? `https://youtube.com/watch?v=${updated.exercise.videos[0].youtubeVideoId}` : undefined,
-                youtubeId: updated.exercise?.videos?.[0]?.youtubeVideoId,
-                gifUrl: updated.exercise?.gifUrl ?? undefined,
-                lastSets: [],
-                pr: null,
-                sets: e.sets.map((s) => ({ ...s, done: false })),
-              },
-        ),
-      );
+      applySwapResult(exIdx, await r.json(), sug.name);
     } catch {
       /* ignore */
     }
-  }, [exercises, id]);
+  }, [exercises, id, applySwapResult]);
+
+  // Swap the current exercise to a machine identified from a photo. `choice` is
+  // either an existing library exercise ({ exerciseId }) or a new one to
+  // find-or-create by name ({ name, muscleGroup }). Returns the new name or null.
+  const photoSwapExercise = useCallback(
+    async (exIdx: number, choice: { exerciseId?: string; name?: string; muscleGroup?: string }): Promise<string | null> => {
+      const ex = exercises[exIdx];
+      if (!ex) return null;
+      const payload = choice.exerciseId
+        ? { newExerciseId: choice.exerciseId }
+        : { newExerciseName: choice.name, newExerciseMuscle: choice.muscleGroup };
+      try {
+        const r = await fetch(`/api/workouts/${id}/exercises/${ex.woExerciseId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) return null;
+        const updated = await r.json();
+        applySwapResult(exIdx, updated, choice.name);
+        return updated.exercise?.name || choice.name || null;
+      } catch {
+        return null;
+      }
+    },
+    [exercises, id, applySwapResult],
+  );
 
   const moveExercise = useCallback((exIdx: number, dir: -1 | 1) => {
     setExercises((prev) => {
@@ -438,6 +469,7 @@ export function useSession(id: string) {
     fillRemaining,
     removeExercise,
     swapExercise,
+    photoSwapExercise,
     moveExercise,
     stats,
     startedAt,
