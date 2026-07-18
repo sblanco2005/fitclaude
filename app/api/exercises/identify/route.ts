@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/middleware';
 
-export const maxDuration = 15;
+// Meta (Muse Spark) vision is a reasoning model — allow more time than the old
+// Haiku path (which was ~10s).
+export const maxDuration = 60;
 
 export const POST = withAuth(async (request) => {
   let body;
@@ -27,7 +29,7 @@ export const POST = withAuth(async (request) => {
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(() => controller.abort(), 55000);
 
     const response = await fetch(`${backendUrl}/api/exercises/identify`, {
       method: 'POST',
