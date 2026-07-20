@@ -1,11 +1,24 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import type { Workout, WorkoutExercise } from '@/types';
-import { CheckIcon, ChevronLeftIcon, SpinIcon, LibraryIcon, SearchIcon, CloseIcon } from '@/components/redesign/icons';
+import { CheckIcon, ChevronLeftIcon, SpinIcon, LibraryIcon, SearchIcon, CloseIcon, PlusIcon } from '@/components/redesign/icons';
+import { readImageCompressed } from '@/lib/image';
 
 type LibEx = { id: string; name: string; muscleGroup: string; exerciseType: string };
+// A pick option: an existing library exercise (has id) or a vision-identified
+// one to find-or-create by name.
+type PickOption = { id?: string; name: string; muscleGroup?: string; confidence?: string };
+
+function CameraIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  );
+}
 
 // Screen 09 · Workout Detail — accent: ember
 const titleCase = (s?: string | null) => (s ? s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '');
@@ -17,11 +30,18 @@ export default function RoutineDetailPage() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [swapping, setSwapping] = useState<string | null>(null);
-  // Library picker
-  const [libFor, setLibFor] = useState<WorkoutExercise | null>(null);
+  // Exercise picker — replace an existing exercise or add a new one; via library
+  // search OR a photo of the machine (Meta vision).
+  const [sheetMode, setSheetMode] = useState<'replace' | 'add' | null>(null);
+  const [libFor, setLibFor] = useState<WorkoutExercise | null>(null); // replace target
   const [lib, setLib] = useState<LibEx[]>([]);
   const [libLoading, setLibLoading] = useState(false);
   const [libSearch, setLibSearch] = useState('');
+  const [applying, setApplying] = useState(false);
+  const [identifying, setIdentifying] = useState(false);
+  const [identified, setIdentified] = useState<{ equipment: string; options: PickOption[] } | null>(null);
+  const [idError, setIdError] = useState<string | null>(null);
+  const idFileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     const r = await fetch(`/api/workouts/${id}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
@@ -59,29 +79,68 @@ export default function RoutineDetailPage() {
     }).catch(() => {});
   };
 
-  const openLibrary = async (e: WorkoutExercise) => {
-    setLibFor(e);
-    setLibSearch('');
+  const loadLib = async () => {
     setLibLoading(true);
     const list = await fetch('/api/exercises').then((x) => (x.ok ? x.json() : [])).catch(() => []);
     setLib(Array.isArray(list) ? list : []);
     setLibLoading(false);
   };
 
-  const pickFromLibrary = async (exerciseId: string) => {
-    if (!libFor) return;
-    const target = libFor.id;
-    setLibFor(null);
-    setSwapping(target);
+  const openReplace = async (e: WorkoutExercise) => {
+    setSheetMode('replace'); setLibFor(e); setLibSearch(''); setIdentified(null); setIdError(null);
+    await loadLib();
+  };
+  const openAdd = async () => {
+    setSheetMode('add'); setLibFor(null); setLibSearch(''); setIdentified(null); setIdError(null);
+    await loadLib();
+  };
+  const closeSheet = () => { setSheetMode(null); setLibFor(null); setIdentified(null); setIdError(null); setLibSearch(''); };
+
+  // Apply a pick — replace the target exercise or append a new one. Accepts a
+  // library id or a name (find-or-create on the server for unknown machines).
+  const applyPick = async (opt: PickOption) => {
+    if (applying) return;
+    setApplying(true);
+    const target = libFor?.id;
+    if (sheetMode === 'replace') setSwapping(target ?? null);
     try {
-      await fetch(`/api/workouts/${id}/exercises/${target}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newExerciseId: exerciseId }),
-      });
+      if (sheetMode === 'replace' && target) {
+        const body = opt.id ? { newExerciseId: opt.id } : { newExerciseName: opt.name, newExerciseMuscle: opt.muscleGroup };
+        await fetch(`/api/workouts/${id}/exercises/${target}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      } else if (sheetMode === 'add') {
+        const body = opt.id ? { exerciseId: opt.id } : { exerciseName: opt.name, exerciseMuscle: opt.muscleGroup };
+        await fetch(`/api/workouts/${id}/exercises`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      }
+      closeSheet();
       await load();
     } finally {
+      setApplying(false);
       setSwapping(null);
+    }
+  };
+
+  // Photo the machine → identify → surface options (library matches + the
+  // identified exercise as a "new" pick) at the top of the sheet.
+  const onIdentifyFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setIdentifying(true); setIdError(null); setIdentified(null);
+    try {
+      const img = await readImageCompressed(f);
+      const res = await fetch('/api/exercises/identify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_base64: img.base64, image_media_type: img.mediaType }) });
+      const data = res.ok ? await res.json() : { error: 'Identify failed' };
+      const opts: PickOption[] = (data.matches ?? []).map((m: { id: string; name: string; muscleGroup: string; confidence: string }) => ({ id: m.id, name: m.name, muscleGroup: m.muscleGroup, confidence: m.confidence }));
+      const primary = (data.primary_exercise || '').trim();
+      if (primary && !opts.some((o) => o.name.toLowerCase() === primary.toLowerCase())) {
+        opts.unshift({ name: primary, muscleGroup: data.muscle_group || undefined });
+      }
+      if (!opts.length) { setIdError(data.error || 'Couldn’t identify the machine. Try a clearer photo.'); return; }
+      setIdentified({ equipment: data.raw_identification || 'this machine', options: opts });
+    } catch {
+      setIdError('Couldn’t read the photo. Try again.');
+    } finally {
+      setIdentifying(false);
     }
   };
 
@@ -156,45 +215,77 @@ export default function RoutineDetailPage() {
               </button>
             </div>
 
-            {/* Replace from library */}
-            <button onClick={() => openLibrary(e)} disabled={swapping === e.id} aria-label="Replace exercise" className="shrink-0 text-[var(--rd-text-muted)]">
+            {/* Replace exercise (library or photo) */}
+            <button onClick={() => openReplace(e)} disabled={swapping === e.id} aria-label="Replace exercise" className="shrink-0 text-[var(--rd-text-muted)]">
               {swapping === e.id ? <SpinIcon size={17} className="animate-spinslow" /> : <LibraryIcon size={17} />}
             </button>
           </div>
         ))}
+
+        {/* Add an exercise — library or photo a machine */}
+        <button onClick={openAdd} className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed py-3.5 text-[13px] font-semibold" style={{ borderColor: 'rgba(255,255,255,.14)', color: 'var(--rd-text-secondary)' }}>
+          <PlusIcon size={16} /> Add exercise
+        </button>
       </div>
 
-      {/* Library picker */}
-      {libFor && (
-        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setLibFor(null)}>
+      {/* Exercise picker — replace or add, via library search or a machine photo */}
+      {sheetMode && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={closeSheet}>
           <div className="absolute inset-0" style={{ background: 'rgba(4,5,8,.6)', backdropFilter: 'blur(2px)' }} />
-          <div className="relative flex max-h-[80%] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-[var(--rd-border)] pb-6" style={{ background: '#0F1117' }} onClick={(ev) => ev.stopPropagation()}>
+          <div className="relative flex max-h-[84%] w-full flex-col overflow-hidden rounded-t-[24px] border-t border-[var(--rd-border)] pb-6" style={{ background: '#0F1117' }} onClick={(ev) => ev.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pb-1 pt-5">
-              <div>
-                <p className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">REPLACING</p>
-                <h3 className="font-display mt-0.5 text-[18px] font-bold text-[var(--rd-ink)]">{libFor.exercise?.name || 'Exercise'}</h3>
+              <div className="min-w-0">
+                <p className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">{sheetMode === 'replace' ? 'REPLACING' : 'ADD EXERCISE'}</p>
+                <h3 className="font-display mt-0.5 truncate text-[18px] font-bold text-[var(--rd-ink)]">{sheetMode === 'replace' ? (libFor?.exercise?.name || 'Exercise') : 'Pick or snap a machine'}</h3>
               </div>
-              <button onClick={() => setLibFor(null)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
+              <button onClick={closeSheet} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
             </div>
-            <div className="px-5 pb-3 pt-3">
-              <div className="flex items-center gap-2 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-3.5 py-2.5">
+
+            {/* Search + camera */}
+            <div className="flex items-center gap-2 px-5 pb-3 pt-3">
+              <div className="flex flex-1 items-center gap-2 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-3.5 py-2.5">
                 <SearchIcon size={17} className="text-[var(--rd-text-faint)]" />
-                <input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Search exercises…" autoFocus className="font-body min-w-0 flex-1 bg-transparent text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:outline-none" />
+                <input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Search exercises…" className="font-body min-w-0 flex-1 bg-transparent text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:outline-none" />
               </div>
+              <button onClick={() => idFileRef.current?.click()} disabled={identifying} aria-label="Photo a machine" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border disabled:opacity-60" style={{ borderColor: 'rgba(34,211,238,.35)', background: 'rgba(34,211,238,.12)', color: '#22D3EE' }}>
+                {identifying ? <svg className="animate-spin" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.5" /></svg> : <CameraIcon size={18} />}
+              </button>
+              <input ref={idFileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onIdentifyFile} />
             </div>
+
             <div className="scrollbar-hide flex-1 space-y-1.5 overflow-y-auto px-5">
+              {/* Identified-from-photo options */}
+              {idError && <p className="rounded-[10px] border px-3 py-2 text-[12px]" style={{ borderColor: 'rgba(255,107,69,.4)', background: 'rgba(255,107,69,.1)', color: 'var(--rd-ember)' }}>{idError}</p>}
+              {identified && (
+                <div className="mb-1.5 rounded-[12px] border p-2.5" style={{ borderColor: 'rgba(34,211,238,.3)', background: 'rgba(34,211,238,.06)' }}>
+                  <p className="font-label px-1 pb-1.5 text-[9px] tracking-[.14em]" style={{ color: '#22D3EE' }}>SPOTTED · {identified.equipment.toUpperCase()}</p>
+                  <div className="space-y-1.5">
+                    {identified.options.map((o, i) => (
+                      <button key={i} onClick={() => applyPick(o)} disabled={applying} className="flex w-full items-center justify-between rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3.5 py-2.5 text-left disabled:opacity-50">
+                        <span className="min-w-0">
+                          <span className="block truncate text-[14px] font-semibold text-[var(--rd-ink)]">{o.name}</span>
+                          {o.muscleGroup && <span className="font-label text-[11px] capitalize text-[var(--rd-text-faint)]">{o.muscleGroup}</span>}
+                        </span>
+                        {o.id ? <span className="font-label ml-2 shrink-0 text-[9px] tracking-[.1em] text-[var(--rd-text-faint)]">{(o.confidence || '').toUpperCase()}</span> : <span className="font-label ml-2 shrink-0 rounded-[6px] px-1.5 py-0.5 text-[9px] font-bold" style={{ background: 'rgba(34,211,238,.15)', color: '#22D3EE' }}>NEW</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Library list */}
               {libLoading ? (
                 <p className="py-8 text-center text-[13px] text-[var(--rd-text-faint)]">Loading…</p>
               ) : libFiltered.length === 0 ? (
                 <p className="py-8 text-center text-[13px] text-[var(--rd-text-faint)]">No matches.</p>
               ) : (
                 libFiltered.map((x) => (
-                  <button key={x.id} onClick={() => pickFromLibrary(x.id)} className="flex w-full items-center justify-between rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3.5 py-3 text-left active:bg-[var(--rd-card-glass-hover)]">
+                  <button key={x.id} onClick={() => applyPick({ id: x.id, name: x.name, muscleGroup: x.muscleGroup })} disabled={applying} className="flex w-full items-center justify-between rounded-[11px] border border-[var(--rd-border)] bg-[var(--rd-card)] px-3.5 py-3 text-left active:bg-[var(--rd-card-glass-hover)] disabled:opacity-50">
                     <span className="min-w-0">
                       <span className="block truncate text-[14px] font-semibold text-[var(--rd-ink)]">{x.name}</span>
                       <span className="font-label block text-[11px] capitalize text-[var(--rd-text-faint)]">{x.muscleGroup} · {x.exerciseType}</span>
                     </span>
-                    {x.name === libFor.exercise?.name && <CheckIcon size={16} className="shrink-0 text-[var(--rd-lime)]" />}
+                    {sheetMode === 'replace' && x.name === libFor?.exercise?.name && <CheckIcon size={16} className="shrink-0 text-[var(--rd-lime)]" />}
                   </button>
                 ))
               )}

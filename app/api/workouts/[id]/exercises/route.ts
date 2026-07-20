@@ -15,10 +15,31 @@ export const POST = withAuth(async (request: NextRequest, user, params) => {
   if (!owns) return AuthErrors.notFound('Workout');
 
   const body = await request.json();
-  const { exerciseId, sets = 3, reps = '8-12' } = body;
+  const { sets = 3, reps = '8-12', exerciseName, exerciseMuscle } = body;
+  let { exerciseId } = body;
+
+  // Vision-add: a machine not yet in the library → find-or-create by name.
+  if (!exerciseId && typeof exerciseName === 'string' && exerciseName.trim()) {
+    const nm = exerciseName.trim();
+    let ex = await prisma.exercise.findFirst({
+      where: { name: { equals: nm, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (!ex) {
+      ex = await prisma.exercise.create({
+        data: {
+          name: nm,
+          muscleGroup: (typeof exerciseMuscle === 'string' && exerciseMuscle.trim()) || 'full_body',
+          exerciseType: 'compound',
+        },
+        select: { id: true },
+      });
+    }
+    exerciseId = ex.id;
+  }
 
   if (!exerciseId) {
-    return NextResponse.json({ error: 'exerciseId is required' }, { status: 400 });
+    return NextResponse.json({ error: 'exerciseId or exerciseName is required' }, { status: 400 });
   }
 
   // Verify the exercise exists
