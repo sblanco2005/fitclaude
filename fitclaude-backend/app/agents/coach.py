@@ -912,6 +912,42 @@ async def _tool_generate_program(
     }
 
 
+# Cardio modality names — used to detect a cardio workout the LLM mislabeled.
+# Deliberately does NOT match bare "row" (that's "Barbell Row" etc.) or "walk"
+# ("Walking Lunge") — require unambiguous cardio-machine terms.
+_CARDIO_NAME_RE = re.compile(
+    r"\b(rower|rowing|erg|air\s?bike|echo\s?bike|assault\s?(?:bike|runner)?|treadmill|"
+    r"run(?:ning)?|jog(?:ging)?|sprint|jump\s?rope|skipping|"
+    r"stair\s?(?:climber|master)|elliptical|cycling|spin\s?bike|stationary\s?bike)\b",
+    re.IGNORECASE,
+)
+
+
+def _classify_category(params: dict) -> str:
+    """Deterministic category for a generated workout. The LLM sometimes tags a
+    clearly cardio workout as 'lifting'; correct that so it logs as cardio
+    (time/distance/calories), matching how the session detects cardio."""
+    category = (params.get("category") or "lifting").lower()
+    workout_type = (params.get("workout_type") or "").lower()
+    exercises = params.get("exercises", []) or []
+
+    # Explicit cardio signals: any segment carries a time/distance/calorie target,
+    # the type is cardio, or the exercise names are predominantly cardio machines.
+    has_cardio_target = any(
+        e.get("duration_seconds") or e.get("distance") or e.get("calories")
+        for e in exercises if isinstance(e, dict)
+    )
+    named = [str(e.get("name", "")) for e in exercises if isinstance(e, dict)]
+    cardio_named = sum(1 for n in named if _CARDIO_NAME_RE.search(n))
+    mostly_cardio = bool(named) and cardio_named >= max(2, (len(named) + 1) // 2)
+
+    if workout_type == "cardio" or has_cardio_target or mostly_cardio:
+        if category not in ("cardio", "hiit"):
+            logger.info(f"[Coach] Corrected category '{category}' -> 'cardio' (cardio signals detected)")
+        return "cardio"
+    return category
+
+
 async def _tool_generate_workout(
     db: AsyncSession, user_id: str, params: dict, user_tz: ZoneInfo | None = None
 ) -> dict:
@@ -962,7 +998,7 @@ async def _tool_generate_workout(
         id=cuid_generator.generate(),
         user_id=user_id,
         workout_type=params["workout_type"],
-        category=params.get("category", "lifting"),
+        category=_classify_category(params),
         source="coach",
         name=workout_name,
         date=datetime.now(user_tz).astimezone(tz.utc).replace(tzinfo=None) if user_tz else datetime.utcnow(),

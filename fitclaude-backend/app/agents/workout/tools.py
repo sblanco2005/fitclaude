@@ -34,7 +34,7 @@ TOOL_DEFINITIONS = [
                         "lifting", "hiit", "cardio", "mobility",
                         "calisthenics", "sport",
                     ],
-                    "description": "The training style: lifting (weights/machines), hiit (high-intensity intervals), cardio (running/cycling/swimming), mobility (stretching/yoga/recovery), calisthenics (bodyweight), sport (sport-specific drills)",
+                    "description": "The training style: lifting (weights/machines), hiit (high-intensity intervals), cardio (running/cycling/swimming/rowing/erg/air bike/treadmill or any time-, distance-, or calorie-based conditioning), mobility (stretching/yoga/recovery), calisthenics (bodyweight), sport (sport-specific drills). ALWAYS use 'cardio' when the workout is built around cardio machines or timed/distance/calorie segments — never 'lifting' for those.",
                 },
                 "name": {
                     "type": "string",
