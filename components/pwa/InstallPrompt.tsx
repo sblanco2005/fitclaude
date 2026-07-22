@@ -17,8 +17,8 @@ export function InstallPrompt() {
     // Register service worker. When a NEW worker takes control (a fresh deploy
     // shipped), reload once so the app runs the new code instead of a stale
     // cached bundle. Guarded so it never loops.
+    let onVisible: (() => void) | undefined;
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
       // Reload on an UPDATE (a new worker replacing an existing one), not on the
       // first install's initial claim, and never more than once.
       let hadController = !!navigator.serviceWorker.controller;
@@ -29,6 +29,15 @@ export function InstallPrompt() {
         reloaded = true;
         window.location.reload();
       });
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        // Proactively check for a new worker on load and every time the app is
+        // brought back to the foreground — so a fresh deploy is picked up
+        // promptly (a gym PWA can stay open for days). The controllerchange
+        // handler above then swaps in the new code.
+        reg.update().catch(() => {});
+        onVisible = () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); };
+        document.addEventListener('visibilitychange', onVisible);
+      }).catch(() => {});
     }
 
     // Check if already installed
@@ -53,7 +62,10 @@ export function InstallPrompt() {
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
     window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      if (onVisible) document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const handleInstall = useCallback(async () => {
