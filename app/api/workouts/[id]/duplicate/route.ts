@@ -37,6 +37,13 @@ export const POST = withAuth(async (_request, user, params) => {
           restSeconds: ex.restSeconds,
           notes: ex.notes,
           wasSpicy: ex.wasSpicy,
+          supersetGroup: ex.supersetGroup,
+          // Carry cardio targets so a duplicated cardio session logs as cardio
+          // (time/distance/calories), not weights.
+          durationSeconds: ex.durationSeconds,
+          distance: ex.distance,
+          distanceUnit: ex.distanceUnit,
+          caloriesTarget: ex.caloriesTarget,
           // setLogs intentionally omitted — fresh session
         })),
       },
