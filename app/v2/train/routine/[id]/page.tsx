@@ -24,6 +24,48 @@ function CameraIcon({ size = 16 }: { size?: number }) {
 // Screen 09 · Workout Detail — accent: ember
 const titleCase = (s?: string | null) => (s ? s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '');
 
+const fmtDur = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
+// A cardio exercise carries a time/distance/calorie target instead of weight.
+const isCardioExercise = (e: WorkoutExercise) =>
+  e.durationSeconds != null || e.distance != null || e.caloriesTarget != null;
+
+// The planned target for a cardio segment ("6:30", "2000 m", "60 cal", "×20").
+function cardioTargetLabel(e: WorkoutExercise): string {
+  if (e.durationSeconds != null) return fmtDur(e.durationSeconds);
+  if (e.distance != null) return `${e.distance} ${e.distanceUnit ?? 'm'}`;
+  if (e.caloriesTarget != null) return `${e.caloriesTarget} cal`;
+  if (e.reps) return `×${e.reps}`;
+  return '—';
+}
+
+// Tolerate legacy double-encoded setLogs.
+function parseLogArray(raw: string | null | undefined): Array<{ durationSec?: number; distance?: number; distanceUnit?: string; calories?: number; reps?: number | null }> {
+  try {
+    let v = raw ? JSON.parse(raw) : [];
+    if (typeof v === 'string') v = JSON.parse(v);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+// What the user actually logged for a cardio segment across its rounds.
+function cardioLoggedLabel(setLogs: string | null | undefined): string | null {
+  const rounds = parseLogArray(setLogs);
+  const parts = rounds
+    .map((r) => {
+      const p: string[] = [];
+      if (r.durationSec) p.push(fmtDur(r.durationSec));
+      if (r.distance) p.push(`${r.distance} ${r.distanceUnit ?? 'm'}`);
+      if (r.calories) p.push(`${r.calories} cal`);
+      if (r.reps) p.push(`×${r.reps}`);
+      return p.join(' · ');
+    })
+    .filter(Boolean);
+  return parts.length ? parts.join('  ·  ') : null;
+}
+
 export default function RoutineDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -61,6 +103,7 @@ export default function RoutineDetailPage() {
   const exercises = (w?.exercises ?? []).slice().sort((a, b) => a.order - b.order);
   const estMin = Math.max(0, exercises.length * 8);
   const name = titleCase(w?.name?.trim() || w?.workoutType) || 'Workout';
+  const cardioWorkout = w?.category === 'cardio' || w?.workoutType === 'cardio';
 
   const hitIt = async () => {
     if (starting) return;
@@ -227,9 +270,19 @@ export default function RoutineDetailPage() {
                   {hasDemo && <PlayIcon size={11} className={open ? 'text-[var(--rd-lime)]' : 'text-[var(--rd-text-faint)]'} />}
                 </p>
                 <p className="font-label mt-0.5 text-[11px] text-[var(--rd-text-faint)]">
-                  {e.sets} × {e.reps ?? '–'}
-                  {e.weightKg ? ` · ${Math.round(e.weightKg)} kg` : ''}
-                  {e.restSeconds ? ` · rest ${e.restSeconds}s` : ''}
+                  {cardioWorkout || isCardioExercise(e) ? (
+                    <>
+                      {/* Logged actuals for a finished session, else the planned target */}
+                      {(w.completed && cardioLoggedLabel(e.setLogs)) || cardioTargetLabel(e)}
+                      {e.restSeconds ? ` · rest ${e.restSeconds}s` : ''}
+                    </>
+                  ) : (
+                    <>
+                      {e.sets} × {e.reps ?? '–'}
+                      {e.weightKg ? ` · ${Math.round(e.weightKg)} kg` : ''}
+                      {e.restSeconds ? ` · rest ${e.restSeconds}s` : ''}
+                    </>
+                  )}
                 </p>
               </button>
 
