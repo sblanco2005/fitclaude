@@ -185,6 +185,31 @@ function buildCardioLast(all: Workout[], currentId: string): Map<string, CardioR
   return lastByName;
 }
 
+// A workout logs as cardio when it's flagged cardio by EITHER category or type.
+// (The coach/duplicate paths have sometimes left category='lifting' on a clearly
+// cardio workout — workoutType stays 'cardio', so we honor that too.)
+export function isCardioWorkout(w: Workout | null | undefined): boolean {
+  return w?.category === 'cardio' || w?.workoutType === 'cardio';
+}
+
+// Recover a cardio metric from a legacy reps string when the dedicated target
+// columns are absent — "2000m"→distance, "60 cal"→calories, "90 sec"/"5 min"→
+// duration. Falls back to a plain rep count.
+function parseRepsMetric(reps: string | null | undefined): { durationSec: number | null; distance: number | null; distanceUnit: DistUnit | null; calories: number | null; reps: number | null } {
+  const s = (reps ?? '').toLowerCase().trim();
+  const base = { durationSec: null, distance: null, distanceUnit: null as DistUnit | null, calories: null, reps: null };
+  let m: RegExpMatchArray | null;
+  if ((m = s.match(/(\d+)\s*cal/))) return { ...base, calories: parseInt(m[1], 10) };
+  if ((m = s.match(/(\d+):(\d{1,2})/))) return { ...base, durationSec: parseInt(m[1], 10) * 60 + parseInt(m[2], 10) };
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*(?:min|minutes?)/))) return { ...base, durationSec: Math.round(parseFloat(m[1]) * 60) };
+  if ((m = s.match(/(\d+)\s*(?:secs?|seconds?|s)\b/))) return { ...base, durationSec: parseInt(m[1], 10) };
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*k(?:m)?\b/))) return { ...base, distance: parseFloat(m[1]), distanceUnit: 'km' };
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*mi\b/))) return { ...base, distance: parseFloat(m[1]), distanceUnit: 'mi' };
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*m(?:eters?|etres?)?\b/))) return { ...base, distance: parseFloat(m[1]), distanceUnit: 'm' };
+  if ((m = s.match(/^(\d+)/))) return { ...base, reps: parseInt(m[1], 10) };
+  return base;
+}
+
 function buildSegments(w: Workout, lastByName: Map<string, CardioRound[]>): SessionSegment[] {
   return (w.exercises ?? [])
     .slice()
@@ -192,12 +217,20 @@ function buildSegments(w: Workout, lastByName: Map<string, CardioRound[]>): Sess
     .map((e) => {
       const name = e.exercise?.name || e.notes?.split('|')[0] || 'Segment';
       const rounds = Math.max(1, e.sets || 1);
+      // Prefer the dedicated columns; fall back to parsing the reps string.
+      const p = parseRepsMetric(e.reps);
+      const durationSec = e.durationSeconds ?? p.durationSec;
+      const distance = e.distance ?? p.distance;
+      const distanceUnit = (e.distanceUnit as DistUnit) ?? p.distanceUnit;
+      const calories = e.caloriesTarget ?? p.calories;
+      const hasMetric = durationSec != null || distance != null || calories != null;
       const target = {
-        durationSec: e.durationSeconds ?? null,
-        distance: e.distance ?? null,
-        distanceUnit: (e.distanceUnit as DistUnit) ?? null,
-        calories: e.caloriesTarget ?? null,
-        reps: e.reps ? (parseInt(e.reps, 10) || null) : null,
+        durationSec,
+        distance,
+        distanceUnit,
+        calories,
+        // Only surface a rep target when no time/distance/calorie metric applies.
+        reps: hasMetric ? null : (p.reps ?? (e.reps ? parseInt(e.reps, 10) || null : null)),
       };
       const last = lastByName.get(name.toLowerCase()) ?? [];
       const roundEntries: SegmentLog[] = Array.from({ length: rounds }, (_, i) => {
@@ -249,7 +282,7 @@ export function useSession(id: string) {
       setDefaultUnit(pRes?.weightUnit === 'kg' ? 'kg' : 'lb');
       setWorkout(w);
       if (w) {
-        if (w.category === 'cardio') {
+        if (isCardioWorkout(w)) {
           setSegments(buildSegments(w, buildCardioLast(all, id)));
         } else {
           const { lastByName, prByName } = buildHistory(all, id);
@@ -412,7 +445,7 @@ export function useSession(id: string) {
     async (fatigueRating: number | null, note: string) => {
       setSaving(true);
       const durationMinutes = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
-      const cardio = workout?.category === 'cardio';
+      const cardio = isCardioWorkout(workout);
       // NOTE: the /log route JSON.stringifies each entry.setLogs, so we send an
       // ARRAY (not a pre-stringified string) — otherwise it double-encodes and
       // history/Last can't be read back.
@@ -457,7 +490,7 @@ export function useSession(id: string) {
     loading,
     saving,
     workout,
-    isCardio: workout?.category === 'cardio',
+    isCardio: isCardioWorkout(workout),
     exercises,
     segments,
     defaultUnit,
