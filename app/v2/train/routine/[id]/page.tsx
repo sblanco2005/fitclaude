@@ -3,8 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import type { Workout, WorkoutExercise } from '@/types';
-import { CheckIcon, ChevronLeftIcon, SpinIcon, LibraryIcon, SearchIcon, CloseIcon, PlusIcon } from '@/components/redesign/icons';
+import { CheckIcon, ChevronLeftIcon, SpinIcon, LibraryIcon, SearchIcon, CloseIcon, PlusIcon, PlayIcon } from '@/components/redesign/icons';
 import { readImageCompressed } from '@/lib/image';
+import { YouTubeAutoplay } from '@/components/redesign/session/YouTubeAutoplay';
 
 type LibEx = { id: string; name: string; muscleGroup: string; exerciseType: string };
 // A pick option: an existing library exercise (has id) or a vision-identified
@@ -42,6 +43,10 @@ export default function RoutineDetailPage() {
   const [identified, setIdentified] = useState<{ equipment: string; options: PickOption[] } | null>(null);
   const [idError, setIdError] = useState<string | null>(null);
   const idFileRef = useRef<HTMLInputElement>(null);
+  // Inline exercise demo (GIF / video) — which row is open + which media.
+  const [demoFor, setDemoFor] = useState<string | null>(null);
+  const [demoKind, setDemoKind] = useState<'gif' | 'video' | 'unavailable'>('gif');
+  const [gifFailed, setGifFailed] = useState(false);
 
   const load = async () => {
     const r = await fetch(`/api/workouts/${id}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
@@ -65,18 +70,29 @@ export default function RoutineDetailPage() {
     if (r?.id) router.push(`/v2/train/session/${r.id}`);
   };
 
-  // Reorder — optimistic, then persist the full order.
+  // Reorder — optimistic, then persist. If the persist fails, reload so the UI
+  // reflects the real DB order instead of a stale optimistic swap.
   const move = async (idx: number, dir: -1 | 1) => {
     const j = idx + dir;
     if (j < 0 || j >= exercises.length) return;
     const next = [...exercises];
     [next[idx], next[j]] = [next[j], next[idx]];
+    const orderedIds = next.map((e) => e.id);
     setW((prev) => (prev ? { ...prev, exercises: next.map((e, i) => ({ ...e, order: i + 1 })) } : prev));
-    await fetch(`/api/workouts/${id}/exercises/reorder`, {
+    const r = await fetch(`/api/workouts/${id}/exercises/reorder`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderedIds: next.map((e) => e.id) }),
-    }).catch(() => {});
+      body: JSON.stringify({ orderedIds }),
+    }).catch(() => null);
+    if (!r || !r.ok) await load();
+  };
+
+  // Toggle the inline demo for a row (prefer video, else GIF).
+  const toggleDemo = (weId: string, hasVideo: boolean, hasGif: boolean) => {
+    if (demoFor === weId) { setDemoFor(null); return; }
+    setGifFailed(false);
+    setDemoKind(hasVideo ? 'video' : hasGif ? 'gif' : 'unavailable');
+    setDemoFor(weId);
   };
 
   const loadLib = async () => {
@@ -193,34 +209,70 @@ export default function RoutineDetailPage() {
 
       {/* Exercise rows */}
       <div className="space-y-2.5">
-        {exercises.map((e, i) => (
-          <div key={e.id} className="rd-card flex items-center gap-3 p-3.5">
-            <span className="font-num flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--rd-card)] text-[13px] font-bold text-[var(--rd-text-muted)]">{i + 1}</span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[14px] font-semibold text-[var(--rd-ink)]">{e.exercise?.name || e.variation?.name || 'Exercise'}</p>
-              <p className="font-label mt-0.5 text-[11px] text-[var(--rd-text-faint)]">
-                {e.sets} × {e.reps ?? '–'}
-                {e.weightKg ? ` · ${Math.round(e.weightKg)} kg` : ''}
-                {e.restSeconds ? ` · rest ${e.restSeconds}s` : ''}
-              </p>
+        {exercises.map((e, i) => {
+          const gif = e.exercise?.gifUrl;
+          const vid = e.exercise?.videos?.[0]?.youtubeVideoId;
+          const hasGif = !!gif;
+          const hasVideo = !!vid;
+          const hasDemo = hasGif || hasVideo;
+          const open = demoFor === e.id;
+          return (
+          <div key={e.id} className="rd-card p-3">
+            <div className="flex items-center gap-2.5">
+              <span className="font-num flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--rd-card)] text-[13px] font-bold text-[var(--rd-text-muted)]">{i + 1}</span>
+              {/* Tap the name to watch a demo */}
+              <button onClick={() => hasDemo && toggleDemo(e.id, hasVideo, hasGif)} className="min-w-0 flex-1 text-left" aria-label={hasDemo ? 'Watch demo' : undefined}>
+                <p className="flex items-center gap-1.5 truncate text-[14px] font-semibold text-[var(--rd-ink)]">
+                  {e.exercise?.name || e.variation?.name || 'Exercise'}
+                  {hasDemo && <PlayIcon size={11} className={open ? 'text-[var(--rd-lime)]' : 'text-[var(--rd-text-faint)]'} />}
+                </p>
+                <p className="font-label mt-0.5 text-[11px] text-[var(--rd-text-faint)]">
+                  {e.sets} × {e.reps ?? '–'}
+                  {e.weightKg ? ` · ${Math.round(e.weightKg)} kg` : ''}
+                  {e.restSeconds ? ` · rest ${e.restSeconds}s` : ''}
+                </p>
+              </button>
+
+              {/* Reorder — padded for a comfortable tap target */}
+              <div className="flex flex-col">
+                <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="flex h-6 w-8 items-center justify-center text-[var(--rd-text-muted)] disabled:opacity-20">
+                  <ChevronLeftIcon size={16} className="rotate-90" />
+                </button>
+                <button onClick={() => move(i, 1)} disabled={i === exercises.length - 1} aria-label="Move down" className="flex h-6 w-8 items-center justify-center text-[var(--rd-text-muted)] disabled:opacity-20">
+                  <ChevronLeftIcon size={16} className="-rotate-90" />
+                </button>
+              </div>
+
+              {/* Replace exercise (library or photo) */}
+              <button onClick={() => openReplace(e)} disabled={swapping === e.id} aria-label="Replace exercise" className="flex h-9 w-9 shrink-0 items-center justify-center text-[var(--rd-text-muted)]">
+                {swapping === e.id ? <SpinIcon size={17} className="animate-spinslow" /> : <LibraryIcon size={17} />}
+              </button>
             </div>
 
-            {/* Reorder */}
-            <div className="flex flex-col">
-              <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="text-[var(--rd-text-muted)] disabled:opacity-20">
-                <ChevronLeftIcon size={16} className="rotate-90" />
-              </button>
-              <button onClick={() => move(i, 1)} disabled={i === exercises.length - 1} aria-label="Move down" className="text-[var(--rd-text-muted)] disabled:opacity-20">
-                <ChevronLeftIcon size={16} className="-rotate-90" />
-              </button>
-            </div>
-
-            {/* Replace exercise (library or photo) */}
-            <button onClick={() => openReplace(e)} disabled={swapping === e.id} aria-label="Replace exercise" className="shrink-0 text-[var(--rd-text-muted)]">
-              {swapping === e.id ? <SpinIcon size={17} className="animate-spinslow" /> : <LibraryIcon size={17} />}
-            </button>
+            {/* Inline demo player */}
+            {open && (
+              <div className="mt-2.5 overflow-hidden rounded-[12px] border border-[var(--rd-border)] bg-black">
+                <div className="flex items-center justify-between px-3 py-1.5">
+                  <span className="font-label text-[10px] tracking-[.12em] text-[var(--rd-text-faint)]">HOW-TO</span>
+                  <div className="flex items-center gap-2">
+                    {hasVideo && demoKind === 'gif' && <button onClick={() => setDemoKind('video')} className="font-label text-[10px] font-semibold text-[var(--rd-lime)]">VIDEO</button>}
+                    {hasGif && !gifFailed && demoKind === 'video' && <button onClick={() => setDemoKind('gif')} className="font-label text-[10px] font-semibold text-[var(--rd-lime)]">GIF</button>}
+                    <button onClick={() => setDemoFor(null)} aria-label="Close demo" className="text-[var(--rd-text-muted)]"><CloseIcon size={15} /></button>
+                  </div>
+                </div>
+                {demoKind === 'gif' && hasGif ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={gif} alt={e.exercise?.name || 'demo'} className="max-h-[220px] w-full object-contain" onError={() => { setGifFailed(true); setDemoKind(hasVideo ? 'video' : 'unavailable'); }} />
+                ) : demoKind === 'video' && hasVideo ? (
+                  <div className="aspect-video w-full"><YouTubeAutoplay key={vid} videoId={vid!} title={e.exercise?.name || 'demo'} /></div>
+                ) : (
+                  <div className="px-4 py-6 text-center"><p className="text-[13px] text-[var(--rd-text-muted)]">No demo available for this exercise yet.</p></div>
+                )}
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
 
         {/* Add an exercise — library or photo a machine */}
         <button onClick={openAdd} className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed py-3.5 text-[13px] font-semibold" style={{ borderColor: 'rgba(255,255,255,.14)', color: 'var(--rd-text-secondary)' }}>
