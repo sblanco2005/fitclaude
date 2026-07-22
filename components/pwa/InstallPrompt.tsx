@@ -14,9 +14,21 @@ export function InstallPrompt() {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    // Register service worker
+    // Register service worker. When a NEW worker takes control (a fresh deploy
+    // shipped), reload once so the app runs the new code instead of a stale
+    // cached bundle. Guarded so it never loops.
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
+      // Reload on an UPDATE (a new worker replacing an existing one), not on the
+      // first install's initial claim, and never more than once.
+      let hadController = !!navigator.serviceWorker.controller;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController) { hadController = true; return; }
+        if (reloaded) return;
+        reloaded = true;
+        window.location.reload();
+      });
     }
 
     // Check if already installed
