@@ -34,6 +34,9 @@ class ExerciseResponse(BaseModel):
 class IdentifyExerciseRequest(BaseModel):
     image_base64: str
     image_media_type: str
+    # The muscle group the user is currently training — biases the suggested
+    # exercises toward that muscle for this equipment (e.g. bench + glutes).
+    target_muscle: Optional[str] = None
 
 
 class ExerciseMatch(BaseModel):

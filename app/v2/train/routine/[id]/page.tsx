@@ -187,7 +187,9 @@ export default function RoutineDetailPage() {
     setIdentifying(true); setIdError(null); setIdentified(null);
     try {
       const img = await readImageCompressed(f);
-      const res = await fetch('/api/exercises/identify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_base64: img.base64, image_media_type: img.mediaType }) });
+      // When replacing, bias suggestions toward that exercise's muscle group.
+      const targetMuscle = sheetMode === 'replace' ? (libFor?.exercise?.muscleGroup ?? null) : null;
+      const res = await fetch('/api/exercises/identify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_base64: img.base64, image_media_type: img.mediaType, target_muscle: targetMuscle }) });
       const data = res.ok ? await res.json() : { error: 'Identify failed' };
       const opts: PickOption[] = (data.matches ?? []).map((m: { id: string; name: string; muscleGroup: string; confidence: string }) => ({ id: m.id, name: m.name, muscleGroup: m.muscleGroup, confidence: m.confidence }));
       const primary = (data.primary_exercise || '').trim();
