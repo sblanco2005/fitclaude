@@ -16,7 +16,7 @@ export const POST = withAuth(async (request) => {
     );
   }
 
-  const { image_base64, image_media_type } = body;
+  const { image_base64, image_media_type, target_muscle } = body;
 
   if (!image_base64 || !image_media_type) {
     return NextResponse.json(
@@ -34,7 +34,7 @@ export const POST = withAuth(async (request) => {
     const response = await fetch(`${backendUrl}/api/exercises/identify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_base64, image_media_type }),
+      body: JSON.stringify({ image_base64, image_media_type, target_muscle: target_muscle || null }),
       signal: controller.signal,
     });
 

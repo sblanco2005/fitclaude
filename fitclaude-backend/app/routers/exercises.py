@@ -35,7 +35,7 @@ async def identify_from_image(
 ):
     """Identify gym equipment from a photo and return matching exercises."""
     try:
-        result = await identify_exercise(body.image_base64, body.image_media_type, db)
+        result = await identify_exercise(body.image_base64, body.image_media_type, db, target_muscle=body.target_muscle)
         return result
     except Exception as e:
         logger.exception("Exercise identification failed")

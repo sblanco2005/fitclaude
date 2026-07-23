@@ -48,8 +48,23 @@ async def identify_exercise(
     image_base64: str,
     image_media_type: str,
     db: AsyncSession,
+    target_muscle: str | None = None,
 ) -> dict:
-    """Send image to Claude Haiku, then fuzzy-match results against exercise DB."""
+    """Send image to the vision model, then fuzzy-match results against exercise DB.
+
+    When target_muscle is given, bias the suggested exercises toward that muscle
+    for the identified equipment (e.g. a bench while training glutes → hip
+    thrust / bulgarian split squat / step-up rather than bench press)."""
+
+    prompt = IDENTIFY_PROMPT
+    if target_muscle and target_muscle.strip():
+        tm = target_muscle.strip()
+        prompt += (
+            f"\n\nCONTEXT: The user is mid-workout training their {tm} and wants to swap in a "
+            f"{tm} exercise using this equipment. In 'primary_exercise' and 'alternative_exercises', "
+            f"PRIORITIZE exercises that train {tm} with this equipment (e.g. a flat bench for glutes → "
+            "Hip Thrust, Bulgarian Split Squat, Step-up). Still set 'equipment_name' accurately."
+        )
 
     # 1. Vision call (Meta Muse Spark, or Anthropic Haiku fallback)
     response = await client.messages.create(
@@ -67,7 +82,7 @@ async def identify_exercise(
                             "data": image_base64,
                         },
                     },
-                    {"type": "text", "text": IDENTIFY_PROMPT},
+                    {"type": "text", "text": prompt},
                 ],
             }
         ],
@@ -88,9 +103,9 @@ async def identify_exercise(
             "error": "Could not identify gym equipment in this image.",
         }
 
-    # 3. Fuzzy-match against DB
+    # 3. Fuzzy-match against DB (biased toward the muscle being trained)
     all_exercises = await get_all_exercises(db)
-    matches = _fuzzy_match(all_exercises, identification)
+    matches = _fuzzy_match(all_exercises, identification, target_muscle)
 
     return {
         "matches": matches,
@@ -128,13 +143,15 @@ def _parse_json(text: str) -> dict | None:
     return None
 
 
-def _fuzzy_match(all_exercises: list, identification: dict) -> list[dict]:
-    """Match Claude's identification against DB exercises."""
+def _fuzzy_match(all_exercises: list, identification: dict, target_muscle: str | None = None) -> list[dict]:
+    """Match the identification against DB exercises. If target_muscle is given,
+    that muscle is used to fill and to rank same-muscle exercises first."""
     candidate_names = [identification.get("primary_exercise", "")]
     candidate_names.extend(identification.get("alternative_exercises", []))
     candidate_names = [n for n in candidate_names if n and n != "unknown"]
 
-    target_muscle = (identification.get("muscle_group") or "").lower()
+    # Prefer the muscle the user is training; fall back to the equipment's muscle.
+    fill_muscle = (target_muscle or identification.get("muscle_group") or "").lower()
 
     matches: list[dict] = []
     seen_ids: set[str] = set()
@@ -154,15 +171,21 @@ def _fuzzy_match(all_exercises: list, identification: dict) -> list[dict]:
                 matches.append({"id": ex.id, "name": ex.name, "muscleGroup": ex.muscle_group, "confidence": "medium"})
                 seen_ids.add(ex.id)
 
-    # Pass 2: same muscle group (fill up to 5)
-    if len(matches) < 5 and target_muscle and target_muscle != "unknown":
+    # Pass 2: same muscle group (fill up to 6)
+    if len(matches) < 6 and fill_muscle and fill_muscle != "unknown":
         for ex in all_exercises:
             if ex.id in seen_ids:
                 continue
-            if ex.muscle_group.lower() == target_muscle:
+            if ex.muscle_group.lower() == fill_muscle:
                 matches.append({"id": ex.id, "name": ex.name, "muscleGroup": ex.muscle_group, "confidence": "low"})
                 seen_ids.add(ex.id)
-                if len(matches) >= 5:
+                if len(matches) >= 6:
                     break
 
-    return matches[:5]
+    # Rank exercises for the target muscle first (stable) so the swap list leads
+    # with the most relevant options for what the user is training.
+    if target_muscle and target_muscle.strip():
+        tm = target_muscle.strip().lower()
+        matches.sort(key=lambda m: (m.get("muscleGroup", "").lower() != tm))
+
+    return matches[:6]
