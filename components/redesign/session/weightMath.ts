@@ -5,8 +5,10 @@
 export const LB_PER_KG = 2.20462;
 export type Unit = 'lb' | 'kg';
 
-// Canonical storage is POUNDS (matches V1). Display rounds kg to 0.1, lb to whole.
-export const lbToKg = (lb: number) => Math.round((lb / LB_PER_KG) * 10) / 10;
+// Canonical storage is POUNDS (matches V1). Weights are stored in lb, so kg is
+// always a conversion — round it to the nearest 0.5 kg (standard plate step) so
+// it reads cleanly (e.g. 152.5kg) instead of drifting to 152.4kg. lb → whole.
+export const lbToKg = (lb: number) => Math.round((lb / LB_PER_KG) * 2) / 2;
 export const kgToLb = (kg: number) => Math.round(kg * LB_PER_KG);
 export const formatWeight = (lb: number, unit: Unit) => (unit === 'lb' ? `${Math.round(lb)}lb` : `${lbToKg(lb)}kg`);
 
@@ -16,8 +18,11 @@ export const fromDisplay = (v: number, unit: Unit) => (unit === 'lb' ? v : kgToL
 
 // Plates PER SIDE for a barbell, given the total lifted. `barDisplay` is the bar
 // weight expressed in the current display unit.
-export const perSideDisplay = (totalLb: number, unit: Unit, barDisplay: number) =>
-  Math.max(0, Math.round(((toDisplay(totalLb, unit) - barDisplay) / 2) * 10) / 10);
+export const perSideDisplay = (totalLb: number, unit: Unit, barDisplay: number) => {
+  const raw = (toDisplay(totalLb, unit) - barDisplay) / 2;
+  const q = unit === 'kg' ? 2 : 10; // 0.5 kg or 0.1 lb increments
+  return Math.max(0, Math.round(raw * q) / q);
+};
 
 // Inverse of perSideDisplay: a per-side value (in display units) → total in lb.
 export const totalLbFromPerSide = (perSideVal: number, unit: Unit, barDisplay: number) => {

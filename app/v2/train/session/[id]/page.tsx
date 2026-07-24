@@ -22,6 +22,10 @@ function CameraIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+// Display a weight cleanly: kg is already snapped to 0.5 by the math, so keep it;
+// lb rounds to whole. Avoids "153kg" while the plates below sum to 152.5.
+const cleanW = (v: number, unit: Unit) => (unit === 'kg' ? v : Math.round(v));
+
 // Screen 03 · Hit It (live workout) — accent: ember
 type Unit = 'kg' | 'lb';
 const fmtTime = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
@@ -383,7 +387,7 @@ export default function SessionPage() {
 
 // Compact row for done / upcoming sets — tap anywhere to open it for editing.
 function CompactRow({ n, set, unit, perSide, barDisplay, onSelect, onToggle }: { n: number; set: SetEntry; unit: Unit; perSide: boolean; barDisplay: number; onSelect: () => void; onToggle: () => void }) {
-  const perSideVal = Math.round(perSideDisplay(set.weightLb, unit, barDisplay));
+  const perSideVal = cleanW(perSideDisplay(set.weightLb, unit, barDisplay), unit);
   const midText = perSide
     ? (set.weightLb > 0 ? `2×${perSideVal}${unit} /side` : '—')
     : (set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—');
@@ -440,7 +444,7 @@ function ActiveSet({ n, set, unit, perSide, barDisplay, onChange, onLog }: {
       </div>
       {perSide && set.weightLb > 0 && (
         <p className="font-label mt-2 text-center text-[10px] text-[var(--rd-lime)]">
-          = {Math.round(totalDisplay)}{unit} total · {Math.round(barDisplay)}{unit} bar + 2×{perSideVal}{unit}  <span className="text-[var(--rd-text-faint)]">= {otherLabel}</span>
+          = {cleanW(totalDisplay, unit)}{unit} total · {cleanW(barDisplay, unit)}{unit} bar + 2×{perSideVal}{unit}  <span className="text-[var(--rd-text-faint)]">= {otherLabel}</span>
         </p>
       )}
       {!perSide && set.weightLb > 0 && (
