@@ -48,8 +48,8 @@ export default function SessionPage() {
   const [gifFailed, setGifFailed] = useState(false);
   // Which set is expanded for editing. null → auto-pick the first unlogged set.
   const [activeSet, setActiveSet] = useState<number | null>(null);
-  // Swap the current exercise — from the library or by photographing a machine.
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // Exercise picker — swap the current exercise, or add a new one to the workout.
+  const [pickerMode, setPickerMode] = useState<'swap' | 'add' | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
   const [swapToast, setSwapToast] = useState<string | null>(null);
 
@@ -141,12 +141,25 @@ export default function SessionPage() {
   // Apply a pick from the library or a machine photo to the current exercise.
   const pickSwap = async (opt: PickOption) => {
     const name = await s.photoSwapExercise(safeIdx, { exerciseId: opt.id, name: opt.name, muscleGroup: opt.muscleGroup });
-    setPickerOpen(false);
+    setPickerMode(null);
     if (name) {
       setActiveSet(null); setDemo(null); setGifFailed(false);
       setSwapToast(name);
     } else {
       setSwapError('Swap failed. Try again.');
+    }
+  };
+
+  // Add a new exercise to the workout, then jump to it.
+  const pickAdd = async (opt: PickOption) => {
+    const idx = await s.addExercise({ exerciseId: opt.id, name: opt.name, muscleGroup: opt.muscleGroup });
+    setPickerMode(null);
+    if (idx != null) {
+      setActiveSet(null); setDemo(null); setGifFailed(false);
+      setExIdx(idx);
+      setSwapToast(`Added ${opt.name}`);
+    } else {
+      setSwapError('Couldn’t add that exercise. Try again.');
     }
   };
 
@@ -233,7 +246,7 @@ export default function SessionPage() {
           </button>
           {/* Swap this exercise — from the library or by photographing a machine. */}
           <button
-            onClick={() => { setSwapError(null); setPickerOpen(true); }}
+            onClick={() => { setSwapError(null); setPickerMode('swap'); }}
             className="font-label flex items-center gap-1.5 rounded-[9px] border px-3 py-1.5 text-[11px] font-semibold uppercase"
             style={{ borderColor: 'rgba(34,211,238,.3)', background: 'rgba(34,211,238,.1)', color: '#22D3EE' }}
           >
@@ -315,6 +328,11 @@ export default function SessionPage() {
         </div>
       </section>
 
+      {/* Add an exercise to this workout on the fly (library or machine photo) */}
+      <button onClick={() => { setSwapError(null); setPickerMode('add'); }} className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed py-3.5 text-[13px] font-semibold" style={{ borderColor: 'rgba(255,255,255,.14)', color: 'var(--rd-text-secondary)' }}>
+        <PlusIcon size={16} /> Add exercise
+      </button>
+
       {/* Bottom bar — go to the NEXT exercise (prominent, clickable). On the last
           exercise there's no next, so it becomes Finish. Finish is also at the top. */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center">
@@ -338,9 +356,12 @@ export default function SessionPage() {
         </div>
       </div>
 
-      {/* Swap picker — library search + machine photo (biased to this muscle) */}
-      {pickerOpen && (
-        <ExercisePicker label={ex.name} targetMuscle={ex.muscle} onPick={pickSwap} onClose={() => setPickerOpen(false)} />
+      {/* Picker — swap the current exercise (muscle-biased) or add a new one */}
+      {pickerMode === 'swap' && (
+        <ExercisePicker label={ex.name} targetMuscle={ex.muscle} onPick={pickSwap} onClose={() => setPickerMode(null)} />
+      )}
+      {pickerMode === 'add' && (
+        <ExercisePicker label="Add exercise" onPick={pickAdd} onClose={() => setPickerMode(null)} />
       )}
       {swapError && (
         <div className="fixed inset-x-0 bottom-24 z-40 mx-auto flex max-w-[430px] items-center gap-2 px-5">
