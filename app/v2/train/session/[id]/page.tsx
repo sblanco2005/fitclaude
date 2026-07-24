@@ -391,6 +391,8 @@ function CompactRow({ n, set, unit, perSide, barDisplay, onSelect, onToggle }: {
   const midText = perSide
     ? (set.weightLb > 0 ? `2×${perSideVal}${unit} /side` : '—')
     : (set.lastWeightLb != null ? `${formatWeight(set.lastWeightLb, unit)} × ${set.lastReps ?? '–'}` : '—');
+  // Show the other unit for a logged set (e.g. logged in kg → also see lb).
+  const otherLabel = unit === 'lb' ? `${lbToKg(set.weightLb)}kg` : `${Math.round(set.weightLb)}lb`;
   return (
     <div
       role="button"
@@ -402,7 +404,12 @@ function CompactRow({ n, set, unit, perSide, barDisplay, onSelect, onToggle }: {
       <span className="font-num text-[13px] font-bold text-[var(--rd-text-muted)]">{n}</span>
       <span className="font-label text-[12px]" style={{ color: perSide ? 'var(--rd-ember)' : 'var(--rd-text-faint)' }}>{midText}</span>
       <span className="font-label text-[12px]" style={{ color: set.done ? 'var(--rd-lime)' : 'var(--rd-text-faint)' }}>
-        {set.done ? `${formatWeight(set.weightLb, unit)} × ${set.reps}` : 'tap to edit'}
+        {set.done ? (
+          <>
+            {formatWeight(set.weightLb, unit)} × {set.reps}
+            {set.weightLb > 0 && <span className="text-[var(--rd-text-faint)]"> · {otherLabel}</span>}
+          </>
+        ) : 'tap to edit'}
       </span>
       <button onClick={(e) => { e.stopPropagation(); onToggle(); }} aria-label="Toggle logged" className="flex justify-center">
         {set.done ? <span className="text-[var(--rd-lime)]"><CheckIcon size={15} /></span> : <span className="h-4 w-4 rounded-full border border-[var(--rd-border-strong)]" />}
