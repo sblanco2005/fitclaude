@@ -415,6 +415,49 @@ export function useSession(id: string) {
     [exercises, id, applySwapResult],
   );
 
+  // Append a new exercise to the live workout (library or find-or-create by
+  // name). Returns the new exercise's index so the caller can navigate to it.
+  const addExercise = useCallback(
+    async (choice: { exerciseId?: string; name?: string; muscleGroup?: string }): Promise<number | null> => {
+      const payload = choice.exerciseId
+        ? { exerciseId: choice.exerciseId }
+        : { exerciseName: choice.name, exerciseMuscle: choice.muscleGroup };
+      try {
+        const r = await fetch(`/api/workouts/${id}/exercises`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) return null;
+        const e = await r.json();
+        const nm = e.exercise?.name || choice.name || 'Exercise';
+        const eq = e.exercise?.equipmentRequired ?? '';
+        const setCount = Math.max(1, e.sets || 3);
+        const targetReps = parseFirstInt(e.reps, 8);
+        const video = e.exercise?.videos?.[0];
+        const newEx: SessionExercise = {
+          woExerciseId: e.id,
+          name: nm,
+          muscle: e.exercise?.muscleGroup || choice.muscleGroup || '',
+          equipment: eq,
+          isBarbell: /barbell/i.test(nm) || /barbell/i.test(eq),
+          youtubeUrl: video ? `https://youtube.com/watch?v=${video.youtubeVideoId}` : undefined,
+          youtubeId: video?.youtubeVideoId,
+          gifUrl: e.exercise?.gifUrl ?? undefined,
+          lastSets: [],
+          pr: null,
+          sets: Array.from({ length: setCount }, () => ({ weightLb: 0, reps: targetReps, done: false })),
+        };
+        const newIdx = exercises.length; // index of the appended exercise
+        setExercises((prev) => [...prev, newEx]);
+        return newIdx;
+      } catch {
+        return null;
+      }
+    },
+    [id, exercises],
+  );
+
   const moveExercise = useCallback((exIdx: number, dir: -1 | 1) => {
     setExercises((prev) => {
       const next = [...prev];
@@ -503,6 +546,7 @@ export function useSession(id: string) {
     removeExercise,
     swapExercise,
     photoSwapExercise,
+    addExercise,
     moveExercise,
     stats,
     startedAt,

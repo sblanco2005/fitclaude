@@ -6,6 +6,7 @@ import type { Workout, WorkoutExercise } from '@/types';
 import { CheckIcon, ChevronLeftIcon, SpinIcon, LibraryIcon, SearchIcon, CloseIcon, PlusIcon, PlayIcon } from '@/components/redesign/icons';
 import { readImageCompressed } from '@/lib/image';
 import { YouTubeAutoplay } from '@/components/redesign/session/YouTubeAutoplay';
+import { formatWeight, kgToLb } from '@/components/redesign/session/weightMath';
 
 type LibEx = { id: string; name: string; muscleGroup: string; exerciseType: string };
 // A pick option: an existing library exercise (has id) or a vision-identified
@@ -39,8 +40,8 @@ function cardioTargetLabel(e: WorkoutExercise): string {
   return '—';
 }
 
-// Tolerate legacy double-encoded setLogs.
-function parseLogArray(raw: string | null | undefined): Array<{ durationSec?: number; distance?: number; distanceUnit?: string; calories?: number; reps?: number | null }> {
+// Tolerate legacy double-encoded setLogs. Covers both cardio and lifting rounds.
+function parseLogArray(raw: string | null | undefined): Array<{ durationSec?: number; distance?: number; distanceUnit?: string; calories?: number; reps?: number | null; weight?: number; set?: number }> {
   try {
     let v = raw ? JSON.parse(raw) : [];
     if (typeof v === 'string') v = JSON.parse(v);
@@ -48,6 +49,14 @@ function parseLogArray(raw: string | null | undefined): Array<{ durationSec?: nu
   } catch {
     return [];
   }
+}
+
+// What the user actually lifted, in their profile unit ("135lb×8  145lb×8").
+function liftingLoggedLabel(setLogs: string | null | undefined, unit: 'kg' | 'lb'): string | null {
+  const parts = parseLogArray(setLogs)
+    .map((r) => (r.weight != null ? `${formatWeight(r.weight, unit)}×${r.reps ?? '–'}` : ''))
+    .filter(Boolean);
+  return parts.length ? parts.join('  ') : null;
 }
 
 // What the user actually logged for a cardio segment across its rounds.
@@ -90,6 +99,8 @@ export default function RoutineDetailPage() {
   const [demoKind, setDemoKind] = useState<'gif' | 'video' | 'unavailable'>('gif');
   const [gifFailed, setGifFailed] = useState(false);
 
+  const [unit, setUnit] = useState<'kg' | 'lb'>('lb');
+
   const load = async () => {
     const r = await fetch(`/api/workouts/${id}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     setW(r);
@@ -97,6 +108,8 @@ export default function RoutineDetailPage() {
   };
   useEffect(() => {
     load();
+    // Adopt the user's weight unit so logged lifts read in their metric.
+    fetch('/api/profile').then((x) => (x.ok ? x.json() : null)).then((p) => setUnit(p?.weightUnit === 'kg' ? 'kg' : 'lb')).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -278,10 +291,13 @@ export default function RoutineDetailPage() {
                       {(w.completed && cardioLoggedLabel(e.setLogs)) || cardioTargetLabel(e)}
                       {e.restSeconds ? ` · rest ${e.restSeconds}s` : ''}
                     </>
+                  ) : w.completed && liftingLoggedLabel(e.setLogs, unit) ? (
+                    // Finished lifting session → what you actually logged, in your unit.
+                    <>{liftingLoggedLabel(e.setLogs, unit)}</>
                   ) : (
                     <>
                       {e.sets} × {e.reps ?? '–'}
-                      {e.weightKg ? ` · ${Math.round(e.weightKg)} kg` : ''}
+                      {e.weightKg ? ` · ${formatWeight(kgToLb(e.weightKg), unit)}` : ''}
                       {e.restSeconds ? ` · rest ${e.restSeconds}s` : ''}
                     </>
                   )}

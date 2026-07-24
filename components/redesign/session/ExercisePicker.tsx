@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { CloseIcon, SearchIcon } from '@/components/redesign/icons';
 import { readImageCompressed } from '@/lib/image';
 
@@ -26,7 +26,8 @@ export function ExercisePicker({ label, targetMuscle, onPick, onClose }: {
   onClose: () => void;
 }) {
   const [lib, setLib] = useState<LibEx[]>([]);
-  const [libLoading, setLibLoading] = useState(true);
+  const [libLoaded, setLibLoaded] = useState(false);
+  const [libLoading, setLibLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [applying, setApplying] = useState(false);
   const [identifying, setIdentifying] = useState(false);
@@ -34,13 +35,19 @@ export function ExercisePicker({ label, targetMuscle, onPick, onClose }: {
   const [idError, setIdError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    (async () => {
-      const list = await fetch('/api/exercises').then((r) => (r.ok ? r.json() : [])).catch(() => []);
-      setLib(Array.isArray(list) ? list : []);
-      setLibLoading(false);
-    })();
-  }, []);
+  // Lazy-load the library only once the user starts searching — the sheet opens
+  // instantly with just the search box + camera, no giant list up front.
+  const ensureLib = React.useCallback(() => {
+    if (libLoaded || libLoading) return;
+    setLibLoading(true);
+    fetch('/api/exercises')
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => [])
+      .then((list) => { setLib(Array.isArray(list) ? list : []); setLibLoaded(true); })
+      .finally(() => setLibLoading(false));
+  }, [libLoaded, libLoading]);
+
+  const onSearch = (v: string) => { setSearch(v); if (v.trim()) ensureLib(); };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -94,7 +101,7 @@ export function ExercisePicker({ label, targetMuscle, onPick, onClose }: {
         <div className="flex items-center gap-2 px-5 pb-3 pt-3">
           <div className="flex flex-1 items-center gap-2 rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-3.5 py-2.5">
             <SearchIcon size={17} className="text-[var(--rd-text-faint)]" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search exercises…" className="font-body min-w-0 flex-1 bg-transparent text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:outline-none" />
+            <input value={search} onChange={(e) => onSearch(e.target.value)} onFocus={ensureLib} placeholder="Search exercises…" className="font-body min-w-0 flex-1 bg-transparent text-[14px] text-[var(--rd-ink)] placeholder:text-[var(--rd-text-faint)] focus:outline-none" />
           </div>
           <button onClick={() => fileRef.current?.click()} disabled={identifying} aria-label="Photo a machine" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border disabled:opacity-60" style={{ borderColor: 'rgba(34,211,238,.35)', background: 'rgba(34,211,238,.12)', color: '#22D3EE' }}>
             {identifying ? <svg className="animate-spin" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.5" /></svg> : <CameraIcon size={18} />}
@@ -121,7 +128,11 @@ export function ExercisePicker({ label, targetMuscle, onPick, onClose }: {
             </div>
           )}
 
-          {libLoading ? (
+          {!q ? (
+            !identified && !idError && (
+              <p className="py-10 text-center text-[13px] text-[var(--rd-text-faint)]">Search the library, or 📷 snap a machine.</p>
+            )
+          ) : libLoading ? (
             <p className="py-8 text-center text-[13px] text-[var(--rd-text-faint)]">Loading…</p>
           ) : filtered.length === 0 ? (
             <p className="py-8 text-center text-[13px] text-[var(--rd-text-faint)]">No matches.</p>
