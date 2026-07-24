@@ -56,6 +56,7 @@ export default function SessionPage() {
   const [pickerMode, setPickerMode] = useState<'swap' | 'add' | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
   const [swapToast, setSwapToast] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - s.startedAt) / 1000)), 1000);
@@ -122,7 +123,18 @@ export default function SessionPage() {
   const safeIdx = Math.min(exIdx, s.exercises.length - 1);
   const ex = s.exercises[safeIdx];
   const next = s.exercises[safeIdx + 1];
-  const goTo = (i: number) => { setActiveSet(null); setDemo(null); setGifFailed(false); setExIdx(Math.max(0, Math.min(s.exercises.length - 1, i))); };
+  const goTo = (i: number) => { setActiveSet(null); setDemo(null); setGifFailed(false); setConfirmRemove(false); setExIdx(Math.max(0, Math.min(s.exercises.length - 1, i))); };
+
+  // Remove the current exercise from the live workout, then land on a neighbor.
+  const removeCurrent = async () => {
+    const count = s.exercises.length;
+    const removedName = ex.name;
+    setConfirmRemove(false);
+    setActiveSet(null); setDemo(null); setGifFailed(false);
+    setExIdx((prev) => Math.min(prev, Math.max(0, count - 2)));
+    await s.removeExercise(safeIdx);
+    setSwapToast(`Removed ${removedName}`);
+  };
   const hasGif = !!ex.gifUrl;
   const hasVideo = !!ex.youtubeId;
   // Prefer the (reliable) video; fall back to the GIF; never silently vanish.
@@ -336,6 +348,19 @@ export default function SessionPage() {
       <button onClick={() => { setSwapError(null); setPickerMode('add'); }} className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed py-3.5 text-[13px] font-semibold" style={{ borderColor: 'rgba(255,255,255,.14)', color: 'var(--rd-text-secondary)' }}>
         <PlusIcon size={16} /> Add exercise
       </button>
+
+      {/* Remove the current exercise (confirm-first; not the last one) */}
+      {s.exercises.length > 1 && (
+        confirmRemove ? (
+          <div className="flex items-center justify-center gap-4 pt-0.5 text-[12px]">
+            <span className="text-[var(--rd-text-muted)]">Remove {ex.name}?</span>
+            <button onClick={() => setConfirmRemove(false)} className="font-semibold text-[var(--rd-text-secondary)]">Cancel</button>
+            <button onClick={removeCurrent} className="font-semibold text-[var(--rd-ember)]">Remove</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmRemove(true)} className="w-full pt-0.5 text-center text-[12px] font-semibold text-[var(--rd-text-faint)]">Remove this exercise</button>
+        )
+      )}
 
       {/* Bottom bar — go to the NEXT exercise (prominent, clickable). On the last
           exercise there's no next, so it becomes Finish. Finish is also at the top. */}
