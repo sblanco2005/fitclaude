@@ -7,9 +7,9 @@ import {
 } from '../components/redesign/session/weightMath';
 
 // ── Unit conversion ──────────────────────────────────────────────
-test('lb↔kg conversion', () => {
-  assert.equal(lbToKg(220), 99.8);       // 220 / 2.20462
-  assert.equal(lbToKg(45), 20.4);
+test('lb↔kg conversion (kg rounded to clean 0.5 increments)', () => {
+  assert.equal(lbToKg(220), 100);        // 220 / 2.20462 = 99.79 → 100.0
+  assert.equal(lbToKg(45), 20.5);        // 20.41 → 20.5
   assert.equal(kgToLb(100), 220);        // 100 * 2.20462 rounded
   assert.equal(kgToLb(20), 44);
   assert.equal(lbToKg(0), 0);
@@ -17,14 +17,14 @@ test('lb↔kg conversion', () => {
 
 test('formatWeight renders the right unit', () => {
   assert.equal(formatWeight(185, 'lb'), '185lb');
-  assert.equal(formatWeight(185, 'kg'), '83.9kg');
+  assert.equal(formatWeight(185, 'kg'), '84kg'); // 83.91 → 84.0
   assert.equal(formatWeight(0, 'lb'), '0lb');
 });
 
 test('toDisplay / fromDisplay are inverse in lb, convert in kg', () => {
   assert.equal(toDisplay(185, 'lb'), 185);
   assert.equal(fromDisplay(185, 'lb'), 185);
-  assert.equal(toDisplay(220, 'kg'), 99.8);
+  assert.equal(toDisplay(220, 'kg'), 100);
   assert.equal(fromDisplay(100, 'kg'), 220);
 });
 
