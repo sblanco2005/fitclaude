@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     job_api_key: str = ""
     youtube_discovery_channels: str = "Jeff Nippard,Renaissance Periodization,AthleanX,Jeremy Ethier"
 
+    # Webshare RESIDENTIAL proxy for transcript fetching — YouTube blocks the
+    # VPS datacenter IP, so youtube-transcript-api routes through Webshare when
+    # these are set. (Residential plan, not the free datacenter proxies.)
+    webshare_proxy_username: str = ""
+    webshare_proxy_password: str = ""
+
     # protected_namespaces=() silences the pydantic warning about the
     # model_api_key field colliding with the reserved "model_" namespace.
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "protected_namespaces": ()}

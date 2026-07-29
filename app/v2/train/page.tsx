@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useWorkouts, type RoutineCard, type RoutineGroup } from '@/components/redesign/workouts/useWorkouts';
 import { ScreenHeader } from '@/components/redesign/ui';
-import { PlusIcon, SearchIcon, SpinIcon, TrainIcon, ChevronLeftIcon, CheckIcon } from '@/components/redesign/icons';
+import { PlusIcon, SearchIcon, SpinIcon, TrainIcon, ChevronLeftIcon, CheckIcon, CloseIcon } from '@/components/redesign/icons';
+import { FromYouTubeSheet } from '@/components/redesign/program/FromYouTubeSheet';
 
 // Screen 05 · Workouts ("Train") — grouped layout (Option A)
 export default function TrainPage() {
@@ -17,6 +17,8 @@ export default function TrainPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDel, setConfirmDel] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showChooser, setShowChooser] = useState(false);
+  const [showYouTube, setShowYouTube] = useState(false);
 
   const q = search.trim().toLowerCase();
   const groups = useMemo(() => {
@@ -64,9 +66,9 @@ export default function TrainPage() {
               {hasDeletable && (
                 <button onClick={() => setSelectMode(true)} className="font-label rounded-[12px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] px-3 py-2 text-[13px] font-semibold text-[var(--rd-text-secondary)]">Select</button>
               )}
-              <Link href="/v2/program?new=1" aria-label="Add program" className="grad-ember flex h-10 w-10 items-center justify-center rounded-[13px] text-[#0A0C10]" style={{ boxShadow: 'var(--rd-glow-ember)' }}>
+              <button onClick={() => setShowChooser(true)} aria-label="New routine" className="grad-ember flex h-10 w-10 items-center justify-center rounded-[13px] text-[#0A0C10]" style={{ boxShadow: 'var(--rd-glow-ember)' }}>
                 <PlusIcon size={19} />
-              </Link>
+              </button>
             </div>
           )
         }
@@ -137,6 +139,39 @@ export default function TrainPage() {
           </div>
         </div>
       )}
+
+      {/* "+" chooser — new program vs a routine from a YouTube video */}
+      {showChooser && (
+        <div className="fixed inset-0 z-[55] flex items-end" onClick={() => setShowChooser(false)}>
+          <div className="absolute inset-0" style={{ background: 'rgba(4,5,8,.6)', backdropFilter: 'blur(2px)' }} />
+          <div className="relative w-full rounded-t-[24px] border-t border-[var(--rd-border)] p-5 pb-8" style={{ background: '#0F1117' }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-[18px] font-bold text-[var(--rd-ink)]">Create a routine</h3>
+              <button onClick={() => setShowChooser(false)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
+            </div>
+            <div className="mt-4 space-y-2.5">
+              <button onClick={() => { setShowChooser(false); router.push('/v2/program?new=1'); }} className="flex w-full items-center gap-3 rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card)] p-4 text-left">
+                <span className="grad-ember flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] text-[#0A0C10]"><PlusIcon size={18} /></span>
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-semibold text-[var(--rd-ink)]">New program</span>
+                  <span className="block text-[12px] text-[var(--rd-text-faint)]">Build a weekly program day by day</span>
+                </span>
+              </button>
+              <button onClick={() => { setShowChooser(false); setShowYouTube(true); }} className="flex w-full items-center gap-3 rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card)] p-4 text-left">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] text-white" style={{ background: 'var(--rd-youtube)' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M10 15.5 15.19 12 10 8.5v7ZM12 4c4.5 0 7.5.35 7.5.35.9.1 1.6.8 1.7 1.7 0 0 .3 2 .3 3.95v0c0 1.95-.3 3.95-.3 3.95-.1.9-.8 1.6-1.7 1.7 0 0-3 .35-7.5.35s-7.5-.35-7.5-.35c-.9-.1-1.6-.8-1.7-1.7 0 0-.3-2-.3-3.95v0c0-1.95.3-3.95.3-3.95.1-.9.8-1.6 1.7-1.7C4.5 4.35 7.5 4 12 4Z"/></svg>
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-semibold text-[var(--rd-ink)]">From a YouTube video</span>
+                  <span className="block text-[12px] text-[var(--rd-text-faint)]">Paste a link — I&apos;ll read it and build the routine</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showYouTube && <FromYouTubeSheet onClose={() => setShowYouTube(false)} />}
     </div>
   );
 }

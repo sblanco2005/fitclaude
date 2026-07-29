@@ -1,5 +1,6 @@
 """Coach agent orchestrator — handles the Claude API tool-use loop."""
 
+import asyncio
 import json
 import logging
 import re
@@ -19,7 +20,12 @@ from app.agents.workout.prompts import COACH_SYSTEM_PROMPT, build_user_context
 from app.agents import nutrition_agent, vision_nutrition_agent
 from app.router import detect_food_logging_intent
 from app.agents.workout.spicy import get_spicy_variation
-from app.services.youtube_service import import_exercises_from_youtube
+from app.services.youtube_service import (
+    import_exercises_from_youtube,
+    _extract_video_id,
+    _fetch_transcript,
+    parse_workout_from_transcript,
+)
 from app.jobs.video_linker import _link_best_video
 from app.agents.workout.tools import TOOL_DEFINITIONS
 from app.agents.minimax_fallback import handle_chat_fallback
@@ -1169,6 +1175,39 @@ async def _tool_generate_workout(
             "that only use their available equipment. Call generate_workout again if you want to add replacements."
         )
 
+    return result
+
+
+async def generate_workout_from_youtube(
+    db: AsyncSession, user_id: str, youtube_url: str, user_tz: ZoneInfo | None = None
+) -> dict:
+    """Build a saved routine from a YouTube workout video's transcript.
+
+    URL → transcript (Webshare proxy) → Muse Spark structured extraction →
+    _tool_generate_workout (creates the Workout + WorkoutExercise rows). Returns
+    the same shape as _tool_generate_workout, or a clear {error} for bad URL /
+    no transcript / non-workout video.
+    """
+    try:
+        video_id = _extract_video_id(youtube_url)
+    except ValueError:
+        return {"error": "That doesn't look like a valid YouTube link."}
+
+    try:
+        # _fetch_transcript is synchronous — offload so we don't block the loop.
+        transcript = await asyncio.to_thread(_fetch_transcript, video_id)
+    except Exception as e:
+        logger.warning(f"[youtube] transcript fetch failed for {video_id}: {type(e).__name__}: {str(e)[:200]}")
+        return {"error": "Couldn't get this video's transcript — it may have captions disabled, or the proxy isn't configured."}
+
+    if not transcript or len(transcript) < 40:
+        return {"error": "This video has no usable transcript to read."}
+
+    params = await parse_workout_from_transcript(transcript)
+    if not params or not params.get("exercises"):
+        return {"error": "I couldn't find a workout in that video. Try a video that walks through specific exercises."}
+
+    result = await _tool_generate_workout(db, user_id, params, user_tz=user_tz)
     return result
 
 
