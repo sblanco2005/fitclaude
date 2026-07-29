@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import analytics, chat, exercises, jobs, nutrition, program, users, workouts
+from app.routers import analytics, chat, exercises, jobs, nutrition, program, users, workouts, youtube
 
 logging.basicConfig(level=logging.INFO)
 
@@ -37,6 +37,7 @@ app.include_router(nutrition.router)
 app.include_router(exercises.router)
 app.include_router(jobs.router)
 app.include_router(program.router)
+app.include_router(youtube.router)
 
 
 @app.get("/health")
