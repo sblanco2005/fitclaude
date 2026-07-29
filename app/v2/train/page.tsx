@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useWorkouts, type RoutineCard, type RoutineGroup } from '@/components/redesign/workouts/useWorkouts';
 import { ScreenHeader } from '@/components/redesign/ui';
 import { PlusIcon, SearchIcon, SpinIcon, TrainIcon, ChevronLeftIcon, CheckIcon, CloseIcon } from '@/components/redesign/icons';
-import { FromYouTubeSheet } from '@/components/redesign/program/FromYouTubeSheet';
 import { FromTextSheet } from '@/components/redesign/program/FromTextSheet';
 
 // Screen 05 · Workouts ("Train") — grouped layout (Option A)
@@ -19,7 +18,6 @@ export default function TrainPage() {
   const [confirmDel, setConfirmDel] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showChooser, setShowChooser] = useState(false);
-  const [showYouTube, setShowYouTube] = useState(false);
   const [showText, setShowText] = useState(false);
 
   const q = search.trim().toLowerCase();
@@ -168,21 +166,11 @@ export default function TrainPage() {
                   <span className="block text-[12px] text-[var(--rd-text-faint)]">An Instagram caption, a transcript, any write-up</span>
                 </span>
               </button>
-              <button onClick={() => { setShowChooser(false); setShowYouTube(true); }} className="flex w-full items-center gap-3 rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card)] p-4 text-left">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] text-white" style={{ background: 'var(--rd-youtube)' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M10 15.5 15.19 12 10 8.5v7ZM12 4c4.5 0 7.5.35 7.5.35.9.1 1.6.8 1.7 1.7 0 0 .3 2 .3 3.95v0c0 1.95-.3 3.95-.3 3.95-.1.9-.8 1.6-1.7 1.7 0 0-3 .35-7.5.35s-7.5-.35-7.5-.35c-.9-.1-1.6-.8-1.7-1.7 0 0-.3-2-.3-3.95v0c0-1.95.3-3.95.3-3.95.1-.9.8-1.6 1.7-1.7C4.5 4.35 7.5 4 12 4Z"/></svg>
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[15px] font-semibold text-[var(--rd-ink)]">From a YouTube link</span>
-                  <span className="block text-[12px] text-[var(--rd-text-faint)]">Paste a link — I&apos;ll read it and build the routine</span>
-                </span>
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {showYouTube && <FromYouTubeSheet onClose={() => setShowYouTube(false)} />}
       {showText && <FromTextSheet onClose={() => setShowText(false)} />}
     </div>
   );
