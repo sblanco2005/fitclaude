@@ -72,7 +72,7 @@ export function FromLinkSheet({ onClose }: { onClose: () => void }) {
               </div>
               <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--rd-border)] bg-[var(--rd-card-glass)] text-[var(--rd-text-secondary)]"><CloseIcon size={16} /></button>
             </div>
-            <p className="mt-2 text-[13px] leading-relaxed text-[var(--rd-text-muted)]">Paste a <span className="text-[var(--rd-text-secondary)]">YouTube</span>, <span className="text-[var(--rd-text-secondary)]">Instagram</span>, or <span className="text-[var(--rd-text-secondary)]">TikTok</span> link — I&apos;ll read what&apos;s said in it and build a routine you can edit. Works best when the exercises are spoken.</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-[var(--rd-text-muted)]"><span className="text-[var(--rd-text-secondary)]">YouTube</span> is instant and reliable. <span className="text-[var(--rd-text-secondary)]">Instagram / TikTok</span> are transcribed from the audio — slower, and only work when the exercises are <span className="italic">spoken</span>. If a reel times out or fails, paste the caption with <span className="text-[var(--rd-text-secondary)]">Paste a workout</span> instead.</p>
 
             <div className="mt-5">
               <label className="font-label text-[10px] tracking-[.14em] text-[var(--rd-text-faint)]">VIDEO LINK</label>
