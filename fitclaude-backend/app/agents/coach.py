@@ -22,6 +22,7 @@ from app.agents.workout.spicy import get_spicy_variation
 from app.services.youtube_service import (
     import_exercises_from_youtube,
     parse_workout_from_transcript,
+    fetch_transcript_via_supadata,
 )
 from app.jobs.video_linker import _link_best_video
 from app.agents.workout.tools import TOOL_DEFINITIONS
@@ -1173,6 +1174,32 @@ async def _tool_generate_workout(
         )
 
     return result
+
+
+async def generate_workout_from_url(
+    db: AsyncSession, user_id: str, url: str, user_tz: ZoneInfo | None = None
+) -> dict:
+    """Build a saved routine from a video link (YouTube / Instagram / TikTok / X).
+
+    Supadata returns the transcript (existing captions, or AI-generated from the
+    audio for reels), then the same extraction + persistence as the paste path.
+    """
+    url = (url or "").strip()
+    if not url.startswith("http"):
+        return {"error": "That doesn't look like a valid link. Paste the full URL."}
+
+    if not settings.supadata_api_key:
+        return {"error": "Link import isn't configured yet (missing the transcript API key)."}
+
+    transcript = await fetch_transcript_via_supadata(url)
+    if not transcript or len(transcript) < 40:
+        return {"error": "Couldn't get a usable transcript from that link — the video may be private, have no speech, or still be processing (try again in a moment)."}
+
+    params = await parse_workout_from_transcript(transcript)
+    if not params or not params.get("exercises"):
+        return {"error": "I couldn't find a workout in that video. It works best when the exercises are spoken or written out."}
+
+    return await _tool_generate_workout(db, user_id, params, user_tz=user_tz)
 
 
 async def generate_workout_from_text(

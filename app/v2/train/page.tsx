@@ -6,6 +6,7 @@ import { useWorkouts, type RoutineCard, type RoutineGroup } from '@/components/r
 import { ScreenHeader } from '@/components/redesign/ui';
 import { PlusIcon, SearchIcon, SpinIcon, TrainIcon, ChevronLeftIcon, CheckIcon, CloseIcon } from '@/components/redesign/icons';
 import { FromTextSheet } from '@/components/redesign/program/FromTextSheet';
+import { FromLinkSheet } from '@/components/redesign/program/FromLinkSheet';
 
 // Screen 05 · Workouts ("Train") — grouped layout (Option A)
 export default function TrainPage() {
@@ -19,6 +20,7 @@ export default function TrainPage() {
   const [deleting, setDeleting] = useState(false);
   const [showChooser, setShowChooser] = useState(false);
   const [showText, setShowText] = useState(false);
+  const [showLink, setShowLink] = useState(false);
 
   const q = search.trim().toLowerCase();
   const groups = useMemo(() => {
@@ -166,12 +168,22 @@ export default function TrainPage() {
                   <span className="block text-[12px] text-[var(--rd-text-faint)]">An Instagram caption, a transcript, any write-up</span>
                 </span>
               </button>
+              <button onClick={() => { setShowChooser(false); setShowLink(true); }} className="flex w-full items-center gap-3 rounded-[14px] border border-[var(--rd-border)] bg-[var(--rd-card)] p-4 text-left">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] text-white" style={{ background: 'linear-gradient(135deg,#FF0050,#8134AF,#00F2EA)' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 0 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-semibold text-[var(--rd-ink)]">From a link</span>
+                  <span className="block text-[12px] text-[var(--rd-text-faint)]">YouTube, Instagram, or TikTok — I&apos;ll read the video</span>
+                </span>
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {showText && <FromTextSheet onClose={() => setShowText(false)} />}
+      {showLink && <FromLinkSheet onClose={() => setShowLink(false)} />}
     </div>
   );
 }
