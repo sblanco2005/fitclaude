@@ -74,6 +74,9 @@ def _fetch_transcript(video_id: str) -> str:
         proxy_config = WebshareProxyConfig(
             proxy_username=settings.webshare_proxy_username,
             proxy_password=settings.webshare_proxy_password,
+            # Rotating residential exits: some IPs are flagged by YouTube and
+            # get the "/sorry" CAPTCHA page — retry through more fresh exits.
+            retries_when_blocked=25,
         )
     ytt = YouTubeTranscriptApi(proxy_config=proxy_config)
     transcript = ytt.fetch(video_id)
