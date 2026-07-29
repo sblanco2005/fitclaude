@@ -1,9 +1,11 @@
 """YouTube transcript parsing — extract exercises OR a full routine from videos."""
 
+import asyncio
 import json
 import logging
 import re
 
+import httpx
 from anthropic import AsyncAnthropic
 from cuid2 import Cuid
 from sqlalchemy import select
@@ -137,6 +139,66 @@ Rules:
 - If the transcript is NOT a workout (e.g. a vlog or cooking video) or has no exercises, return {"exercises": []}.
 
 Respond with ONLY the JSON object."""
+
+
+# ─── Transcript from ANY supported link (YouTube / Instagram / TikTok / X) ────
+
+def _supadata_text(data: dict) -> str | None:
+    """Normalize a Supadata response's `content` (string or segment list) to text."""
+    c = data.get("content")
+    if isinstance(c, str):
+        return c.strip() or None
+    if isinstance(c, list):
+        joined = " ".join(seg.get("text", "") for seg in c if isinstance(seg, dict)).strip()
+        return joined or None
+    return None
+
+
+async def fetch_transcript_via_supadata(url: str) -> str | None:
+    """Fetch a transcript for a YouTube/Instagram/TikTok/X/Facebook URL via
+    Supadata (one API, no scraping). Handles the sync (200) and async (202 →
+    poll) cases. Returns plain text, or None on failure / no key."""
+    key = settings.supadata_api_key
+    if not key:
+        return None
+    base = settings.supadata_base_url.rstrip("/")
+    headers = {"x-api-key": key}
+    params = {"url": url, "text": "true", "mode": "auto"}
+    async with httpx.AsyncClient(timeout=60) as http:
+        try:
+            r = await http.get(f"{base}/transcript", params=params, headers=headers)
+        except Exception as e:
+            logger.error(f"[supadata] request failed: {type(e).__name__}: {e}")
+            return None
+
+        if r.status_code == 200:
+            return _supadata_text(r.json())
+
+        if r.status_code == 202:
+            job_id = (r.json() or {}).get("jobId")
+            if not job_id:
+                return None
+            # Poll (Supadata generates a transcript for long / caption-less media).
+            for _ in range(16):  # ~48s
+                await asyncio.sleep(3)
+                try:
+                    pr = await http.get(f"{base}/transcript/{job_id}", headers=headers)
+                except Exception:
+                    continue
+                if pr.status_code != 200:
+                    continue
+                pd = pr.json() or {}
+                status = str(pd.get("status") or "").lower()
+                if status in ("failed", "error"):
+                    logger.warning(f"[supadata] job {job_id} failed")
+                    return None
+                txt = _supadata_text(pd)
+                if txt and status in ("completed", "succeeded", "done", "success", ""):
+                    return txt
+            return None  # still processing after the poll window
+
+        logger.warning(f"[supadata] HTTP {r.status_code}: {r.text[:200]}")
+        return None
 
 
 async def parse_workout_from_transcript(transcript: str) -> dict | None:

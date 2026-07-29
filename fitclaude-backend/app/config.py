@@ -34,11 +34,16 @@ class Settings(BaseSettings):
     job_api_key: str = ""
     youtube_discovery_channels: str = "Jeff Nippard,Renaissance Periodization,AthleanX,Jeremy Ethier"
 
-    # Webshare RESIDENTIAL proxy for transcript fetching — YouTube blocks the
-    # VPS datacenter IP, so youtube-transcript-api routes through Webshare when
-    # these are set. (Residential plan, not the free datacenter proxies.)
+    # Webshare RESIDENTIAL proxy (legacy; retired in favor of Supadata). Kept so
+    # existing .env values don't error — unused unless youtube-transcript-api is
+    # given creds.
     webshare_proxy_username: str = ""
     webshare_proxy_password: str = ""
+
+    # Supadata — one API for transcripts from YouTube, Instagram, TikTok, X,
+    # Facebook. Powers "create a routine from a link" (no scraping/proxy).
+    supadata_api_key: str = ""
+    supadata_base_url: str = "https://api.supadata.ai/v1"
 
     # protected_namespaces=() silences the pydantic warning about the
     # model_api_key field colliding with the reserved "model_" namespace.
