@@ -1211,6 +1211,25 @@ async def generate_workout_from_youtube(
     return result
 
 
+async def generate_workout_from_text(
+    db: AsyncSession, user_id: str, text: str, user_tz: ZoneInfo | None = None
+) -> dict:
+    """Build a saved routine from pasted workout text (e.g. an Instagram caption).
+
+    Same extraction + persistence as the YouTube path, minus the transcript fetch
+    — the pasted text IS the description.
+    """
+    text = (text or "").strip()
+    if len(text) < 20:
+        return {"error": "That's too short to read — paste the full workout (exercises, sets, reps)."}
+
+    params = await parse_workout_from_transcript(text)
+    if not params or not params.get("exercises"):
+        return {"error": "I couldn't find a workout in that text. Make sure it lists the exercises (and ideally sets/reps)."}
+
+    return await _tool_generate_workout(db, user_id, params, user_tz=user_tz)
+
+
 def _sanitize_raw_text(text: str) -> str:
     """Strip XML/HTML-like parameter tags that Claude sometimes injects into raw_text."""
     # Remove patterns like: "> <parameter name="calories">200

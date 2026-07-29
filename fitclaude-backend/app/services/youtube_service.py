@@ -111,7 +111,7 @@ async def _parse_exercises_from_transcript(transcript: str) -> list[dict]:
 
 # ─── Transcript → a full ROUTINE (not just library exercises) ────────────────
 
-WORKOUT_FROM_TRANSCRIPT_PROMPT = """You are a fitness coach. From a YouTube workout video's transcript, build ONE structured workout routine that matches what the video actually does.
+WORKOUT_FROM_TRANSCRIPT_PROMPT = """You are a fitness coach. From a workout description — a video transcript OR a social-post caption — build ONE structured workout routine that matches what it prescribes.
 
 Return ONLY a valid JSON object (no markdown, no prose) with:
 - "name": a short routine name based on the video (e.g. "Chest & Triceps Hypertrophy", "20-Min Rower HIIT")
@@ -150,7 +150,7 @@ async def parse_workout_from_transcript(transcript: str) -> dict | None:
             model=settings.meta_model,
             max_tokens=max(settings.meta_max_tokens, 8000),  # room for reasoning + JSON
             system=WORKOUT_FROM_TRANSCRIPT_PROMPT,
-            messages=[{"role": "user", "content": f"Build a routine from this workout video transcript:\n\n{transcript}"}],
+            messages=[{"role": "user", "content": f"Build a routine from this workout description:\n\n{transcript}"}],
         )
     except Exception as e:
         logger.error(f"[youtube] workout extraction failed: {e}")
