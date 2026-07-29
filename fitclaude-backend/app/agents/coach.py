@@ -1191,13 +1191,17 @@ async def generate_workout_from_url(
     if not settings.supadata_api_key:
         return {"error": "Link import isn't configured yet (missing the transcript API key)."}
 
+    is_youtube = "youtube.com" in url or "youtu.be" in url
+
     transcript = await fetch_transcript_via_supadata(url)
     if not transcript or len(transcript) < 40:
-        return {"error": "Couldn't get a usable transcript from that link — the video may be private, have no speech, or still be processing (try again in a moment)."}
+        if is_youtube:
+            return {"error": "Couldn't read that YouTube video — it may be private or have no transcript. Try another, or paste the description with 'Paste a workout'."}
+        return {"error": "Instagram/TikTok can be slow or blocked — this one didn't work (no clear speech, or it timed out). Try again in a moment, or paste the caption with 'Paste a workout'."}
 
     params = await parse_workout_from_transcript(transcript)
     if not params or not params.get("exercises"):
-        return {"error": "I couldn't find a workout in that video. It works best when the exercises are spoken or written out."}
+        return {"error": "I got the transcript but couldn't find a structured workout in it. Works best when the exercises are actually named/spoken."}
 
     return await _tool_generate_workout(db, user_id, params, user_tz=user_tz)
 
