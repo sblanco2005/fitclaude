@@ -57,6 +57,8 @@ export default function SessionPage() {
   const [swapError, setSwapError] = useState<string | null>(null);
   const [swapToast, setSwapToast] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // When a swap target already exists elsewhere in the workout, ask first.
+  const [dupPrompt, setDupPrompt] = useState<{ name: string; idx: number; opt: PickOption } | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - s.startedAt) / 1000)), 1000);
@@ -91,7 +93,7 @@ export default function SessionPage() {
         exercises={s.isCardio ? s.segments.length : s.exercises.length}
         saving={s.saving}
         onSave={async (fatigue, note) => { await s.save(fatigue, note); router.push('/v2/train'); }}
-        onDiscard={() => router.push('/v2/train')}
+        onDiscard={() => { s.discardDraft(); router.push('/v2/train'); }}
       />
     );
   }
@@ -154,16 +156,29 @@ export default function SessionPage() {
     setActiveSet(i);
   };
 
-  // Apply a pick from the library or a machine photo to the current exercise.
-  const pickSwap = async (opt: PickOption) => {
+  // Do the swap and stay on THIS exercise position (never jump elsewhere).
+  const doSwap = async (opt: PickOption) => {
     const name = await s.photoSwapExercise(safeIdx, { exerciseId: opt.id, name: opt.name, muscleGroup: opt.muscleGroup });
-    setPickerMode(null);
+    setExIdx(safeIdx); // hold position
     if (name) {
       setActiveSet(null); setDemo(null); setGifFailed(false);
       setSwapToast(name);
     } else {
       setSwapError('Swap failed. Try again.');
     }
+  };
+
+  // Apply a pick from the library or a machine photo to the current exercise.
+  // If the chosen exercise is already elsewhere in this workout, ask first so
+  // the user can jump to it instead of creating a duplicate.
+  const pickSwap = async (opt: PickOption) => {
+    setPickerMode(null);
+    const dupIdx = s.exercises.findIndex((e, i) => i !== safeIdx && e.name.toLowerCase() === opt.name.toLowerCase());
+    if (dupIdx >= 0) {
+      setDupPrompt({ name: opt.name, idx: dupIdx, opt });
+      return;
+    }
+    await doSwap(opt);
   };
 
   // Add a new exercise to the workout, then jump to it.
@@ -391,6 +406,26 @@ export default function SessionPage() {
       )}
       {pickerMode === 'add' && (
         <ExercisePicker label="Add exercise" onPick={pickAdd} onClose={() => setPickerMode(null)} />
+      )}
+
+      {/* Duplicate guard — the swap target is already in this workout */}
+      {dupPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={() => setDupPrompt(null)}>
+          <div className="absolute inset-0" style={{ background: 'rgba(4,5,8,.6)', backdropFilter: 'blur(2px)' }} />
+          <div className="relative w-full max-w-[360px] rounded-[18px] border border-[var(--rd-border)] p-5" style={{ background: '#0F1117' }} onClick={(e) => e.stopPropagation()}>
+            <p className="text-[15px] font-bold text-[var(--rd-ink)]">Already in this workout</p>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--rd-text-muted)]">
+              <span className="font-semibold text-[var(--rd-text-secondary)]">{dupPrompt.name}</span> is already exercise {dupPrompt.idx + 1}. Skip to it instead of adding a duplicate?
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <button onClick={() => { const i = dupPrompt.idx; setDupPrompt(null); goTo(i); }} className="grad-ember flex h-11 w-full items-center justify-center rounded-[12px] text-[14px] font-semibold text-[#0A0C10]">Go to exercise {dupPrompt.idx + 1}</button>
+              <div className="flex gap-2">
+                <button onClick={() => setDupPrompt(null)} className="flex-1 rounded-[12px] border border-[var(--rd-border)] py-2.5 text-[13px] font-semibold text-[var(--rd-text-secondary)]">Cancel</button>
+                <button onClick={() => { const o = dupPrompt.opt; setDupPrompt(null); doSwap(o); }} className="flex-1 rounded-[12px] border border-[var(--rd-border)] py-2.5 text-[13px] font-semibold text-[var(--rd-text-muted)]">Swap anyway</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       {swapError && (
         <div className="fixed inset-x-0 bottom-24 z-40 mx-auto flex max-w-[430px] items-center gap-2 px-5">

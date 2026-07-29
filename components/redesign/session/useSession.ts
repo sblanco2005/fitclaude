@@ -258,6 +258,40 @@ function buildSegments(w: Workout, lastByName: Map<string, CardioRound[]>): Sess
     });
 }
 
+// ── In-progress draft (localStorage) ─────────────────────────────────────────
+// The session only persists to the server on Finish, so we mirror live progress
+// (logged sets / cardio rounds + the start time) to localStorage keyed by the
+// session id. Reopening the app mid-workout restores it instead of losing it.
+const DRAFT_PREFIX = 'fc:session:';
+const DRAFT_MAX_AGE = 24 * 60 * 60 * 1000; // 24h — drop abandoned drafts
+
+type SessionDraft = {
+  v: 1;
+  startedAt: number;
+  savedAt: number;
+  exProgress: Record<string, SetEntry[]>;
+  segProgress: Record<string, { metrics: MetricKey[]; rounds: SegmentLog[] }>;
+};
+
+function readDraft(id: string): SessionDraft | null {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(DRAFT_PREFIX + id) : null;
+    if (!raw) return null;
+    const d = JSON.parse(raw) as SessionDraft;
+    if (!d || d.v !== 1) return null;
+    if (Date.now() - (d.savedAt || 0) > DRAFT_MAX_AGE) { localStorage.removeItem(DRAFT_PREFIX + id); return null; }
+    return d;
+  } catch {
+    return null;
+  }
+}
+function writeDraft(id: string, d: SessionDraft) {
+  try { localStorage.setItem(DRAFT_PREFIX + id, JSON.stringify(d)); } catch { /* quota/private mode */ }
+}
+function clearDraft(id: string) {
+  try { localStorage.removeItem(DRAFT_PREFIX + id); } catch { /* noop */ }
+}
+
 export function useSession(id: string) {
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [exercises, setExercises] = useState<SessionExercise[]>([]);
@@ -265,7 +299,7 @@ export function useSession(id: string) {
   const [defaultUnit, setDefaultUnit] = useState<'kg' | 'lb'>('lb');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [startedAt] = useState<number>(() => Date.now());
+  const [startedAt, setStartedAt] = useState<number>(() => Date.now());
 
   useEffect(() => {
     let cancelled = false;
@@ -282,11 +316,29 @@ export function useSession(id: string) {
       setDefaultUnit(pRes?.weightUnit === 'kg' ? 'kg' : 'lb');
       setWorkout(w);
       if (w) {
+        // Restore any in-progress draft (logged sets/rounds), merged by
+        // woExerciseId onto the fresh server structure.
+        const draft = readDraft(id);
+        if (draft?.startedAt) setStartedAt(draft.startedAt);
         if (isCardioWorkout(w)) {
-          setSegments(buildSegments(w, buildCardioLast(all, id)));
+          let segs = buildSegments(w, buildCardioLast(all, id));
+          if (draft) {
+            segs = segs.map((s) => {
+              const p = draft.segProgress[s.woExerciseId];
+              return p ? { ...s, metrics: p.metrics ?? s.metrics, rounds: p.rounds ?? s.rounds } : s;
+            });
+          }
+          setSegments(segs);
         } else {
           const { lastByName, prByName } = buildHistory(all, id);
-          setExercises(buildExercises(w, lastByName, prByName));
+          let exs = buildExercises(w, lastByName, prByName);
+          if (draft) {
+            exs = exs.map((e) => {
+              const savedSets = draft.exProgress[e.woExerciseId];
+              return savedSets ? { ...e, sets: savedSets } : e;
+            });
+          }
+          setExercises(exs);
         }
       }
       setLoading(false);
@@ -295,6 +347,20 @@ export function useSession(id: string) {
       cancelled = true;
     };
   }, [id]);
+
+  // Mirror live progress to localStorage so closing the app mid-workout doesn't
+  // lose logged sets/rounds. Runs on every change once loaded.
+  useEffect(() => {
+    if (loading) return;
+    if (!exercises.length && !segments.length) return;
+    writeDraft(id, {
+      v: 1,
+      startedAt,
+      savedAt: Date.now(),
+      exProgress: Object.fromEntries(exercises.map((e) => [e.woExerciseId, e.sets])),
+      segProgress: Object.fromEntries(segments.map((s) => [s.woExerciseId, { metrics: s.metrics, rounds: s.rounds }])),
+    });
+  }, [exercises, segments, startedAt, loading, id]);
 
   const updateSet = useCallback((exIdx: number, setIdx: number, patch: Partial<SetEntry>) => {
     setExercises((prev) =>
@@ -519,6 +585,7 @@ export function useSession(id: string) {
             body: JSON.stringify({ fatigueRating, notes: note || undefined }),
           }).catch(() => {});
         }
+        if (r.ok) clearDraft(id); // finished → drop the in-progress draft
         return r.ok;
       } catch {
         return false;
@@ -547,6 +614,7 @@ export function useSession(id: string) {
     swapExercise,
     photoSwapExercise,
     addExercise,
+    discardDraft: () => clearDraft(id),
     moveExercise,
     stats,
     startedAt,
