@@ -6,6 +6,7 @@ otherwise.
 """
 
 import json
+import logging
 import re
 
 from anthropic import AsyncAnthropic
@@ -14,13 +15,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.services.exercise_service import get_all_exercises
 
+logger = logging.getLogger(__name__)
+
 _META_ENABLED = bool(settings.use_meta and settings.model_api_key)
 if _META_ENABLED:
     # Bearer auth (auth_token), not x-api-key.
     client = AsyncAnthropic(auth_token=settings.model_api_key, base_url=settings.meta_base_url)
     _IDENTIFY_MODEL = settings.meta_model
-    # Reasoning model — thinking tokens count against max_tokens, so give it room.
-    _IDENTIFY_MAX_TOKENS = 1500
+    # Reasoning model — thinking tokens count against max_tokens. A hard photo
+    # (dark, odd angle, no name plate) makes it reason more; too small a budget
+    # starves the JSON output → empty → "couldn't identify". Give it room.
+    _IDENTIFY_MAX_TOKENS = 4000
 else:
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
     _IDENTIFY_MODEL = settings.haiku_model
@@ -96,16 +101,34 @@ async def identify_exercise(
 
     # 2. Parse JSON from response (handle potential markdown code blocks)
     identification = _parse_json(text)
+    usage = getattr(response, "usage", None)
     if not identification or identification.get("confidence") == "none":
+        # Log enough to diagnose a "couldn't identify" — was the text empty
+        # (reasoning ate the budget) or did the model return confidence 'none'?
+        logger.warning(
+            "[identify] no result — text_len=%d parsed=%s conf=%s usage=%s text_head=%r",
+            len(text or ""),
+            bool(identification),
+            (identification or {}).get("confidence"),
+            usage,
+            (text or "")[:160],
+        )
         return {
             "matches": [],
             "raw_identification": identification.get("equipment_name", "unknown") if identification else "unknown",
-            "error": "Could not identify gym equipment in this image.",
+            "error": "Could not identify gym equipment in this image. Try a clearer, brighter photo — ideally of the machine's name plate.",
         }
 
     # 3. Fuzzy-match against DB (biased toward the muscle being trained)
     all_exercises = await get_all_exercises(db)
     matches = _fuzzy_match(all_exercises, identification, target_muscle)
+    logger.info(
+        "[identify] equipment=%r conf=%s primary=%r matches=%d",
+        identification.get("equipment_name"),
+        identification.get("confidence"),
+        identification.get("primary_exercise"),
+        len(matches),
+    )
 
     return {
         "matches": matches,
