@@ -24,11 +24,11 @@ const navItems = [
     ),
   },
   {
-    href: '/nutrition',
-    label: 'Nutrition',
+    href: '/fuel',
+    label: 'Fuel',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3c2.8 3.3 4.2 6 4.2 8.2A4.2 4.2 0 117.8 11.2C7.8 9 9.2 6.3 12 3zM9.5 16.5c.8.7 1.6 1 2.5 1s1.7-.3 2.5-1" />
       </svg>
     ),
   },
@@ -58,7 +58,6 @@ function hasActiveHitIt(): boolean {
   try {
     const queue = JSON.parse(localStorage.getItem('fitclaude:hitItQueue') || '[]');
     if (!Array.isArray(queue) || queue.length === 0) return false;
-    // Check if any session is actually running (not just queued)
     for (const name of queue) {
       const raw = localStorage.getItem(`fitclaude:session:${name}`);
       if (raw) {
@@ -79,7 +78,6 @@ export function BottomNav() {
 
   const handleNavClick = useCallback(
     (e: React.MouseEvent, href: string) => {
-      // Only intercept if we're on /workouts AND navigating away AND there's an active session
       if (pathname.startsWith('/workouts') && !href.startsWith('/workouts') && hasActiveHitIt()) {
         e.preventDefault();
         setPendingHref(href);
@@ -91,14 +89,9 @@ export function BottomNav() {
   const confirmLeave = useCallback(() => {
     if (pendingHref) {
       const dest = pendingHref;
-      // Clear the active tab so the workouts page won't auto-switch to Hit It
-      // if it briefly re-mounts during client-side navigation.
       localStorage.removeItem('fitclaude:activeTab');
-      // Tell pages (like home) to skip the "active workout → redirect back" logic.
       sessionStorage.setItem('fitclaude:hitItLeave', '1');
       setPendingHref(null);
-      // Use router.push for client-side navigation — avoids full page reload
-      // which can cause race conditions with localStorage-based redirects.
       router.push(dest);
     }
   }, [pendingHref, router]);
@@ -135,7 +128,6 @@ export function BottomNav() {
         </div>
       </nav>
 
-      {/* Active workout leave confirmation */}
       {pendingHref && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-4 pb-20">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={cancelLeave} />
